@@ -2,7 +2,7 @@
  * Copyright (c) 2009, Google Inc.
  * All rights reserved.
  *
- * Copyright (c) 2009-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2009-2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -86,6 +86,10 @@
 #define MAX_APP_STR_LEN 64
 #define MAX_NUM_FS 10
 #define DEFAULT_STACK_CHK_GUARD 0xc0c0c0c0
+
+#if HIBERNATION_SUPPORT
+VOID BootIntoHibernationImage (BootInfo *Info, BOOLEAN *SetRotAndBootState);
+#endif
 
 STATIC BOOLEAN BootReasonAlarm = FALSE;
 STATIC BOOLEAN BootIntoFastboot = FALSE;
@@ -182,6 +186,10 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
   /* Flashless Boot */
   BOOLEAN FlashlessBoot = FALSE;
   EFI_MEM_CARDINFO_PROTOCOL *CardInfo = NULL;
+  #if HIBERNATION_SUPPORT
+  /* set ROT and BootSatte only once per boot*/
+  BOOLEAN SetRotAndBootState = FALSE;
+  #endif
 
   DEBUG ((EFI_D_INFO, "Loader Build Info: %a %a\n", __DATE__, __TIME__));
   DEBUG ((EFI_D_VERBOSE, "LinuxLoader Load Address to debug ABL: 0x%llx\n",
@@ -324,6 +332,9 @@ flashless_boot:
     Info.BootIntoRecovery = BootIntoRecovery;
     Info.BootReasonAlarm = BootReasonAlarm;
     Info.FlashlessBoot = FlashlessBoot;
+  #if HIBERNATION_SUPPORT
+    BootIntoHibernationImage (&Info, &SetRotAndBootState);
+  #endif
     Status = LoadImageAndAuth (&Info);
     if (Status != EFI_SUCCESS) {
       DEBUG ((EFI_D_ERROR, "LoadImageAndAuth failed: %r\n", Status));
