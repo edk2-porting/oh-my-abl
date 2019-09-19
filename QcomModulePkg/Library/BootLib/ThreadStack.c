@@ -76,6 +76,8 @@ STATIC BOOLEAN IsMultiStack = TRUE;
 // can manage stack by link table.
 STATIC BOOLEAN IsThreadUSSLLSupported = FALSE;
 STATIC THREAD_STACK_NODE * ThreadStackNodeList;
+STATIC Thread* TimerThread = NULL;
+STATIC EFI_EVENT TimerStackEvent;
 
 STATIC THREAD_STACK_NODE * ThreadStackNodeInit (Thread *thread)
 {
@@ -312,6 +314,70 @@ __safestack_pointer_address (VOID)
   return (VOID**) &(ThreadStackNodeTmp->ThreadStackEntry->StackTop);
 }
 
+STATIC VOID EFIAPI __attribute__ ( (no_sanitize ("safe-stack")))
+TimerStackHandler (IN EFI_EVENT Event, IN VOID *Context)
+{
+  TimerThread = KernIntf->Thread->GetCurrentThread ();
+  DEBUG ((EFI_D_VERBOSE, "TimerStackHandler TimerThread =  %r\n", TimerThread));
+
+  //Timer use one thread in abl, so only need to allocate unsafestack once.
+  AllocateUnSafeStackPtr (TimerThread);
+
+  return;
+}
+
+/* Close the timer and event */
+VOID CloseStackTimer (VOID)
+{
+  /* Close the timer and event */
+  if (TimerStackEvent) {
+    gBS->SetTimer (TimerStackEvent, TimerCancel, 0);
+    gBS->CloseEvent (TimerStackEvent);
+    TimerStackEvent = NULL;
+  }
+  DEBUG ((EFI_D_VERBOSE, "Close the timer and event\n"));
+}
+
+/* Start timer stack allocate timer, it only runs one time to get timer thread
+ * ID in TimerStackHandler.
+ */
+STATIC VOID
+StartStackTimer (VOID)
+{
+  EFI_STATUS Status;
+
+  Status = gBS->SetTimer (TimerStackEvent, TimerRelative, 500000);
+
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "ERROR: Failed to start stack Timer: %r\n", Status));
+    CloseStackTimer ();
+  }
+}
+
+/**
+  Create a event and timer to allocate timer stack as all timer share the same
+  thread ID.
+  @retval EFI_SUCCESS     The entry point is executed successfully.
+  @retval other           Some error occurs when executing this entry point.
+ **/
+EFI_STATUS EFIAPI
+TimerStackInit (VOID)
+{
+  EFI_STATUS Status = EFI_SUCCESS;
+
+  Status = gBS->CreateEvent (EVT_TIMER | EVT_NOTIFY_SIGNAL, TPL_CALLBACK,
+          TimerStackHandler, NULL, &TimerStackEvent);
+
+  if (!EFI_ERROR (Status) &&
+      TimerStackEvent) {
+    StartStackTimer ();
+
+    DEBUG ((EFI_D_VERBOSE, "Create TimerStackEvent: %r\n", Status));
+
+  }
+  return Status;
+}
+
 /**
   If IsThreadUSSLLSupported is true, UEFI core will call back here to free
   stack, if false, UEFI client link table use ThreadStackNodeRemove () to free
@@ -382,4 +448,14 @@ EFI_STATUS InitThreadUnsafeStack (VOID)
     }
   }
   return Status;
+}
+
+
+VOID DeInitThreadUnsafeStack (VOID)
+{
+  if (!IsThreadUSSLLSupported) {
+    //Release timer stack
+    CloseStackTimer ();
+    ThreadStackNodeRemove (TimerThread);
+  }
 }
