@@ -134,9 +134,6 @@
   !if $(EARLY_ETH_ENABLED)
       GCC:*_*_*_CC_FLAGS = -DEARLY_ETH_ENABLED
   !endif
-  !if $(EARLY_ETH_ENABLED_LA)
-      GCC:*_*_*_CC_FLAGS = -DEARLY_ETH_ENABLED_LA
-  !endif
   !if $(AB_RETRYCOUNT_DISABLE)
       GCC:*_*_*_CC_FLAGS = -DAB_RETRYCOUNT_DISABLE
   !endif

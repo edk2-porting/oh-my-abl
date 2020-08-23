@@ -45,6 +45,4 @@ GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf);
 
 BOOLEAN
 EarlyEthEnabled ();
-BOOLEAN
-EarlyEthEnabled_LA ();
 #endif

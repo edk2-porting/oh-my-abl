@@ -48,6 +48,7 @@ GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf)
   UINT32 DataSize = 0;
   UINT32 Pidx;
   UINT32 Qidx;
+  CHAR8 BootDeviceType[BOOT_DEV_NAME_SIZE_MAX];
 
   memset (ipv4buf, '\0', MAX_IP_ADDR_BUF);
   AsciiStrnCpyS (ipv4buf, MAX_IP_ADDR_BUF, " eipv4=", 7);
@@ -56,7 +57,9 @@ GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf)
   memset (macbuf, '\0', MAX_IP_ADDR_BUF);
   AsciiStrnCpyS (macbuf, MAX_IP_ADDR_BUF, " ermac=", 7);
 
-  if (EarlyEthEnabled_LA ()) {
+  GetRootDeviceType (BootDeviceType, BOOT_DEV_NAME_SIZE_MAX);
+
+  if (!AsciiStrnCmp (BootDeviceType, "EMMC", AsciiStrLen ("EMMC"))) {
     DataSize = BOOT_IMG_MAX_PAGE_SIZE;
   } else {
     GetPageSize (&DataSize);
@@ -164,20 +167,6 @@ BOOLEAN
 EarlyEthEnabled (VOID)
 {
 #if EARLY_ETH_ENABLED
-  return 1;
-#else
-  return 0;
-#endif
-}
-
-/*
- * Return 1 if build has early ethernet feature enabled otherwise 0.
- * Applicable only for Android builds.
- */
-BOOLEAN
-EarlyEthEnabled_LA (VOID)
-{
-#if EARLY_ETH_ENABLED_LA
   return 1;
 #else
   return 0;
