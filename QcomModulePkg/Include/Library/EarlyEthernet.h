@@ -32,6 +32,7 @@
 #define MAX_IP_ADDR_BUF      64
 #define EARLY_ADDR_TERMINATOR   '#'
 #define IP_ADDR_STR_OFFSET   0
+#define MAC_ADDR_LEN   17
 
 /**
  *  Reads partition and try to extract IP addresses
