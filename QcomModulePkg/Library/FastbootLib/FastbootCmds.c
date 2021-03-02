@@ -1715,7 +1715,8 @@ CmdFlash (IN CONST CHAR8 *arg, IN VOID *data, IN UINT32 sz)
     }
   }
 
-  if (IsVirtualAbOtaSupported ()) {
+  if (IsDynamicPartitionSupport ()) {
+    /* Virtual A/B is enabled by default.*/
     if (CheckVirtualAbCriticalPartition (PartitionName)) {
       AsciiSPrint (FlashResultStr, MAX_RSP_SIZE,
                     "Flashing of %s is not allowed in %a state",
@@ -1988,7 +1989,8 @@ CmdErase (IN CONST CHAR8 *arg, IN VOID *data, IN UINT32 sz)
     }
   }
 
-  if (IsVirtualAbOtaSupported ()) {
+  if (IsDynamicPartitionSupport ()) {
+    /* Virtual A/B feature is enabled by default. */
     if (CheckVirtualAbCriticalPartition (PartitionName)) {
       AsciiSPrint (EraseResultStr, MAX_RSP_SIZE,
                     "Erase of %s is not allowed in %a state",
@@ -2089,7 +2091,8 @@ CmdSetActive (CONST CHAR8 *Arg, VOID *Data, UINT32 Size)
     return;
   }
 
-  if (IsVirtualAbOtaSupported ()) {
+  if (IsDynamicPartitionSupport ()) {
+    /* Virtual A/B feature is enabled by default.*/
     if (GetSnapshotMergeStatus () == MERGING) {
       FastbootFail ("Slot Change is not allowed in merging state");
       return;
@@ -2597,7 +2600,6 @@ CmdRebootFastboot (IN CONST CHAR8 *Arg, IN VOID *Data, IN UINT32 Size)
   FastbootFail ("Failed to reboot");
 }
 
-#ifdef VIRTUAL_AB_OTA
 STATIC VOID
 CmdUpdateSnapshot (IN CONST CHAR8 *Arg, IN VOID *Data, IN UINT32 Size)
 {
@@ -2638,7 +2640,6 @@ CmdUpdateSnapshot (IN CONST CHAR8 *Arg, IN VOID *Data, IN UINT32 Size)
   FastbootFail ("Invalid snapshot-update command");
   return;
 }
-#endif
 
 STATIC VOID
 CmdContinue (IN CONST CHAR8 *Arg, IN VOID *Data, IN UINT32 Size)
@@ -3687,9 +3688,6 @@ FastbootCommandSetup (IN VOID *Base, IN UINT64 Size)
       {"oem device-info", CmdOemDevinfo},
       {"continue", CmdContinue},
       {"reboot", CmdReboot},
-#ifdef VIRTUAL_AB_OTA
-      {"snapshot-update", CmdUpdateSnapshot},
-#endif
       {"reboot-bootloader", CmdRebootBootloader},
       {"getvar:", CmdGetVar},
       {"download:", CmdDownload},
@@ -3709,27 +3707,6 @@ FastbootCommandSetup (IN VOID *Base, IN UINT64 Size)
 
   if (IsDynamicPartitionSupport ()) {
     FastbootPublishVar ("is-userspace", "no");
-  }
-
-  if (IsVirtualAbOtaSupported ()) {
-    SnapshotMergeStatus = GetSnapshotMergeStatus ();
-
-    switch (SnapshotMergeStatus) {
-      case SNAPSHOTTED:
-        SnapshotMergeStatus = SNAPSHOTTED;
-        break;
-      case MERGING:
-        SnapshotMergeStatus = MERGING;
-        break;
-      default:
-        SnapshotMergeStatus = NONE_MERGE_STATUS;
-        break;
-    }
-
-    AsciiSPrint (SnapshotMergeState,
-                  AsciiStrLen (VabSnapshotMergeStatus[SnapshotMergeStatus]) + 1,
-                  "%a", VabSnapshotMergeStatus[SnapshotMergeStatus]);
-    FastbootPublishVar ("snapshot-update-status", SnapshotMergeState);
   }
 
   AsciiSPrint (FullProduct, sizeof (FullProduct), "%a", PRODUCT_NAME);
@@ -3802,6 +3779,26 @@ FastbootCommandSetup (IN VOID *Base, IN UINT64 Size)
   if (IsDynamicPartitionSupport ()) {
     FastbootRegister ("reboot-recovery", CmdRebootRecovery);
     FastbootRegister ("reboot-fastboot", CmdRebootFastboot);
+    FastbootRegister ("snapshot-update", CmdUpdateSnapshot);
+
+    SnapshotMergeStatus = GetSnapshotMergeStatus ();
+
+    switch (SnapshotMergeStatus) {
+      case SNAPSHOTTED:
+        SnapshotMergeStatus = SNAPSHOTTED;
+        break;
+      case MERGING:
+        SnapshotMergeStatus = MERGING;
+        break;
+      default:
+        SnapshotMergeStatus = NONE_MERGE_STATUS;
+        break;
+    }
+
+    AsciiSPrint (SnapshotMergeState,
+                  AsciiStrLen (VabSnapshotMergeStatus[SnapshotMergeStatus]) + 1,
+                  "%a", VabSnapshotMergeStatus[SnapshotMergeStatus]);
+    FastbootPublishVar ("snapshot-update-status", SnapshotMergeState);
   }
 
   // Read Allow Ulock Flag

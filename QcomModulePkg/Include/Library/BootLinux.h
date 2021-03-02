@@ -236,7 +236,6 @@ VOID ResetBootDevImage (VOID);
 BOOLEAN IsBootDevImage (VOID);
 BOOLEAN IsABRetryCountDisabled (VOID);
 BOOLEAN IsDynamicPartitionSupport (VOID);
-BOOLEAN IsVirtualAbOtaSupported (VOID);
 UINT64 SetandGetLoadAddr (BootParamlist *BootParamlistPtr, AddrType Type);
 BOOLEAN IsNANDSquashFsSupport (VOID);
 BOOLEAN IsEnableDisplayMenuFlagSupported (VOID);
