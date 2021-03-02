@@ -2560,7 +2560,6 @@ CmdReboot (IN CONST CHAR8 *arg, IN VOID *data, IN UINT32 sz)
   FastbootFail ("Failed to reboot");
 }
 
-#if DYNAMIC_PARTITION_SUPPORT
 STATIC VOID
 CmdRebootRecovery (IN CONST CHAR8 *Arg, IN VOID *Data, IN UINT32 Size)
 {
@@ -2639,7 +2638,6 @@ CmdUpdateSnapshot (IN CONST CHAR8 *Arg, IN VOID *Data, IN UINT32 Size)
   FastbootFail ("Invalid snapshot-update command");
   return;
 }
-#endif
 #endif
 
 STATIC VOID
@@ -3689,12 +3687,8 @@ FastbootCommandSetup (IN VOID *Base, IN UINT64 Size)
       {"oem device-info", CmdOemDevinfo},
       {"continue", CmdContinue},
       {"reboot", CmdReboot},
-#ifdef DYNAMIC_PARTITION_SUPPORT
-      {"reboot-recovery", CmdRebootRecovery},
-      {"reboot-fastboot", CmdRebootFastboot},
 #ifdef VIRTUAL_AB_OTA
       {"snapshot-update", CmdUpdateSnapshot},
-#endif
 #endif
       {"reboot-bootloader", CmdRebootBootloader},
       {"getvar:", CmdGetVar},
@@ -3804,6 +3798,11 @@ FastbootCommandSetup (IN VOID *Base, IN UINT64 Size)
   UINT32 FastbootCmdCnt = sizeof (cmd_list) / sizeof (cmd_list[0]);
   for (i = 1; i < FastbootCmdCnt; i++)
     FastbootRegister (cmd_list[i].name, cmd_list[i].cb);
+
+  if (IsDynamicPartitionSupport ()) {
+    FastbootRegister ("reboot-recovery", CmdRebootRecovery);
+    FastbootRegister ("reboot-fastboot", CmdRebootFastboot);
+  }
 
   // Read Allow Ulock Flag
   Status = ReadAllowUnlockValue (&IsAllowUnlock);

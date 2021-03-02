@@ -1799,17 +1799,22 @@ BOOLEAN IsABRetryCountDisabled (VOID)
 }
 #endif
 
-#if DYNAMIC_PARTITION_SUPPORT
 BOOLEAN IsDynamicPartitionSupport (VOID)
 {
-  return TRUE;
+  UINT32 PtnCount;
+  INT32 PtnIdx;
+
+  GetPartitionCount (&PtnCount);
+
+  PtnIdx = GetPartitionIndex ((CHAR16 *)L"super");
+
+  if (PtnIdx < PtnCount &&
+      PtnIdx != INVALID_PTN) {
+    return TRUE;
+  } else {
+    return FALSE;
+  }
 }
-#else
-BOOLEAN IsDynamicPartitionSupport (VOID)
-{
-  return FALSE;
-}
-#endif
 
 #if VIRTUAL_AB_OTA
 BOOLEAN IsVirtualAbOtaSupported (VOID)
