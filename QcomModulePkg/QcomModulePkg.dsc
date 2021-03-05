@@ -167,6 +167,9 @@
   !if $(ENABLE_LE_VARIANT) == 1
       GCC:*_*_*_CC_FLAGS = -DENABLE_LE_VARIANT
   !endif
+  !if $(ENABLE_LV_ATOMIC_AB) == 1
+      GCC:*_*_*_CC_FLAGS = -DENABLE_LV_ATOMIC_AB
+  !endif
   !if $(DISABLE_PARALLEL_DOWNLOAD_FLASH) == 1
       GCC:*_*_*_CC_FLAGS = -DDISABLE_PARALLEL_DOWNLOAD_FLASH
   !endif
