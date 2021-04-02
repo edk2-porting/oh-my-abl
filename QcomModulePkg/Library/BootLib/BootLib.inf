@@ -71,6 +71,7 @@
 	ThreadStack.c
 	DisplayCtrl.c
         Bootconfig.c
+	EarlyEthernet.c
 
 [Packages]
 	ArmPkg/ArmPkg.dec

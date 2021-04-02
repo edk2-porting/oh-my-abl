@@ -80,6 +80,7 @@
 #include "UpdateCmdLine.h"
 #include "Recovery.h"
 #include "LECmdLine.h"
+#include "EarlyEthernet.h"
 
 #define SIZE_OF_DELIM 2
 #define PARAM_DELIM "\n"
@@ -109,6 +110,10 @@ STATIC CHAR8 *AndroidSlotSuffix = " androidboot.slot_suffix=";
 STATIC CHAR8 *RootCmdLine = " rootwait ro init=";
 STATIC CHAR8 *InitCmdline = INIT_BIN;
 STATIC CHAR8 *SkipRamFs = " skip_initramfs";
+
+STATIC CHAR8 IPv4AddrBufCmdLine[MAX_IP_ADDR_BUF];
+STATIC CHAR8 IPv6AddrBufCmdLine[MAX_IP_ADDR_BUF];
+STATIC CHAR8 MacEthAddrBufCmdLine[MAX_IP_ADDR_BUF];
 
 /* Display command line related structures */
 #define MAX_DISPLAY_CMD_LINE 256
@@ -694,6 +699,15 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
     AsciiStrCatS (Dst, MaxCmdLineLen, Src);
   }
 
+  if (EarlyEthEnabled ()) {
+    Src = Param->EarlyIPv4CmdLine;
+    AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+    Src = Param->EarlyIPv6CmdLine;
+    AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+    Src = Param->EarlyEthMacCmdLine;
+    AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+  }
+
   return EFI_SUCCESS;
 }
 CHAR8* RemoveSpace (CHAR8* param, UINT32 ParamLen)
@@ -836,6 +850,7 @@ UpdateBootConfigParams (LIST_ENTRY *BootConfigListHead,
   Dst[AsciiStrLen (Dst) + 1] = '\0';
   *FinalBootConfig = Dst;
   *FinalBootConfigLen = AsciiStrLen (Dst) + 1;
+
   return EFI_SUCCESS;
 }
 VOID
@@ -1234,6 +1249,15 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
     Param.MemOffAmt = NULL;
   }
 
+  if (EarlyEthEnabled ()) {
+    GetEarlyEthInfoFromPartition (IPv4AddrBufCmdLine,
+                                 IPv6AddrBufCmdLine,
+                                 MacEthAddrBufCmdLine);
+    CmdLineLen += AsciiStrLen (IPv4AddrBufCmdLine);
+    CmdLineLen += AsciiStrLen (IPv6AddrBufCmdLine);
+    CmdLineLen += AsciiStrLen (MacEthAddrBufCmdLine);
+  }
+
   /* 1 extra byte for NULL */
   CmdLineLen += 1;
 
@@ -1267,6 +1291,12 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   Param.DtbIdxStr = DtbIdxStr;
   Param.LEVerityCmdLine = LEVerityCmdLine;
   Param.HeaderVersion = HeaderVersion;
+
+  if (EarlyEthEnabled ()) {
+    Param.EarlyIPv4CmdLine = IPv4AddrBufCmdLine;
+    Param.EarlyIPv6CmdLine = IPv6AddrBufCmdLine;
+    Param.EarlyEthMacCmdLine = MacEthAddrBufCmdLine;
+  }
 
   Status = UpdateCmdLineParams (&Param, FinalCmdLine, BootParamlistPtr);
   if (Status != EFI_SUCCESS) {
