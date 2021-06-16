@@ -53,6 +53,7 @@
 #define MB_SIZE 0x100000
 
 typedef struct BootInfo BootInfo;
+typedef struct BootLinuxParamlist BootParamlist;
 
 typedef struct UpdateCmdLineParamList {
   BOOLEAN Recovery;
@@ -98,16 +99,12 @@ typedef struct BootConfigParamNode {
 } BootConfigParamNode;
 
 EFI_STATUS
-UpdateCmdLine (CONST CHAR8 *CmdLine,
+UpdateCmdLine (BootParamlist *BootParamlistPtr,
                CHAR8 *FfbmStr,
                BOOLEAN Recovery,
                BOOLEAN AlarmBoot,
                CONST CHAR8 *VBCmdLine,
-               CHAR8 **FinalCmdLine,
-               CHAR8 **FinalBootConfig,
-               UINT32 *FinalBootConfigLen,
-               UINT32 HeaderVersion,
-               VOID *fdt);
+               UINT32 HeaderVersion);
 BOOLEAN
 TargetBatterySocOk (UINT32 *BatteryVoltage);
 

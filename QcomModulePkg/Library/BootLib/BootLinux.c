@@ -1172,12 +1172,9 @@ BootLinux (BootInfo *Info)
    * Called before ShutdownUefiBootServices as it uses some boot service
    * functions
    */
-  Status = UpdateCmdLine (BootParamlistPtr.CmdLine, FfbmStr, Recovery,
-                   AlarmBoot, Info->VBCmdLine, &BootParamlistPtr.FinalCmdLine,
-                   &BootParamlistPtr.FinalBootConfig,
-                   &BootParamlistPtr.FinalBootConfigLen,
-                   Info->HeaderVersion,
-                   (VOID *)BootParamlistPtr.DeviceTreeLoadAddr);
+  Status = UpdateCmdLine (&BootParamlistPtr, FfbmStr, Recovery, AlarmBoot,
+                    Info->VBCmdLine, Info->HeaderVersion);
+
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "Error updating cmdline. Device Error %r\n", Status));
     return Status;
@@ -1736,17 +1733,10 @@ BOOLEAN IsLEVariant (VOID)
 }
 #endif
 
-#ifdef BUILD_SYSTEM_ROOT_IMAGE
-BOOLEAN IsBuildAsSystemRootImage (VOID)
+BOOLEAN IsBuildAsSystemRootImage (BootParamlist *BootParamlistPtr)
 {
-  return TRUE;
+   return BootParamlistPtr->RamdiskSize == 0;
 }
-#else
-BOOLEAN IsBuildAsSystemRootImage (VOID)
-{
-  return FALSE;
-}
-#endif
 
 #ifdef BUILD_USES_RECOVERY_AS_BOOT
 BOOLEAN IsBuildUseRecoveryAsBoot (VOID)

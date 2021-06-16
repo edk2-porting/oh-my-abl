@@ -456,8 +456,8 @@ Unsupported:
 
 STATIC
 EFI_STATUS
-UpdateCmdLineParams (UpdateCmdLineParamList *Param,
-                     CHAR8 **FinalCmdLine)
+UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
+                     BootParamlist *BootParamlistPtr)
 {
   CONST CHAR8 *Src;
   CHAR8 *Dst;
@@ -594,7 +594,7 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param,
     }
   }
 
-  if ((IsBuildAsSystemRootImage () &&
+  if ((IsBuildAsSystemRootImage (BootParamlistPtr) &&
       !Param->MultiSlotBoot) ||
       (Param->MultiSlotBoot &&
       !IsBootDevImage ())) {
@@ -844,16 +844,12 @@ ClearBootConfigList (LIST_ENTRY* BootConfigListHead)
 /*Update command line: appends boot information to the original commandline
  *that is taken from boot image header*/
 EFI_STATUS
-UpdateCmdLine (CONST CHAR8 *CmdLine,
+UpdateCmdLine (BootParamlist *BootParamlistPtr,
                CHAR8 *FfbmStr,
                BOOLEAN Recovery,
                BOOLEAN AlarmBoot,
                CONST CHAR8 *VBCmdLine,
-               CHAR8 **FinalCmdLine,
-               CHAR8 **FinalBootConfig,
-               UINT32 *FinalBootConfigLen,
-               UINT32 HeaderVersion,
-               VOID *fdt)
+               UINT32 HeaderVersion)
 {
   EFI_STATUS Status;
   UINT32 CmdLineLen = 0;
@@ -878,6 +874,12 @@ UpdateCmdLine (CONST CHAR8 *CmdLine,
   CHAR8 RootDevStr[BOOT_DEV_NAME_SIZE_MAX];
   CHAR8 MemOffAmt[MEM_OFF_SIZE];
   BOOLEAN BootConfigFlag = FALSE;
+
+  CONST CHAR8 *CmdLine = BootParamlistPtr->CmdLine;
+  CHAR8 **FinalCmdLine = &BootParamlistPtr->FinalCmdLine;
+  CHAR8 **FinalBootConfig = &BootParamlistPtr->FinalBootConfig;
+  UINT32 *FinalBootConfigLen = &BootParamlistPtr->FinalBootConfigLen;
+  VOID *fdt = (VOID *)BootParamlistPtr->DeviceTreeLoadAddr;
 
   BootConfigListHead = (LIST_ENTRY*) AllocateZeroPool (sizeof (LIST_ENTRY));
   InitializeListHead (BootConfigListHead);
@@ -1052,7 +1054,7 @@ UpdateCmdLine (CONST CHAR8 *CmdLine,
                                          BootConfigLen);
   }
 
-  if ((IsBuildAsSystemRootImage () &&
+  if ((IsBuildAsSystemRootImage (BootParamlistPtr) &&
       !MultiSlotBoot) ||
       (MultiSlotBoot &&
       !IsBootDevImage ())) {
@@ -1220,7 +1222,7 @@ UpdateCmdLine (CONST CHAR8 *CmdLine,
   Param.LEVerityCmdLine = LEVerityCmdLine;
   Param.HeaderVersion = HeaderVersion;
 
-  Status = UpdateCmdLineParams (&Param, FinalCmdLine);
+  Status = UpdateCmdLineParams (&Param, FinalCmdLine, BootParamlistPtr);
   if (Status != EFI_SUCCESS) {
     return Status;
   }
