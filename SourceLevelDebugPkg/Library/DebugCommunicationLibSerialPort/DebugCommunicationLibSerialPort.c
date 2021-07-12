@@ -1,14 +1,8 @@
 /** @file
   Debug Port Library implementation based on serial port.
 
-  Copyright (c) 2010 - 2015, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php.
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2010 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -21,14 +15,14 @@
 /**
   Initialize the debug port.
 
-  This function will initialize debug port to get it ready for data transmition. If
+  This function will initialize debug port to get it ready for data transmission. If
   certain Debug Communication Library instance has to save some private data in the
   stack, this function must work on the mode that doesn't return to the caller, then
   the caller needs to wrap up all rest of logic after DebugPortInitialize() into one
   function and pass it into DebugPortInitialize(). DebugPortInitialize() is
-  responsible to invoke the passing-in funciton at the end of DebugPortInitialize().
+  responsible to invoke the passing-in function at the end of DebugPortInitialize().
 
-  If the paramter Function is not NULL, Debug Communication Libary instance will
+  If the parameter Function is not NULL, Debug Communication Library instance will
   invoke it by passing in the Context to be the first parameter. Debug Communication
   Library instance could create one debug port handle to be the second parameter
   passing into the Function. Debug Communication Library instance also could pass
@@ -65,7 +59,7 @@ DebugPortInitialize (
 
   Status = SerialPortInitialize ();
   if (RETURN_ERROR(Status)) {
-    DEBUG ((EFI_D_ERROR, "Debug Serial Port: Initialization failed!\n")); 
+    DEBUG ((EFI_D_ERROR, "Debug Serial Port: Initialization failed!\n"));
   }
 
   if (Function != NULL) {

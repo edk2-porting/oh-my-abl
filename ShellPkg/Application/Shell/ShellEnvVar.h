@@ -6,14 +6,8 @@
 //#include <Library/UefiRuntimeServicesTableLib.h>
 
 
-  Copyright (c) 2009 - 2010, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2009 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -27,31 +21,36 @@ typedef struct {
   UINT32      Atts;
 } ENV_VAR_LIST;
 
-/**
-  Reports whether an environment variable is Volatile or Non-Volatile
+//
+// The list is used to cache the environment variables.
+//
+extern ENV_VAR_LIST    gShellEnvVarList;
 
-  This will use the Runtime Services call GetVariable to to search for the variable.
+
+/**
+  Reports whether an environment variable is Volatile or Non-Volatile.
 
   @param EnvVarName             The name of the environment variable in question
+  @param Volatile               Return TRUE if the environment variable is volatile
 
-  @retval TRUE                  This environment variable is Volatile
-  @retval FALSE                 This environment variable is NON-Volatile
+  @retval EFI_SUCCESS           The volatile attribute is returned successfully
+  @retval others                Some errors happened.
 **/
-BOOLEAN
-EFIAPI
+EFI_STATUS
 IsVolatileEnv (
-  IN CONST CHAR16 *EnvVarName
+  IN CONST CHAR16 *EnvVarName,
+  OUT BOOLEAN     *Volatile
   );
 
 /**
-  Delete a Non-Violatile environment variable.
+  Delete a Non-Volatile environment variable.
 
-  This will use the Runtime Services call SetVariable to remove a non-violatile variable.
+  This will use the Runtime Services call SetVariable to remove a non-volatile variable.
 
   @param EnvVarName             The name of the environment variable in question
 
-  @retval EFI_SUCCESS           The variable was deleted sucessfully
-  @retval other                 An error ocurred
+  @retval EFI_SUCCESS           The variable was deleted successfully
+  @retval other                 An error occurred
   @sa SetVariable
 **/
 #define SHELL_DELETE_ENVIRONMENT_VARIABLE(EnvVarName) \
@@ -62,16 +61,16 @@ IsVolatileEnv (
   NULL))
 
 /**
-  Set a Non-Violatile environment variable.
+  Set a Non-Volatile environment variable.
 
-  This will use the Runtime Services call SetVariable to set a non-violatile variable.
+  This will use the Runtime Services call SetVariable to set a non-volatile variable.
 
   @param EnvVarName             The name of the environment variable in question
   @param BufferSize             UINTN size of Buffer
   @param Buffer                 Pointer to value to set variable to
 
-  @retval EFI_SUCCESS           The variable was changed sucessfully
-  @retval other                 An error ocurred
+  @retval EFI_SUCCESS           The variable was changed successfully
+  @retval other                 An error occurred
   @sa SetVariable
 **/
 #define SHELL_SET_ENVIRONMENT_VARIABLE_NV(EnvVarName,BufferSize,Buffer)  \
@@ -90,8 +89,8 @@ IsVolatileEnv (
   @param BufferSize             Pointer to the UINTN size of Buffer
   @param Buffer                 Pointer buffer to get variable value into
 
-  @retval EFI_SUCCESS           The variable's value was retrieved sucessfully
-  @retval other                 An error ocurred
+  @retval EFI_SUCCESS           The variable's value was retrieved successfully
+  @retval other                 An error occurred
   @sa SetVariable
 **/
 #define SHELL_GET_ENVIRONMENT_VARIABLE(EnvVarName,BufferSize,Buffer)    \
@@ -111,8 +110,8 @@ IsVolatileEnv (
   @param BufferSize             Pointer to the UINTN size of Buffer
   @param Buffer                 Pointer buffer to get variable value into
 
-  @retval EFI_SUCCESS           The variable's value was retrieved sucessfully
-  @retval other                 An error ocurred
+  @retval EFI_SUCCESS           The variable's value was retrieved successfully
+  @retval other                 An error occurred
   @sa SetVariable
 **/
 #define SHELL_GET_ENVIRONMENT_VARIABLE_AND_ATTRIBUTES(EnvVarName,Atts,BufferSize,Buffer)    \
@@ -123,16 +122,16 @@ IsVolatileEnv (
   Buffer))
 
 /**
-  Set a Violatile environment variable.
+  Set a Volatile environment variable.
 
-  This will use the Runtime Services call SetVariable to set a violatile variable.
+  This will use the Runtime Services call SetVariable to set a volatile variable.
 
   @param EnvVarName             The name of the environment variable in question
   @param BufferSize             UINTN size of Buffer
   @param Buffer                 Pointer to value to set variable to
 
-  @retval EFI_SUCCESS           The variable was changed sucessfully
-  @retval other                 An error ocurred
+  @retval EFI_SUCCESS           The variable was changed successfully
+  @retval other                 An error occurred
   @sa SetVariable
 **/
 #define SHELL_SET_ENVIRONMENT_VARIABLE_V(EnvVarName,BufferSize,Buffer) \
@@ -148,10 +147,9 @@ IsVolatileEnv (
   @param[in, out] List           The pointer to pointer to LIST_ENTRY object for
                                  storing this list.
 
-  @retval EFI_SUCCESS           the list was created sucessfully.
+  @retval EFI_SUCCESS           the list was created successfully.
 **/
 EFI_STATUS
-EFIAPI
 GetEnvironmentVariableList(
   IN OUT LIST_ENTRY *List
   );
@@ -166,10 +164,9 @@ GetEnvironmentVariableList(
   @param[in] List               The pointer to LIST_ENTRY from
                                 GetShellEnvVarList().
 
-  @retval EFI_SUCCESS           The list was Set sucessfully.
+  @retval EFI_SUCCESS           The list was Set successfully.
 **/
 EFI_STATUS
-EFIAPI
 SetEnvironmentVariableList(
   IN LIST_ENTRY *List
   );
@@ -190,7 +187,6 @@ SetEnvironmentVariableList(
   @sa SetEnvironmentVariableList
 **/
 EFI_STATUS
-EFIAPI
 SetEnvironmentVariables(
   IN CONST CHAR16 **Environment
   );
@@ -201,9 +197,85 @@ SetEnvironmentVariables(
   @param[in] List               The pointer to pointer to list.
 **/
 VOID
-EFIAPI
 FreeEnvironmentVariableList(
   IN LIST_ENTRY *List
+  );
+
+/**
+  Find an environment variable in the gShellEnvVarList.
+
+  @param Key        The name of the environment variable.
+  @param Value      The value of the environment variable, the buffer
+                    shoule be freed by the caller.
+  @param ValueSize  The size in bytes of the environment variable
+                    including the tailing CHAR_NULL.
+  @param Atts       The attributes of the variable.
+
+  @retval EFI_SUCCESS       The command executed successfully.
+  @retval EFI_NOT_FOUND     The environment variable is not found in
+                            gShellEnvVarList.
+
+**/
+EFI_STATUS
+ShellFindEnvVarInList (
+  IN  CONST CHAR16    *Key,
+  OUT CHAR16          **Value,
+  OUT UINTN           *ValueSize,
+  OUT UINT32          *Atts OPTIONAL
+  );
+
+/**
+  Add an environment variable into gShellEnvVarList.
+
+  @param Key        The name of the environment variable.
+  @param Value      The value of environment variable.
+  @param ValueSize  The size in bytes of the environment variable
+                    including the tailing CHAR_NULL
+  @param Atts       The attributes of the variable.
+
+  @retval EFI_SUCCESS  The environment variable was added to list successfully.
+  @retval others       Some errors happened.
+
+**/
+EFI_STATUS
+ShellAddEnvVarToList (
+  IN CONST CHAR16     *Key,
+  IN CONST CHAR16     *Value,
+  IN UINTN            ValueSize,
+  IN UINT32           Atts
+  );
+
+/**
+  Remove a specified environment variable in gShellEnvVarList.
+
+  @param Key        The name of the environment variable.
+
+  @retval EFI_SUCCESS       The command executed successfully.
+  @retval EFI_NOT_FOUND     The environment variable is not found in
+                            gShellEnvVarList.
+**/
+EFI_STATUS
+ShellRemvoeEnvVarFromList (
+  IN CONST CHAR16           *Key
+  );
+
+/**
+  Initialize the gShellEnvVarList and cache all Shell-Guid-based environment
+  variables.
+
+**/
+EFI_STATUS
+ShellInitEnvVarList (
+  VOID
+  );
+
+/**
+  Destructe the gShellEnvVarList.
+
+**/
+VOID
+ShellFreeEnvVarList (
+  VOID
   );
 
 #endif //_SHELL_ENVIRONMENT_VARIABLE_HEADER_

@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,12 +33,14 @@
 
 #include "UpdateDeviceTree.h"
 #include "AutoGen.h"
+#include "DisplayCtrl.h"
 #include <Library/UpdateDeviceTree.h>
 #include <Library/LocateDeviceTree.h>
 #include <Library/BootLinux.h>
 #include <Protocol/EFIChipInfoTypes.h>
 #include <Protocol/EFIDDRGetConfig.h>
 #include <Protocol/EFIRng.h>
+#include <Protocol/EFIDisplayPwr.h>
 #include <Library/PartialGoods.h>
 #include <Library/FdtRw.h>
 
@@ -68,24 +70,6 @@ PrintSplashMemInfo (CONST CHAR8 *data, INT32 datalen)
 
   DEBUG ((EFI_D_VERBOSE, "reg = <0x%08x 0x%08x 0x%08x 0x%08x>\n", val[0],
           val[1], val[2], val[3]));
-}
-
-STATIC EFI_STATUS
-ValidateDdrRankChannel (struct ddr_details_entry_info *DdrInfo)
-{
-  if (DdrInfo->num_channels > MAX_CHANNELS) {
-    DEBUG ((EFI_D_ERROR, "ERROR: Number of channels is over the limit\n"));
-    return EFI_INVALID_PARAMETER;
-  }
-
-  for (UINT8 Chan = 0; Chan < DdrInfo->num_channels; Chan++) {
-    if (DdrInfo->num_ranks[Chan] > MAX_RANKS) {
-      DEBUG ((EFI_D_ERROR, "ERROR: Number of ranks is over the limit\n"));
-      return EFI_INVALID_PARAMETER;
-    }
-  }
-
-  return EFI_SUCCESS;
 }
 
 STATIC EFI_STATUS
@@ -144,6 +128,31 @@ GetRandomSeed (UINT64 *RandomSeed)
   return Status;
 }
 
+STATIC VOID
+DisableDisplay (VOID)
+{
+  EFI_STATUS                     Status           = EFI_SUCCESS;
+  EFI_DISPLAY_POWER_PROTOCOL    *pDispPwrProtocol = NULL;
+
+  Status = gBS->LocateProtocol (&gEfiDisplayPowerStateProtocolGuid,
+                                NULL,
+                                (VOID **)&pDispPwrProtocol);
+
+  if ((EFI_SUCCESS != Status) ||
+      (NULL        == pDispPwrProtocol)) {
+    DEBUG ((EFI_D_ERROR,
+           "ERROR: Unable to get display power protocol,Status=%d\n", Status));
+  }
+  else {
+    Status = pDispPwrProtocol->SetDisplayPowerState (pDispPwrProtocol,
+                                                     EfiDisplayPowerStateOff);
+    if (EFI_SUCCESS != Status) {
+      DEBUG ((EFI_D_ERROR,
+             "ERROR: Fail to turn display off,Status=%d\n", Status));
+    }
+  }
+}
+
 STATIC EFI_STATUS
 UpdateSplashMemInfo (VOID *fdt)
 {
@@ -169,9 +178,19 @@ UpdateSplashMemInfo (VOID *fdt)
   /* Get offset of the splash memory reservation node */
   ret = FdtPathOffset (fdt, "/reserved-memory/splash_region");
   if (ret < 0) {
-    DEBUG ((EFI_D_ERROR, "ERROR: Could not get splash memory region node\n"));
+    DEBUG ((EFI_D_WARN, "Splash region not found in device tree, " \
+                        "powering down the display and controller\n"));
+
+    /*
+     * This function call leads to the following:
+     * 1) Turn off display power
+     * 2) Disable display clocks
+     * 3) Reset display TE/RST pin
+     */
+    DisableDisplay ();
     return EFI_NOT_FOUND;
   }
+
   offset = ret;
   DEBUG ((EFI_D_VERBOSE, "FB mem node name: %a\n",
           fdt_get_name (fdt, offset, NULL)));
@@ -639,6 +658,222 @@ dev_tree_add_mem_infoV64 (VOID *fdt, UINT32 offset, UINT64 addr, UINT64 size)
   return ret;
 }
 
+STATIC EFI_STATUS
+GetDDrRegionsInfo (struct ddr_regions_data_info *DdrRegionsInfo,
+            UINT64 *Revision)
+{
+  EFI_STATUS  Status = EFI_SUCCESS;
+  EFI_DDRGETINFO_PROTOCOL *pDDrGetInfoProtocol = NULL;
+
+  Status = gBS->LocateProtocol (&gEfiDDRGetInfoProtocolGuid,
+                                NULL,
+                                (VOID **)&pDDrGetInfoProtocol);
+
+  if ((EFI_SUCCESS != Status) ||
+      (NULL == pDDrGetInfoProtocol)) {
+    DEBUG ((EFI_D_ERROR,
+           "ERROR: Unable to get DDR Info protocol:%r\n", Status));
+    return Status;
+  }
+
+  Status = pDDrGetInfoProtocol->GetDDRMappedRegions (pDDrGetInfoProtocol,
+                                                     DdrRegionsInfo);
+  if ((EFI_SUCCESS != Status) ||
+      (NULL == DdrRegionsInfo)) {
+    DEBUG ((EFI_D_ERROR,
+           "ERROR: Get DDR Regions info failed=%r\n", Status));
+    return EFI_OUT_OF_RESOURCES;
+  }
+
+  *Revision = pDDrGetInfoProtocol->Revision;
+  DEBUG ((EFI_D_VERBOSE, "DDR Header Revision =0x%x\n", *Revision));
+  return Status;
+}
+
+STATIC INT32 AddDDrRegionNode (VOID *Fdt)
+{
+  INT32 Offset;
+
+  Offset = FdtPathOffset (Fdt, "/ddr-regions");
+  if (Offset < 0) {
+    Offset = FdtPathOffset (Fdt, "/");
+    if (Offset < 0) {
+      DEBUG ((EFI_D_ERROR, "Error finding root offset\n"));
+      return Offset;
+    }
+
+    Offset = FdtAddSubnode (Fdt, Offset, "ddr-regions");
+    if (Offset < 0) {
+      DEBUG ((EFI_D_ERROR, "Error adding ddr regions: %d\n", Offset));
+    }
+  } else {
+    DEBUG ((EFI_D_VERBOSE,
+         "Attempted to create a ddr-regions node which already exists\n"));
+  }
+  return Offset;
+}
+
+STATIC INT32 AddDDrRegionNodeProp (struct ddr_regions_data_info *DdrRegionsInfo,
+                                    VOID *Fdt, UINT32 Offset)
+{
+  INT32 Ret;
+  UINT32 Idx;
+  UINT32 MaxDDrRegions;
+  CHAR8 RegionName[DDR_REGION_NAME_LEN] = {""};
+  CHAR8 RegionNameSuffix[DDR_REGION_NAME_SUFFIX] = {""};
+
+  if (DdrRegionsInfo == NULL ||
+      Fdt == NULL) {
+    DEBUG ((EFI_D_ERROR, "Invalid input parameters\n"));
+    return -1;
+  }
+
+  MaxDDrRegions = DdrRegionsInfo->no_of_ddr_regions;
+  if (MaxDDrRegions > MAX_DDR_REGIONS) {
+    DEBUG ((EFI_D_ERROR,
+          "Incorrect DDr regions number: %d, please check the DDR info\n",
+           MaxDDrRegions));
+    return -1;
+  }
+
+  for (Idx = 0; Idx < MaxDDrRegions; Idx++) {
+    AsciiStrnCpyS (RegionName, DDR_REGION_NAME_LEN, "region",
+                   AsciiStrLen ("region"));
+    AsciiSPrint (RegionNameSuffix, sizeof (RegionNameSuffix), "%d", Idx);
+    AsciiStrnCatS (RegionName, DDR_REGION_NAME_LEN, RegionNameSuffix,
+                   DDR_REGION_NAME_SUFFIX);
+
+     /* Add StartAddr Property */
+    FdtPropUpdateFunc (Fdt, Offset, RegionName,
+                       DdrRegionsInfo->ddr_region[Idx].start_address >>
+                       DDR_REGIONS_MASK, fdt_setprop_u32, Ret);
+    if (Ret) {
+      DEBUG ((EFI_D_ERROR,
+             "Failed to add start address(H) for %a\n", RegionName));
+      return Ret;
+    }
+    FdtPropUpdateFunc (Fdt, Offset, RegionName,
+                       DdrRegionsInfo->ddr_region[Idx].start_address &
+                       DDR_REGIONS_LOW_MASK, fdt_appendprop_u32, Ret);
+    if (Ret) {
+      DEBUG ((EFI_D_ERROR,
+             "Failed to add start address(L) for %a\n", RegionName));
+      return Ret;
+    }
+
+    /* Add RegionsSize Property */
+    FdtPropUpdateFunc (Fdt, Offset, RegionName,
+                       DdrRegionsInfo->ddr_region[Idx].size >>
+                       DDR_REGIONS_MASK, fdt_appendprop_u32, Ret);
+    if (Ret) {
+      DEBUG ((EFI_D_ERROR,
+             "Failed to add region size(H) for %a\n", RegionName));
+      return Ret;
+    }
+    FdtPropUpdateFunc (Fdt, Offset, RegionName,
+                       DdrRegionsInfo->ddr_region[Idx].size &
+                       DDR_REGIONS_LOW_MASK, fdt_appendprop_u32, Ret);
+    if (Ret) {
+      DEBUG ((EFI_D_ERROR,
+             "Failed to add region size(L) for %a\n", RegionName));
+      return Ret;
+    }
+
+    /* Add SegmentsStartOffset Property */
+    FdtPropUpdateFunc (Fdt, Offset, RegionName,
+                       DdrRegionsInfo->ddr_region[Idx].segments_start_offset >>
+                       DDR_REGIONS_MASK, fdt_appendprop_u32, Ret);
+    if (Ret) {
+      DEBUG ((EFI_D_ERROR,
+             "Failed to add segments start offset(H) for %a\n", RegionName));
+      return Ret;
+    }
+    FdtPropUpdateFunc (Fdt, Offset, RegionName,
+                       DdrRegionsInfo->ddr_region[Idx].segments_start_offset &
+                       DDR_REGIONS_LOW_MASK, fdt_appendprop_u32, Ret);
+    if (Ret) {
+      DEBUG ((EFI_D_ERROR,
+             "Failed to add segments start offset(L) for %a\n", RegionName));
+      return Ret;
+    }
+
+    /* Add SegmentsStartIndex Property */
+    FdtPropUpdateFunc (Fdt, Offset, RegionName, 0, fdt_appendprop_u32, Ret);
+    if (Ret) {
+      DEBUG ((EFI_D_ERROR,
+            "Failed to add segments start index(H) for %a\n", RegionName));
+      return Ret;
+    }
+    FdtPropUpdateFunc (Fdt, Offset, RegionName,
+                       DdrRegionsInfo->ddr_region[Idx].segments_start_index &
+                       DDR_REGIONS_LOW_MASK, fdt_appendprop_u32, Ret);
+    if (Ret) {
+      DEBUG ((EFI_D_ERROR,
+             "Failed to add segments start index(L) for %a\n", RegionName));
+      return Ret;
+    }
+
+    /* Add GranuleSize Property */
+    FdtPropUpdateFunc (Fdt, Offset, RegionName, 0, fdt_appendprop_u32, Ret);
+    if (Ret) {
+      DEBUG ((EFI_D_ERROR,
+             "Failed to add granule size(H) for %a\n", RegionName));
+      return Ret;
+    }
+    FdtPropUpdateFunc (Fdt, Offset, RegionName,
+                       DdrRegionsInfo->ddr_region[Idx].granule_size &
+                       DDR_REGIONS_LOW_MASK, fdt_appendprop_u32, Ret);
+    if (Ret) {
+      DEBUG ((EFI_D_ERROR,
+             "Failed to add granule size(L) for %a\n", RegionName));
+      return Ret;
+    }
+  }
+  return 0;
+
+}
+
+STATIC EFI_STATUS
+AddDDrRegion (VOID *Fdt)
+{
+  EFI_STATUS Status = EFI_NOT_FOUND;
+  INT32 Ret = 0;
+  INT32 Offset;
+  struct ddr_regions_data_info *DdrRegionsDataInfo;
+  UINT64 Revision = 0;
+
+  DdrRegionsDataInfo = AllocateZeroPool (sizeof (struct ddr_regions_data_info));
+  if (DdrRegionsDataInfo == NULL) {
+    DEBUG ((EFI_D_ERROR, "DDR regions Buffer: Out of resources\n"));
+    return EFI_OUT_OF_RESOURCES;
+  }
+
+  Status = GetDDrRegionsInfo (DdrRegionsDataInfo, &Revision);
+  if (Status != EFI_SUCCESS) {
+    return Status;
+  }
+
+  if (Revision < DDR_DETAILS_STRUCT_VERSION) {
+    DEBUG ((EFI_D_INFO,
+          "DDr regions not supported in Revision=0x%x\n", Revision));
+    return EFI_UNSUPPORTED;
+  }
+
+  Offset = AddDDrRegionNode (Fdt);
+  if (Offset < 0) {
+    DEBUG ((EFI_D_ERROR, "Failed to add ddr region node\n"));
+    return EFI_OUT_OF_RESOURCES;
+  }
+
+  Ret = AddDDrRegionNodeProp (DdrRegionsDataInfo, Fdt, Offset);
+  if (Ret) {
+    DEBUG ((EFI_D_ERROR, "Failed to add ddr regions property\n"));
+    return Ret;
+  }
+
+  return EFI_SUCCESS;
+}
+
 /* Top level function that updates the device tree. */
 EFI_STATUS
 UpdateDeviceTree (VOID *fdt,
@@ -659,8 +894,11 @@ UpdateDeviceTree (VOID *fdt,
   struct ddr_details_entry_info *DdrInfo;
   UINT64 Revision;
   EFI_STATUS Status;
+  EFI_RAMPARTITION_PROTOCOL *EfiRamPartProt;
+  UINT32 Hbb;
   UINT64 UpdateDTStartTime = GetTimerCountms ();
   UINT32 Index;
+
 
   /* Check the device tree header */
   ret = fdt_check_header (fdt) || fdt_check_header_ext (fdt);
@@ -722,8 +960,19 @@ UpdateDeviceTree (VOID *fdt,
               "ddr_device_rank, HBB not supported in Revision=0x%x\n",
               Revision));
     } else {
-      Status = ValidateDdrRankChannel (DdrInfo);
-      if (Status != EFI_SUCCESS) {
+      Status = gBS->LocateProtocol (&gEfiRamPartitionProtocolGuid, NULL,
+                      (VOID **)&EfiRamPartProt);
+
+      if (EFI_ERROR (Status)) {
+        DEBUG ((EFI_D_ERROR,
+                "Failed to get RamPartition Protocol: %d\n", Status));
+        goto OutofUpdateRankChannel;
+      }
+
+      Status = EfiRamPartProt->GetHighestBankBit (EfiRamPartProt, &Hbb);
+
+      if (EFI_ERROR (Status)) {
+        DEBUG ((EFI_D_ERROR, "Failed to get Highest Bank Bit: %d\n", Status));
         goto OutofUpdateRankChannel;
       }
 
@@ -731,12 +980,11 @@ UpdateDeviceTree (VOID *fdt,
               DdrInfo->num_channels));
       for (UINT8 Chan = 0; Chan < DdrInfo->num_channels; Chan++) {
         DEBUG ((EFI_D_VERBOSE, "ddr_device_rank_ch%d:%d\n",
-                Chan, DdrInfo->num_ranks[Chan]));
+                Chan, DDR_MAX_RANKS));
         AsciiSPrint (FdtRankProp, sizeof (FdtRankProp),
                      "ddr_device_rank_ch%d", Chan);
         FdtPropUpdateFunc (fdt, offset, (CONST char *)FdtRankProp,
-                           (UINT32)DdrInfo->num_ranks[Chan],
-                           fdt_appendprop_u32, ret);
+                           DDR_MAX_RANKS, fdt_appendprop_u32, ret);
         if (ret) {
           DEBUG ((EFI_D_ERROR,
                   "ERROR: Cannot update memory node ddr_device_rank_ch%d:0x%x\n",
@@ -745,14 +993,13 @@ UpdateDeviceTree (VOID *fdt,
           DEBUG ((EFI_D_VERBOSE, "ddr_device_rank_ch%d added to memory node\n",
                   Chan));
         }
-        for (UINT8 Rank = 0; Rank < DdrInfo->num_ranks[Chan]; Rank++) {
+        for (UINT8 Rank = 0; Rank < DDR_MAX_RANKS; Rank++) {
           DEBUG ((EFI_D_VERBOSE, "ddr_device_hbb_ch%d_rank%d:%d\n",
-                  Chan, Rank, DdrInfo->hbb[Chan][Rank]));
+                  Chan, Rank, Hbb));
           AsciiSPrint (FdtHbbProp, sizeof (FdtHbbProp),
                        "ddr_device_hbb_ch%d_rank%d", Chan, Rank);
           FdtPropUpdateFunc (fdt, offset, (CONST char *)FdtHbbProp,
-                             (UINT32)DdrInfo->hbb[Chan][Rank],
-                             fdt_appendprop_u32, ret);
+                             Hbb, fdt_appendprop_u32, ret);
           if (ret) {
             DEBUG ((EFI_D_ERROR,
                     "ERROR: Cannot update memory node ddr_device_hbb_ch%d_rank%d:0x%x\n",
@@ -771,6 +1018,7 @@ OutofUpdateRankChannel:
 
   UpdateSplashMemInfo (fdt);
   UpdateDemuraInfo (fdt);
+  UpdatePLLCodesInfo (fdt);
 
   /* Get offset of the chosen node */
   ret = FdtPathOffset (fdt, "/chosen");
@@ -791,21 +1039,24 @@ OutofUpdateRankChannel:
     }
   }
 
-  for (Index = 0; Index < NUM_RNG_SEED_WORDS / sizeof (UINT64); Index++) {
-    Status = GetRandomSeed (&RandomSeed);
-    if (Status == EFI_SUCCESS) {
+  if (!IsLEVariant ()) {
+    for (Index = 0; Index < NUM_RNG_SEED_WORDS / sizeof (UINT64); Index++) {
+      Status = GetRandomSeed (&RandomSeed);
+      if (Status == EFI_SUCCESS) {
 
-      /* Adding the RNG seed to the chosen node */
-      FdtPropUpdateFunc (fdt, offset, (CONST CHAR8 *)"rng-seed",
-                        (UINT64)RandomSeed, fdt_appendprop_u64, ret);
-      if (ret) {
-        DEBUG ((EFI_D_ERROR,
-              "ERROR: Cannot update chosen node [rng-seed] - 0x%x\n", ret));
+        /* Adding the RNG seed to the chosen node */
+        FdtPropUpdateFunc (fdt, offset, (CONST CHAR8 *)"rng-seed",
+                          (UINT64)RandomSeed, fdt_appendprop_u64, ret);
+        if (ret) {
+          DEBUG ((EFI_D_ERROR,
+                "ERROR: Cannot update chosen node [rng-seed] - 0x%x\n", ret));
+          break;
+        }
+      } else {
+        DEBUG ((EFI_D_INFO, "ERROR: Cannot generate Random Seed - %r\n",
+                                Status));
         break;
       }
-    } else {
-      DEBUG ((EFI_D_INFO, "ERROR: Cannot generate Random Seed - %r\n", Status));
-      break;
     }
   }
 
@@ -863,6 +1114,24 @@ OutofUpdateRankChannel:
       return ret;
     }
   }
+
+  if (!IsLEVariant ()) {
+    /* Update DDR regions info */
+    if (FixedPcdGetBool (EnableDdrRegion)) {
+      DEBUG ((EFI_D_VERBOSE, "Start DT ddr regions update: %lu ms\n",
+                          GetTimerCountms ()));
+      Status =  AddDDrRegion (fdt);
+      if (Status != EFI_SUCCESS &&
+          Status != EFI_UNSUPPORTED) {
+        DEBUG ((EFI_D_ERROR,
+                "Failed to update DDR regions info, Status=%r\n", Status));
+        return Status;
+      }
+      DEBUG ((EFI_D_VERBOSE, "End DT ddr regions update: %lu ms\n",
+                           GetTimerCountms ()));
+    }
+  }
+
   fdt_pack (fdt);
 
   DEBUG ((EFI_D_INFO, "Update Device Tree total time: %lu ms \n",

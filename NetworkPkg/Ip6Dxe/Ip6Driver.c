@@ -1,16 +1,10 @@
 /** @file
   The driver binding and service binding protocol for IP6 driver.
 
-  Copyright (c) 2009 - 2014, Intel Corporation. All rights reserved.<BR>
+  Copyright (c) 2009 - 2019, Intel Corporation. All rights reserved.<BR>
   (C) Copyright 2015 Hewlett-Packard Development Company, L.P.<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php.
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -41,14 +35,20 @@ IpSec2InstalledCallback (
   IN VOID       *Context
   )
 {
+  EFI_STATUS    Status;
   //
-  // Close the event so it does not get called again.
+  // Test if protocol was even found.
+  // Notification function will be called at least once.
   //
-  gBS->CloseEvent (Event);
+  Status = gBS->LocateProtocol (&gEfiIpSec2ProtocolGuid, NULL, (VOID **)&mIpSec);
+  if (Status == EFI_SUCCESS && mIpSec != NULL) {
+    //
+    // Close the event so it does not get called again.
+    //
+    gBS->CloseEvent (Event);
 
-  mIpSec2Installed = TRUE;
-
-  return;
+    mIpSec2Installed = TRUE;
+  }
 }
 
 /**
@@ -149,6 +149,22 @@ Ip6CleanService (
   EFI_IPv6_ADDRESS          AllNodes;
   IP6_NEIGHBOR_ENTRY        *NeighborCache;
 
+  IpSb->State     = IP6_SERVICE_DESTROY;
+
+  if (IpSb->Timer != NULL) {
+    gBS->SetTimer (IpSb->Timer, TimerCancel, 0);
+    gBS->CloseEvent (IpSb->Timer);
+
+    IpSb->Timer = NULL;
+  }
+
+  if (IpSb->FasterTimer != NULL) {
+    gBS->SetTimer (IpSb->FasterTimer, TimerCancel, 0);
+    gBS->CloseEvent (IpSb->FasterTimer);
+
+    IpSb->FasterTimer = NULL;
+  }
+
   Ip6ConfigCleanInstance (&IpSb->Ip6ConfigInstance);
 
   if (!IpSb->LinkLocalDadFail) {
@@ -160,7 +176,7 @@ Ip6CleanService (
     Status = Ip6LeaveGroup (IpSb, &AllNodes);
     if (EFI_ERROR (Status)) {
       return Status;
-    }  
+    }
   }
 
   if (IpSb->DefaultInterface != NULL) {
@@ -214,19 +230,6 @@ Ip6CleanService (
     gBS->CloseEvent (IpSb->RecvRequest.MnpToken.Event);
   }
 
-  if (IpSb->Timer != NULL) {
-    gBS->SetTimer (IpSb->Timer, TimerCancel, 0);
-    gBS->CloseEvent (IpSb->Timer);
-
-    IpSb->Timer = NULL;
-  }
-
-  if (IpSb->FasterTimer != NULL) {
-    gBS->SetTimer (IpSb->FasterTimer, TimerCancel, 0);
-    gBS->CloseEvent (IpSb->FasterTimer);
-
-    IpSb->FasterTimer = NULL;
-  }
   //
   // Free the Neighbor Discovery resources
   //
@@ -262,7 +265,6 @@ Ip6CreateService (
   EFI_STATUS                            Status;
   EFI_MANAGED_NETWORK_COMPLETION_TOKEN  *MnpToken;
   EFI_MANAGED_NETWORK_CONFIG_DATA       *Config;
-  IP6_CONFIG_DATA_ITEM                  *DataItem;
 
   ASSERT (Service != NULL);
 
@@ -476,30 +478,6 @@ Ip6CreateService (
     goto ON_ERROR;
   }
 
-  //
-  // If there is any manual address, set it.
-  //
-  DataItem = &IpSb->Ip6ConfigInstance.DataItem[Ip6ConfigDataTypeManualAddress];
-  if (DataItem->Data.Ptr != NULL) {
-    DataItem->SetData (
-                &IpSb->Ip6ConfigInstance,
-                DataItem->DataSize,
-                DataItem->Data.Ptr
-                );
-  }
-
-  //
-  // If there is any gateway address, set it.
-  //
-  DataItem = &IpSb->Ip6ConfigInstance.DataItem[Ip6ConfigDataTypeGateway];
-  if (DataItem->Data.Ptr != NULL) {
-    DataItem->SetData (
-                &IpSb->Ip6ConfigInstance,
-                DataItem->DataSize,
-                DataItem->Data.Ptr
-                );
-  }
-
   InsertHeadList (&IpSb->Interfaces, &IpSb->DefaultInterface->Link);
 
   *Service = IpSb;
@@ -520,7 +498,7 @@ ON_ERROR:
   @param[in]  RemainingDevicePath Optional parameter used to pick a specific child
                                   device to start.
 
-  @retval EFI_SUCCES              This driver is added to ControllerHandle.
+  @retval EFI_SUCCESS             This driver is added to ControllerHandle.
   @retval EFI_ALREADY_STARTED     This driver is already running on ControllerHandle.
   @retval other                   This driver does not support this device.
 
@@ -535,6 +513,12 @@ Ip6DriverBindingStart (
 {
   IP6_SERVICE               *IpSb;
   EFI_STATUS                Status;
+  EFI_IP6_CONFIG_PROTOCOL   *Ip6Cfg;
+  IP6_CONFIG_DATA_ITEM      *DataItem;
+
+  IpSb     = NULL;
+  Ip6Cfg   = NULL;
+  DataItem = NULL;
 
   //
   // Test for the Ip6 service binding protocol
@@ -560,60 +544,132 @@ Ip6DriverBindingStart (
 
   ASSERT (IpSb != NULL);
 
+  Ip6Cfg  = &IpSb->Ip6ConfigInstance.Ip6Config;
+
   //
-  // Install the Ip6ServiceBinding Protocol onto ControlerHandle
+  // Install the Ip6ServiceBinding Protocol onto ControllerHandle
   //
   Status = gBS->InstallMultipleProtocolInterfaces (
                   &ControllerHandle,
                   &gEfiIp6ServiceBindingProtocolGuid,
                   &IpSb->ServiceBinding,
                   &gEfiIp6ConfigProtocolGuid,
-                  &IpSb->Ip6ConfigInstance.Ip6Config,
+                  Ip6Cfg,
                   NULL
                   );
-
-  if (!EFI_ERROR (Status)) {
-    //
-    // ready to go: start the receiving and timer
-    //
-    Status = Ip6ReceiveFrame (Ip6AcceptFrame, IpSb);
-    if (EFI_ERROR (Status)) {
-      goto ON_ERROR;
-    }
-
-    //
-    // The timer expires every 100 (IP6_TIMER_INTERVAL_IN_MS) milliseconds.
-    //
-    Status = gBS->SetTimer (
-                    IpSb->FasterTimer,
-                    TimerPeriodic,
-                    TICKS_PER_MS * IP6_TIMER_INTERVAL_IN_MS
-                    );
-    if (EFI_ERROR (Status)) {
-      goto ON_ERROR;
-    }
-
-    //
-    // The timer expires every 1000 (IP6_ONE_SECOND_IN_MS) milliseconds.
-    //
-    Status = gBS->SetTimer (
-                    IpSb->Timer,
-                    TimerPeriodic,
-                    TICKS_PER_MS * IP6_ONE_SECOND_IN_MS
-                    );
-    if (EFI_ERROR (Status)) {
-      goto ON_ERROR;
-    }    
-
-    //
-    // Initialize the IP6 ID
-    //
-    mIp6Id = NET_RANDOM (NetRandomInitSeed ());
-
-    return EFI_SUCCESS;
+  if (EFI_ERROR (Status)) {
+    goto FREE_SERVICE;
   }
 
-ON_ERROR:
+  //
+  // Read the config data from NV variable again.
+  // The default data can be changed by other drivers.
+  //
+  Status = Ip6ConfigReadConfigData (IpSb->MacString, &IpSb->Ip6ConfigInstance);
+  if (EFI_ERROR (Status)) {
+    goto UNINSTALL_PROTOCOL;
+  }
+
+  //
+  // If there is any default manual address, set it.
+  //
+  DataItem = &IpSb->Ip6ConfigInstance.DataItem[Ip6ConfigDataTypeManualAddress];
+  if (DataItem->Data.Ptr != NULL) {
+    Status = Ip6Cfg->SetData (
+                       Ip6Cfg,
+                       Ip6ConfigDataTypeManualAddress,
+                       DataItem->DataSize,
+                       DataItem->Data.Ptr
+                       );
+    if (Status == EFI_INVALID_PARAMETER || Status == EFI_BAD_BUFFER_SIZE) {
+      //
+      // Clean the invalid ManualAddress configuration.
+      //
+      Status = Ip6Cfg->SetData (
+                         Ip6Cfg,
+                         Ip6ConfigDataTypeManualAddress,
+                         0,
+                         NULL
+                         );
+      DEBUG ((EFI_D_WARN, "Ip6DriverBindingStart: Clean the invalid ManualAddress configuration.\n"));
+    }
+  }
+
+  //
+  // If there is any default gateway address, set it.
+  //
+  DataItem = &IpSb->Ip6ConfigInstance.DataItem[Ip6ConfigDataTypeGateway];
+  if (DataItem->Data.Ptr != NULL) {
+    Status = Ip6Cfg->SetData (
+                       Ip6Cfg,
+                       Ip6ConfigDataTypeGateway,
+                       DataItem->DataSize,
+                       DataItem->Data.Ptr
+                       );
+    if (Status == EFI_INVALID_PARAMETER || Status == EFI_BAD_BUFFER_SIZE) {
+      //
+      // Clean the invalid Gateway configuration.
+      //
+      Status = Ip6Cfg->SetData (
+                         Ip6Cfg,
+                         Ip6ConfigDataTypeGateway,
+                         0,
+                         NULL
+                         );
+      DEBUG ((EFI_D_WARN, "Ip6DriverBindingStart: Clean the invalid Gateway configuration.\n"));
+    }
+  }
+
+  //
+  // ready to go: start the receiving and timer
+  //
+  Status = Ip6ReceiveFrame (Ip6AcceptFrame, IpSb);
+  if (EFI_ERROR (Status)) {
+    goto UNINSTALL_PROTOCOL;
+  }
+
+  //
+  // The timer expires every 100 (IP6_TIMER_INTERVAL_IN_MS) milliseconds.
+  //
+  Status = gBS->SetTimer (
+                  IpSb->FasterTimer,
+                  TimerPeriodic,
+                  TICKS_PER_MS * IP6_TIMER_INTERVAL_IN_MS
+                  );
+  if (EFI_ERROR (Status)) {
+    goto UNINSTALL_PROTOCOL;
+  }
+
+  //
+  // The timer expires every 1000 (IP6_ONE_SECOND_IN_MS) milliseconds.
+  //
+  Status = gBS->SetTimer (
+                  IpSb->Timer,
+                  TimerPeriodic,
+                  TICKS_PER_MS * IP6_ONE_SECOND_IN_MS
+                  );
+  if (EFI_ERROR (Status)) {
+    goto UNINSTALL_PROTOCOL;
+  }
+
+  //
+  // Initialize the IP6 ID
+  //
+  mIp6Id = NET_RANDOM (NetRandomInitSeed ());
+
+  return EFI_SUCCESS;
+
+UNINSTALL_PROTOCOL:
+  gBS->UninstallMultipleProtocolInterfaces (
+         ControllerHandle,
+         &gEfiIp6ServiceBindingProtocolGuid,
+         &IpSb->ServiceBinding,
+         &gEfiIp6ConfigProtocolGuid,
+         Ip6Cfg,
+         NULL
+         );
+
+FREE_SERVICE:
   Ip6CleanService (IpSb);
   FreePool (IpSb);
   return Status;
@@ -621,7 +677,7 @@ ON_ERROR:
 
 /**
   Callback function which provided by user to remove one node in NetDestroyLinkList process.
-  
+
   @param[in]    Entry           The entry to be removed.
   @param[in]    Context         Pointer to the callback context corresponds to the Context in NetDestroyLinkList.
 
@@ -734,8 +790,6 @@ Ip6DriverBindingStop (
                );
   } else if (IsListEmpty (&IpSb->Children)) {
     State           = IpSb->State;
-    IpSb->State     = IP6_SERVICE_DESTROY;
-
     Status = Ip6CleanService (IpSb);
     if (EFI_ERROR (Status)) {
       IpSb->State = State;
@@ -754,7 +808,7 @@ Ip6DriverBindingStop (
     FreePool (IpSb);
     Status = EFI_SUCCESS;
   }
-  
+
 Exit:
   return Status;
 }
@@ -769,8 +823,8 @@ Exit:
                                  is not NULL, then the I/O services are added to
                                  the existing child handle.
 
-  @retval EFI_SUCCES             The child handle was created with the I/O services.
-  @retval EFI_OUT_OF_RESOURCES   There are not enough resources availabe to create
+  @retval EFI_SUCCESS            The child handle was created with the I/O services.
+  @retval EFI_OUT_OF_RESOURCES   There are not enough resources available to create
                                  the child.
   @retval other                  The child handle was not created.
 
@@ -834,7 +888,7 @@ Ip6ServiceBindingCreateChild (
                   );
   if (EFI_ERROR (Status)) {
     gBS->UninstallMultipleProtocolInterfaces (
-           ChildHandle,
+           *ChildHandle,
            &gEfiIp6ProtocolGuid,
            &IpInstance->Ip6Proto,
            NULL
@@ -871,7 +925,7 @@ ON_ERROR:
   @param[in]  This               Protocol instance pointer.
   @param[in]  ChildHandle        Handle of the child to destroy.
 
-  @retval EFI_SUCCES             The I/O services were removed from the child
+  @retval EFI_SUCCESS            The I/O services were removed from the child
                                  handle.
   @retval EFI_UNSUPPORTED        The child handle does not support the I/O services
                                   that are being removed.
@@ -951,14 +1005,14 @@ Ip6ServiceBindingDestroyChild (
   // Uninstall the IP6 protocol first. Many thing happens during
   // this:
   // 1. The consumer of the IP6 protocol will be stopped if it
-  // opens the protocol BY_DRIVER. For eaxmple, if MNP driver is
+  // opens the protocol BY_DRIVER. For example, if MNP driver is
   // stopped, IP driver's stop function will be called, and uninstall
   // EFI_IP6_PROTOCOL will trigger the UDP's stop function. This
   // makes it possible to create the network stack bottom up, and
   // stop it top down.
   // 2. the upper layer will recycle the received packet. The recycle
   // event's TPL is higher than this function. The recycle events
-  // will be called back before preceeding. If any packets not recycled,
+  // will be called back before preceding. If any packets not recycled,
   // that means there is a resource leak.
   //
   gBS->RestoreTPL (OldTpl);

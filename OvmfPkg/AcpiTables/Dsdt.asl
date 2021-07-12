@@ -2,13 +2,7 @@
   Contains root level name space objects for the platform
 
   Copyright (c) 2008, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials are
-  licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -581,7 +575,7 @@ DefinitionBlock ("Dsdt.aml", "DSDT", 1, "INTEL ", "OVMF    ", 4) {
             IO (Decode16, 0x278, 0x278, 0x00, 0x08)
             IO (Decode16, 0x370, 0x370, 0x00, 0x02)
             IO (Decode16, 0x378, 0x378, 0x00, 0x08)
-            IO (Decode16, 0x402, 0x402, 0x00, 0x01)        // QEMU debug console, should use FixedPcdGet16 (PcdDebugIoPort)
+            IO (Decode16, FixedPcdGet16 (PcdDebugIoPort), FixedPcdGet16 (PcdDebugIoPort), 0x00, 0x01)
             IO (Decode16, 0x440, 0x440, 0x00, 0x10)
             IO (Decode16, 0x678, 0x678, 0x00, 0x08)
             IO (Decode16, 0x778, 0x778, 0x00, 0x08)

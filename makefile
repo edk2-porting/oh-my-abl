@@ -31,7 +31,7 @@ BUILD_ROOT := $(ANDROID_PRODUCT_OUT)/$(TARGET)_$(TARGET_TOOLS)
 EDK_TOOLS := $(BUILDDIR)/BaseTools
 EDK_TOOLS_BIN := $(EDK_TOOLS)/Source/C/bin
 ABL_FV_IMG := $(BUILD_ROOT)/FV/abl.fv
-ABL_FV_ELF := $(BOOTLOADER_OUT)/../../abl.elf
+ABL_FV_ELF := $(BOOTLOADER_OUT)/../../unsigned_abl.elf
 SHELL:=/bin/bash
 
 # This function is to check version compatibility, used to control features based on the compiler version. \
@@ -67,7 +67,7 @@ else
 endif
 
 ifeq ($(TARGET_ARCHITECTURE), arm)
-	LOAD_ADDRESS := 0X8FB00000
+	LOAD_ADDRESS := 0X8F700000
 else
 	LOAD_ADDRESS := 0X9FA00000
 endif
@@ -158,4 +158,4 @@ BASETOOLS_CLEAN: ABL_FV_IMG
 	@$(MAKEPATH)make -C $(BUILDDIR)/BaseTools/Source/C clean > /dev/null
 
 ABL_FV_ELF: BASETOOLS_CLEAN
-	python $(WORKSPACE)/QcomModulePkg/Tools/image_header.py $(ABL_FV_IMG) $(ABL_FV_ELF) $(LOAD_ADDRESS) elf 32
+	python3 $(WORKSPACE)/QcomModulePkg/Tools/image_header.py $(ABL_FV_IMG) $(ABL_FV_ELF) $(LOAD_ADDRESS) elf 32 nohash

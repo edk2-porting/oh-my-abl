@@ -1,16 +1,10 @@
 /** @file
-  
+
   Module to rewrite stdlib references within Oniguruma
 
-  Copyright (c) 2014-2015, Hewlett-Packard Development Company, L.P.<BR>
+  (C) Copyright 2014-2015 Hewlett Packard Enterprise Development LP<BR>
 
-  This program and the accompanying materials are licensed and made available
-  under the terms and conditions of the BSD License that accompanies this
-  distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php.
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS, WITHOUT
-  WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 #ifndef ONIGURUMA_UEFI_PORT_H
 #define ONIGURUMA_UEFI_PORT_H
@@ -30,7 +24,17 @@ typedef UINTN size_t;
 
 #define malloc(n) AllocatePool(n)
 #define calloc(n,s) AllocateZeroPool((n)*(s))
-#define free(p) FreePool(p)
+
+#define free(p)             \
+  do {                      \
+    VOID *EvalOnce;         \
+                            \
+    EvalOnce = (p);         \
+    if (EvalOnce != NULL) { \
+      FreePool (EvalOnce);  \
+    }                       \
+  } while (FALSE)
+
 #define realloc(OldPtr,NewSize,OldSize) ReallocatePool(OldSize,NewSize,OldPtr)
 #define xmemmove(Dest,Src,Length) CopyMem(Dest,Src,Length)
 #define xmemcpy(Dest,Src,Length) CopyMem(Dest,Src,Length)
@@ -59,7 +63,7 @@ typedef UINTN size_t;
 
 int OnigStrCmp (char* Str1, char* Str2);
 
-int sprintf (char *str, char const *fmt, ...);
+int EFIAPI sprintf_s (char *str, size_t sizeOfBuffer, char const *fmt, ...);
 
 #define exit(n) ASSERT(FALSE);
 

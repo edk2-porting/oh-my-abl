@@ -2,15 +2,9 @@
   Misc support routines for TCP driver.
 
   (C) Copyright 2014 Hewlett-Packard Development Company, L.P.<BR>
-  Copyright (c) 2009 - 2015, Intel Corporation. All rights reserved.<BR>
+  Copyright (c) 2009 - 2017, Intel Corporation. All rights reserved.<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php.
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -86,6 +80,7 @@ TcpInitTcbLocal (
   // First window size is never scaled
   //
   Tcb->RcvWndScale  = 0;
+  Tcb->RetxmitSeqMax = 0;
 
   Tcb->ProbeTimerOn = FALSE;
 }
@@ -94,7 +89,7 @@ TcpInitTcbLocal (
   Initialize the peer related members.
 
   @param[in, out]  Tcb    Pointer to the TCP_CB of this TCP instance.
-  @param[in]       Seg    Pointer to the segment that contains the peer's intial info.
+  @param[in]       Seg    Pointer to the segment that contains the peer's initial info.
   @param[in]       Opt    Pointer to the options announced by the peer.
 
 **/
@@ -566,7 +561,31 @@ TcpGetRcvMss (
   } else {
     Ip6 = TcpProto->TcpService->IpIo->Ip.Ip6;
     ASSERT (Ip6 != NULL);
-    Ip6->GetModeData (Ip6, &Ip6Mode, NULL, NULL);
+    if (!EFI_ERROR (Ip6->GetModeData (Ip6, &Ip6Mode, NULL, NULL))) {
+      if (Ip6Mode.AddressList != NULL) {
+        FreePool (Ip6Mode.AddressList);
+      }
+
+      if (Ip6Mode.GroupTable != NULL) {
+        FreePool (Ip6Mode.GroupTable);
+      }
+
+      if (Ip6Mode.RouteTable != NULL) {
+        FreePool (Ip6Mode.RouteTable);
+      }
+
+      if (Ip6Mode.NeighborCache != NULL) {
+        FreePool (Ip6Mode.NeighborCache);
+      }
+
+      if (Ip6Mode.PrefixTable != NULL) {
+        FreePool (Ip6Mode.PrefixTable);
+      }
+
+      if (Ip6Mode.IcmpTypeList != NULL) {
+        FreePool (Ip6Mode.IcmpTypeList);
+      }
+    }
 
     return (UINT16) (Ip6Mode.MaxPacketSize - sizeof (TCP_HEAD));
   }
@@ -589,7 +608,7 @@ TcpSetState (
   ASSERT (State < (sizeof (mTcpStateName) / sizeof (CHAR16 *)));
 
   DEBUG (
-    (EFI_D_INFO,
+    (EFI_D_NET,
     "Tcb (%p) state %s --> %s\n",
     Tcb,
     mTcpStateName[Tcb->State],
@@ -838,7 +857,7 @@ TcpOnAppConsume (
       if (TcpOld < Tcb->RcvMss) {
 
         DEBUG (
-          (EFI_D_INFO,
+          (EFI_D_NET,
           "TcpOnAppConsume: send a window update for a window closed Tcb %p\n",
           Tcb)
           );
@@ -847,7 +866,7 @@ TcpOnAppConsume (
       } else if (Tcb->DelayedAck == 0) {
 
         DEBUG (
-          (EFI_D_INFO,
+          (EFI_D_NET,
           "TcpOnAppConsume: scheduled a delayed ACK to update window for Tcb %p\n",
           Tcb)
           );

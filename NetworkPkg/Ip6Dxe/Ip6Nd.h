@@ -3,13 +3,7 @@
 
   Copyright (c) 2009 - 2012, Intel Corporation. All rights reserved.<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php.
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -593,7 +587,7 @@ Ip6ProcessRouterAdvertise (
                                  the IP head removed.
 
   @retval EFI_INVALID_PARAMETER  The parameter is invalid.
-  @retval EFI_OUT_OF_RESOURCES   Insuffcient resources to complete the
+  @retval EFI_OUT_OF_RESOURCES   Insufficient resources to complete the
                                  operation.
   @retval EFI_SUCCESS            Successfully updated the route caches.
 
@@ -711,7 +705,7 @@ Ip6NdFasterTimerTicking (
 
 /**
   The heartbeat timer of ND module in 1 second. This time routine handles following
-  things: 1) maitain default router list; 2) maintain prefix options;
+  things: 1) maintain default router list; 2) maintain prefix options;
   3) maintain route caches.
 
   @param[in]  IpSb              The IP6 service binding instance.

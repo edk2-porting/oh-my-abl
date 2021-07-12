@@ -1,14 +1,9 @@
 /** @file
-  TCG EFI Platform Definition in TCG_EFI_Platform_1_20_Final
+  TCG EFI Platform Definition in TCG_EFI_Platform_1_20_Final and
+  TCG PC Client Platform Firmware Profile Specification, Revision 1.05
 
-  Copyright (c) 2006 - 2015, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2006 - 2019, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -22,13 +17,22 @@
 //
 // Standard event types
 //
+#define EV_PREBOOT_CERT             ((TCG_EVENTTYPE) 0x00000000)
 #define EV_POST_CODE                ((TCG_EVENTTYPE) 0x00000001)
 #define EV_NO_ACTION                ((TCG_EVENTTYPE) 0x00000003)
 #define EV_SEPARATOR                ((TCG_EVENTTYPE) 0x00000004)
+#define EV_ACTION                   ((TCG_EVENTTYPE) 0x00000005)
+#define EV_EVENT_TAG                ((TCG_EVENTTYPE) 0x00000006)
 #define EV_S_CRTM_CONTENTS          ((TCG_EVENTTYPE) 0x00000007)
 #define EV_S_CRTM_VERSION           ((TCG_EVENTTYPE) 0x00000008)
 #define EV_CPU_MICROCODE            ((TCG_EVENTTYPE) 0x00000009)
+#define EV_PLATFORM_CONFIG_FLAGS    ((TCG_EVENTTYPE) 0x0000000A)
 #define EV_TABLE_OF_DEVICES         ((TCG_EVENTTYPE) 0x0000000B)
+#define EV_COMPACT_HASH             ((TCG_EVENTTYPE) 0x0000000C)
+#define EV_NONHOST_CODE             ((TCG_EVENTTYPE) 0x0000000F)
+#define EV_NONHOST_CONFIG           ((TCG_EVENTTYPE) 0x00000010)
+#define EV_NONHOST_INFO             ((TCG_EVENTTYPE) 0x00000011)
+#define EV_OMIT_BOOT_DEVICE_EVENTS  ((TCG_EVENTTYPE) 0x00000012)
 
 //
 // EFI specific event types
@@ -43,11 +47,16 @@
 #define EV_EFI_ACTION                       (EV_EFI_EVENT_BASE + 7)
 #define EV_EFI_PLATFORM_FIRMWARE_BLOB       (EV_EFI_EVENT_BASE + 8)
 #define EV_EFI_HANDOFF_TABLES               (EV_EFI_EVENT_BASE + 9)
+#define EV_EFI_PLATFORM_FIRMWARE_BLOB2      (EV_EFI_EVENT_BASE + 0xA)
+#define EV_EFI_HANDOFF_TABLES2              (EV_EFI_EVENT_BASE + 0xB)
+#define EV_EFI_HCRTM_EVENT                  (EV_EFI_EVENT_BASE + 0x10)
 #define EV_EFI_VARIABLE_AUTHORITY           (EV_EFI_EVENT_BASE + 0xE0)
+#define EV_EFI_SPDM_FIRMWARE_BLOB           (EV_EFI_EVENT_BASE + 0xE1)
+#define EV_EFI_SPDM_FIRMWARE_CONFIG         (EV_EFI_EVENT_BASE + 0xE2)
 
 #define EFI_CALLING_EFI_APPLICATION         \
   "Calling EFI Application from Boot Option"
-#define EFI_RETURNING_FROM_EFI_APPLICATOIN  \
+#define EFI_RETURNING_FROM_EFI_APPLICATION  \
   "Returning from EFI Application from Boot Option"
 #define EFI_EXIT_BOOT_SERVICES_INVOCATION   \
   "Exit Boot Services Invocation"
@@ -74,6 +83,9 @@
 
 #define EV_POSTCODE_INFO_OPROM        "Embedded Option ROM"
 #define OPROM_LEN                     (sizeof(EV_POSTCODE_INFO_OPROM) - 1)
+
+#define EV_POSTCODE_INFO_EMBEDDED_UEFI_DRIVER  "Embedded UEFI Driver"
+#define EMBEDDED_UEFI_DRIVER_LEN               (sizeof(EV_POSTCODE_INFO_EMBEDDED_UEFI_DRIVER) - 1)
 
 #define FIRMWARE_DEBUGGER_EVENT_STRING      "UEFI Debug Mode"
 #define FIRMWARE_DEBUGGER_EVENT_STRING_LEN  (sizeof(FIRMWARE_DEBUGGER_EVENT_STRING) - 1)
@@ -121,6 +133,30 @@ typedef struct tdEFI_PLATFORM_FIRMWARE_BLOB {
 } EFI_PLATFORM_FIRMWARE_BLOB;
 
 ///
+/// UEFI_PLATFORM_FIRMWARE_BLOB
+///
+/// This structure is used in EV_EFI_PLATFORM_FIRMWARE_BLOB
+/// event to facilitate the measurement of firmware volume.
+///
+typedef struct tdUEFI_PLATFORM_FIRMWARE_BLOB {
+  EFI_PHYSICAL_ADDRESS              BlobBase;
+  UINT64                            BlobLength;
+} UEFI_PLATFORM_FIRMWARE_BLOB;
+
+///
+/// UEFI_PLATFORM_FIRMWARE_BLOB2
+///
+/// This structure is used in EV_EFI_PLATFORM_FIRMWARE_BLOB2
+/// event to facilitate the measurement of firmware volume.
+///
+typedef struct tdUEFI_PLATFORM_FIRMWARE_BLOB2 {
+  UINT8                             BlobDescriptionSize;
+//UINT8                             BlobDescription[BlobDescriptionSize];
+//EFI_PHYSICAL_ADDRESS              BlobBase;
+//UINT64                            BlobLength;
+} UEFI_PLATFORM_FIRMWARE_BLOB2;
+
+///
 /// EFI_IMAGE_LOAD_EVENT
 ///
 /// This structure is used in EV_EFI_BOOT_SERVICES_APPLICATION,
@@ -135,6 +171,20 @@ typedef struct tdEFI_IMAGE_LOAD_EVENT {
 } EFI_IMAGE_LOAD_EVENT;
 
 ///
+/// UEFI_IMAGE_LOAD_EVENT
+///
+/// This structure is used in EV_EFI_BOOT_SERVICES_APPLICATION,
+/// EV_EFI_BOOT_SERVICES_DRIVER and EV_EFI_RUNTIME_SERVICES_DRIVER
+///
+typedef struct tdUEFI_IMAGE_LOAD_EVENT {
+  EFI_PHYSICAL_ADDRESS              ImageLocationInMemory;
+  UINT64                            ImageLengthInMemory;
+  UINT64                            ImageLinkTimeAddress;
+  UINT64                            LengthOfDevicePath;
+  EFI_DEVICE_PATH_PROTOCOL          DevicePath[1];
+} UEFI_IMAGE_LOAD_EVENT;
+
+///
 /// EFI_HANDOFF_TABLE_POINTERS
 ///
 /// This structure is used in EV_EFI_HANDOFF_TABLES event to facilitate
@@ -146,11 +196,36 @@ typedef struct tdEFI_HANDOFF_TABLE_POINTERS {
 } EFI_HANDOFF_TABLE_POINTERS;
 
 ///
+/// UEFI_HANDOFF_TABLE_POINTERS
+///
+/// This structure is used in EV_EFI_HANDOFF_TABLES event to facilitate
+/// the measurement of given configuration tables.
+///
+typedef struct tdUEFI_HANDOFF_TABLE_POINTERS {
+  UINT64                            NumberOfTables;
+  EFI_CONFIGURATION_TABLE           TableEntry[1];
+} UEFI_HANDOFF_TABLE_POINTERS;
+
+///
+/// UEFI_HANDOFF_TABLE_POINTERS2
+///
+/// This structure is used in EV_EFI_HANDOFF_TABLES2 event to facilitate
+/// the measurement of given configuration tables.
+///
+typedef struct tdUEFI_HANDOFF_TABLE_POINTERS2 {
+  UINT8                             TableDescriptionSize;
+//UINT8                             TableDescription[TableDescriptionSize];
+//UINT64                            NumberOfTables;
+//EFI_CONFIGURATION_TABLE           TableEntry[1];
+} UEFI_HANDOFF_TABLE_POINTERS2;
+
+///
 /// EFI_VARIABLE_DATA
 ///
 /// This structure serves as the header for measuring variables. The name of the
 /// variable (in Unicode format) should immediately follow, then the variable
 /// data.
+/// This is defined in TCG EFI Platform Spec for TPM1.1 or 1.2 V1.22
 ///
 typedef struct tdEFI_VARIABLE_DATA {
   EFI_GUID                          VariableName;
@@ -159,6 +234,22 @@ typedef struct tdEFI_VARIABLE_DATA {
   CHAR16                            UnicodeName[1];
   INT8                              VariableData[1];  ///< Driver or platform-specific data
 } EFI_VARIABLE_DATA;
+
+///
+/// UEFI_VARIABLE_DATA
+///
+/// This structure serves as the header for measuring variables. The name of the
+/// variable (in Unicode format) should immediately follow, then the variable
+/// data.
+/// This is defined in TCG PC Client Firmware Profile Spec 00.21
+///
+typedef struct tdUEFI_VARIABLE_DATA {
+  EFI_GUID                          VariableName;
+  UINT64                            UnicodeNameLength;
+  UINT64                            VariableDataLength;
+  CHAR16                            UnicodeName[1];
+  INT8                              VariableData[1];  ///< Driver or platform-specific data
+} UEFI_VARIABLE_DATA;
 
 //
 // For TrEE1.0 compatibility
@@ -173,9 +264,69 @@ typedef struct {
 
 typedef struct tdEFI_GPT_DATA {
   EFI_PARTITION_TABLE_HEADER  EfiPartitionHeader;
-  UINTN                       NumberOfPartitions; 
+  UINTN                       NumberOfPartitions;
   EFI_PARTITION_ENTRY         Partitions[1];
 } EFI_GPT_DATA;
+
+typedef struct tdUEFI_GPT_DATA {
+  EFI_PARTITION_TABLE_HEADER  EfiPartitionHeader;
+  UINT64                      NumberOfPartitions;
+  EFI_PARTITION_ENTRY         Partitions[1];
+} UEFI_GPT_DATA;
+
+#define TCG_DEVICE_SECURITY_EVENT_DATA_SIGNATURE "SPDM Device Sec"
+#define TCG_DEVICE_SECURITY_EVENT_DATA_VERSION   0
+
+#define TCG_DEVICE_SECURITY_EVENT_DATA_DEVICE_TYPE_NULL  0
+#define TCG_DEVICE_SECURITY_EVENT_DATA_DEVICE_TYPE_PCI   1
+#define TCG_DEVICE_SECURITY_EVENT_DATA_DEVICE_TYPE_USB   2
+
+///
+/// TCG_DEVICE_SECURITY_EVENT_DATA_HEADER
+/// This is the header of TCG_DEVICE_SECURITY_EVENT_DATA, which is
+/// used in EV_EFI_SPDM_FIRMWARE_BLOB and EV_EFI_SPDM_FIRMWARE_CONFIG.
+///
+typedef struct {
+  UINT8                          Signature[16];
+  UINT16                         Version;
+  UINT16                         Length;
+  UINT32                         SpdmHashAlgo;
+  UINT32                         DeviceType;
+//SPDM_MEASUREMENT_BLOCK         SpdmMeasurementBlock;
+} TCG_DEVICE_SECURITY_EVENT_DATA_HEADER;
+
+#define TCG_DEVICE_SECURITY_EVENT_DATA_PCI_CONTEXT_VERSION  0
+
+///
+/// TCG_DEVICE_SECURITY_EVENT_DATA_PCI_CONTEXT
+/// This is the PCI context data of TCG_DEVICE_SECURITY_EVENT_DATA, which is
+/// used in EV_EFI_SPDM_FIRMWARE_BLOB and EV_EFI_SPDM_FIRMWARE_CONFIG.
+///
+typedef struct {
+  UINT16  Version;
+  UINT16  Length;
+  UINT16  VendorId;
+  UINT16  DeviceId;
+  UINT8   RevisionID;
+  UINT8   ClassCode[3];
+  UINT16  SubsystemVendorID;
+  UINT16  SubsystemID;
+} TCG_DEVICE_SECURITY_EVENT_DATA_PCI_CONTEXT;
+
+#define TCG_DEVICE_SECURITY_EVENT_DATA_USB_CONTEXT_VERSION  0
+
+///
+/// TCG_DEVICE_SECURITY_EVENT_DATA_USB_CONTEXT
+/// This is the USB context data of TCG_DEVICE_SECURITY_EVENT_DATA, which is
+/// used in EV_EFI_SPDM_FIRMWARE_BLOB and EV_EFI_SPDM_FIRMWARE_CONFIG.
+///
+typedef struct {
+  UINT16  Version;
+  UINT16  Length;
+//UINT8   DeviceDescriptor[DescLen];
+//UINT8   BodDescriptor[DescLen];
+//UINT8   ConfigurationDescriptor[DescLen][NumOfConfiguration];
+} TCG_DEVICE_SECURITY_EVENT_DATA_USB_CONTEXT;
 
 //
 // Crypto Agile Log Entry Format
@@ -187,6 +338,17 @@ typedef struct tdTCG_PCR_EVENT2 {
   UINT32              EventSize;
   UINT8               Event[1];
 } TCG_PCR_EVENT2;
+
+//
+// TCG PCR Event2 Header
+// Follow TCG EFI Protocol Spec 5.2 Crypto Agile Log Entry Format
+//
+typedef struct tdTCG_PCR_EVENT2_HDR{
+  TCG_PCRINDEX        PCRIndex;
+  TCG_EVENTTYPE       EventType;
+  TPML_DIGEST_VALUES  Digests;
+  UINT32              EventSize;
+} TCG_PCR_EVENT2_HDR;
 
 //
 // Log Header Entry Data
@@ -212,6 +374,7 @@ typedef struct {
 #define TCG_EfiSpecIDEventStruct_SPEC_VERSION_MAJOR_TPM2   2
 #define TCG_EfiSpecIDEventStruct_SPEC_VERSION_MINOR_TPM2   0
 #define TCG_EfiSpecIDEventStruct_SPEC_ERRATA_TPM2          0
+#define TCG_EfiSpecIDEventStruct_SPEC_ERRATA_TPM2_REV_105  105
 
 typedef struct {
   UINT8               signature[16];
@@ -267,6 +430,65 @@ typedef struct {
   //
 //UINT8               vendorInfo[vendorInfoSize];
 } TCG_EfiSpecIDEventStruct;
+
+typedef struct tdTCG_PCClientTaggedEvent {
+  UINT32              taggedEventID;
+  UINT32              taggedEventDataSize;
+//UINT8               taggedEventData[taggedEventDataSize];
+} TCG_PCClientTaggedEvent;
+
+#define TCG_Sp800_155_PlatformId_Event_SIGNATURE  "SP800-155 Event"
+#define TCG_Sp800_155_PlatformId_Event2_SIGNATURE "SP800-155 Event2"
+
+typedef struct tdTCG_Sp800_155_PlatformId_Event2 {
+  UINT8               Signature[16];
+  //
+  // Where Vendor ID is an integer defined
+  // at http://www.iana.org/assignments/enterprisenumbers
+  //
+  UINT32              VendorId;
+  //
+  // 16-byte identifier of a given platform's static configuration of code
+  //
+  EFI_GUID            ReferenceManifestGuid;
+  //
+  // Below structure is newly added in TCG_Sp800_155_PlatformId_Event2.
+  //
+//UINT8               PlatformManufacturerStrSize;
+//UINT8               PlatformManufacturerStr[PlatformManufacturerStrSize];
+//UINT8               PlatformModelSize;
+//UINT8               PlatformModel[PlatformModelSize];
+//UINT8               PlatformVersionSize;
+//UINT8               PlatformVersion[PlatformVersionSize];
+//UINT8               PlatformModelSize;
+//UINT8               PlatformModel[PlatformModelSize];
+//UINT8               FirmwareManufacturerStrSize;
+//UINT8               FirmwareManufacturerStr[FirmwareManufacturerStrSize];
+//UINT32              FirmwareManufacturerId;
+//UINT8               FirmwareVersion;
+//UINT8               FirmwareVersion[FirmwareVersionSize]];
+} TCG_Sp800_155_PlatformId_Event2;
+
+#define TCG_EfiStartupLocalityEvent_SIGNATURE      "StartupLocality"
+
+
+//
+// The Locality Indicator which sent the TPM2_Startup command
+//
+#define LOCALITY_0_INDICATOR        0x00
+#define LOCALITY_3_INDICATOR        0x03
+
+//
+// Startup Locality Event
+//
+typedef struct tdTCG_EfiStartupLocalityEvent{
+  UINT8       Signature[16];
+  //
+  // The Locality Indicator which sent the TPM2_Startup command
+  //
+  UINT8       StartupLocality;
+} TCG_EfiStartupLocalityEvent;
+
 
 //
 // Restore original structure alignment

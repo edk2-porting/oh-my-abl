@@ -1,15 +1,9 @@
 /** @file
 Header file for Elf convert solution
 
-Copyright (c) 2010 - 2014, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2010 - 2018, Intel Corporation. All rights reserved.<BR>
 
-This program and the accompanying materials are licensed and made available 
-under the terms and conditions of the BSD License which accompanies this 
-distribution.  The full text of the license may be found at 
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -29,11 +23,13 @@ extern UINT32 mImageTimeStamp;
 extern UINT8  *mCoffFile;
 extern UINT32 mTableOffset;
 extern UINT32 mOutImageType;
+extern UINT32 mFileBufferSize;
 
 //
 // Common EFI specific data.
 //
 #define ELF_HII_SECTION_NAME ".hii"
+#define ELF_STRTAB_SECTION_NAME ".strtab"
 #define MAX_COFF_ALIGNMENT 0x10000
 
 //
@@ -43,11 +39,11 @@ typedef enum {
   SECTION_TEXT,
   SECTION_HII,
   SECTION_DATA
-  
+
 } SECTION_FILTER_TYPES;
 
 //
-// FunctionTalbe
+// FunctionTable
 //
 typedef struct {
   VOID    (*ScanSections) ();
@@ -56,7 +52,7 @@ typedef struct {
   VOID    (*WriteDebug) ();
   VOID    (*SetImageSize) ();
   VOID    (*CleanUp) ();
-  
+
 } ELF_FUNCTION_TABLE;
 
 //

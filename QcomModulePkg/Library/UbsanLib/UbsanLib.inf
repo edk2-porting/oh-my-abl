@@ -30,7 +30,6 @@
   QcomModulePkg/QcomModulePkg.dec
   ArmPkg/ArmPkg.dec
   MdePkg/MdePkg.dec
-  StdLib/StdLib.dec
   EmbeddedPkg/EmbeddedPkg.dec
   ArmPlatformPkg/ArmPlatformPkg.dec
   MdeModulePkg/MdeModulePkg.dec

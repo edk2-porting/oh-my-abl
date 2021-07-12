@@ -4,13 +4,7 @@
   Copyright (c) 2008 - 2010, Apple Inc. All rights reserved.<BR>
   Copyright (c) 2011 - 2014, ARM Ltd. All rights reserved.<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -22,12 +16,11 @@
 #include <Library/PrintLib.h>
 #include <Library/ArmDisassemblerLib.h>
 #include <Library/SerialPortLib.h>
+#include <Library/UefiBootServicesTableLib.h>
 
 #include <Guid/DebugImageInfoTable.h>
 #include <Protocol/DebugSupport.h>
 #include <Protocol/LoadedImage.h>
-
-EFI_DEBUG_IMAGE_INFO_TABLE_HEADER *gDebugImageTableHeader = NULL;
 
 STATIC CHAR8 *gExceptionTypeString[] = {
   "Synchronous",
@@ -35,6 +28,8 @@ STATIC CHAR8 *gExceptionTypeString[] = {
   "FIQ",
   "SError"
 };
+
+STATIC BOOLEAN mRecursiveException;
 
 CHAR8 *
 GetImageName (
@@ -119,10 +114,30 @@ DescribeExceptionSyndrome (
   DEBUG ((EFI_D_ERROR, "\n %a \n", Message));
 }
 
+#ifndef MDEPKG_NDEBUG
+STATIC
+CONST CHAR8 *
+BaseName (
+  IN  CONST CHAR8 *FullName
+  )
+{
+  CONST CHAR8 *Str;
+
+  Str = FullName + AsciiStrLen (FullName);
+
+  while (--Str > FullName) {
+    if (*Str == '/' || *Str == '\\') {
+      return Str + 1;
+    }
+  }
+  return Str;
+}
+#endif
+
 /**
   This is the default action to take on an unexpected exception
 
-  Since this is exception context don't do anything crazy like try to allcoate memory.
+  Since this is exception context don't do anything crazy like try to allocate memory.
 
   @param  ExceptionType    Type of the exception
   @param  SystemContext    Register state at the time of the Exception
@@ -136,17 +151,77 @@ DefaultExceptionHandler (
 {
   CHAR8  Buffer[100];
   UINTN  CharCount;
+  INT32  Offset;
+
+  if (mRecursiveException) {
+    STATIC CHAR8 CONST Message[] = "\nRecursive exception occurred while dumping the CPU state\n";
+
+    SerialPortWrite ((UINT8 *)Message, sizeof Message - 1);
+    if (gST->ConOut != NULL) {
+      AsciiPrint (Message);
+    }
+    CpuDeadLoop ();
+  }
+  mRecursiveException = TRUE;
 
   CharCount = AsciiSPrint (Buffer,sizeof (Buffer),"\n\n%a Exception at 0x%016lx\n", gExceptionTypeString[ExceptionType], SystemContext.SystemContextAArch64->ELR);
   SerialPortWrite ((UINT8 *) Buffer, CharCount);
+  if (gST->ConOut != NULL) {
+    AsciiPrint (Buffer);
+  }
 
   DEBUG_CODE_BEGIN ();
-    CHAR8  *Pdb;
+    CHAR8  *Pdb, *PrevPdb;
     UINTN  ImageBase;
     UINTN  PeCoffSizeOfHeader;
-    Pdb = GetImageName (SystemContext.SystemContextAArch64->ELR, &ImageBase, &PeCoffSizeOfHeader);
+    UINT64 *Fp;
+    UINT64 RootFp[2];
+    UINTN  Idx;
+
+    PrevPdb = Pdb = GetImageName (SystemContext.SystemContextAArch64->ELR, &ImageBase, &PeCoffSizeOfHeader);
     if (Pdb != NULL) {
-      DEBUG ((EFI_D_ERROR, "%a loaded at 0x%016lx \n", Pdb, ImageBase));
+      DEBUG ((EFI_D_ERROR, "PC 0x%012lx (0x%012lx+0x%08x) [ 0] %a\n",
+        SystemContext.SystemContextAArch64->ELR, ImageBase,
+        SystemContext.SystemContextAArch64->ELR - ImageBase, BaseName (Pdb)));
+    } else {
+      DEBUG ((EFI_D_ERROR, "PC 0x%012lx\n", SystemContext.SystemContextAArch64->ELR));
+    }
+
+    if ((UINT64 *)SystemContext.SystemContextAArch64->FP != 0) {
+      Idx = 0;
+
+      RootFp[0] = ((UINT64 *)SystemContext.SystemContextAArch64->FP)[0];
+      RootFp[1] = ((UINT64 *)SystemContext.SystemContextAArch64->FP)[1];
+      if (RootFp[1] != SystemContext.SystemContextAArch64->LR) {
+        RootFp[0] = SystemContext.SystemContextAArch64->FP;
+        RootFp[1] = SystemContext.SystemContextAArch64->LR;
+      }
+      for (Fp = RootFp; Fp[0] != 0; Fp = (UINT64 *)Fp[0]) {
+        Pdb = GetImageName (Fp[1], &ImageBase, &PeCoffSizeOfHeader);
+        if (Pdb != NULL) {
+          if (Pdb != PrevPdb) {
+            Idx++;
+            PrevPdb = Pdb;
+          }
+          DEBUG ((EFI_D_ERROR, "PC 0x%012lx (0x%012lx+0x%08x) [% 2d] %a\n",
+            Fp[1], ImageBase, Fp[1] - ImageBase, Idx, BaseName (Pdb)));
+        } else {
+          DEBUG ((EFI_D_ERROR, "PC 0x%012lx\n", Fp[1]));
+        }
+      }
+      PrevPdb = Pdb = GetImageName (SystemContext.SystemContextAArch64->ELR, &ImageBase, &PeCoffSizeOfHeader);
+      if (Pdb != NULL) {
+        DEBUG ((EFI_D_ERROR, "\n[ 0] %a\n", Pdb));
+      }
+
+      Idx = 0;
+      for (Fp = RootFp; Fp[0] != 0; Fp = (UINT64 *)Fp[0]) {
+        Pdb = GetImageName (Fp[1], &ImageBase, &PeCoffSizeOfHeader);
+        if (Pdb != NULL && Pdb != PrevPdb) {
+          DEBUG ((EFI_D_ERROR, "[% 2d] %a\n", ++Idx, Pdb));
+          PrevPdb = Pdb;
+        }
+      }
     }
   DEBUG_CODE_END ();
 
@@ -183,5 +258,18 @@ DefaultExceptionHandler (
   DEBUG ((EFI_D_ERROR, "\n ESR : EC 0x%02x  IL 0x%x  ISS 0x%08x\n", (SystemContext.SystemContextAArch64->ESR & 0xFC000000) >> 26, (SystemContext.SystemContextAArch64->ESR >> 25) & 0x1, SystemContext.SystemContextAArch64->ESR & 0x1FFFFFF ));
 
   DescribeExceptionSyndrome (SystemContext.SystemContextAArch64->ESR);
+
+  DEBUG ((EFI_D_ERROR, "\nStack dump:\n"));
+  for (Offset = -256; Offset < 256; Offset += 32) {
+    DEBUG  ((EFI_D_ERROR, "%c %013lx: %016lx %016lx %016lx %016lx\n",
+      Offset == 0 ? '>' : ' ',
+      SystemContext.SystemContextAArch64->SP + Offset,
+      *(UINT64 *)(SystemContext.SystemContextAArch64->SP + Offset),
+      *(UINT64 *)(SystemContext.SystemContextAArch64->SP + Offset + 8),
+      *(UINT64 *)(SystemContext.SystemContextAArch64->SP + Offset + 16),
+      *(UINT64 *)(SystemContext.SystemContextAArch64->SP + Offset + 24)));
+  }
+
   ASSERT (FALSE);
+  CpuDeadLoop ();
 }

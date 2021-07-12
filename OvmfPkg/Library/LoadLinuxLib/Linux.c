@@ -2,13 +2,7 @@
 
   Copyright (c) 2011 - 2014, Intel Corporation. All rights reserved.<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -357,7 +351,7 @@ SetupLinuxMemmap (
       LastE820->size += EFI_PAGES_TO_SIZE ((UINTN) MemoryMap->NumberOfPages);
       LastEndAddr += EFI_PAGES_TO_SIZE ((UINTN) MemoryMap->NumberOfPages);
     } else {
-      if (E820EntryCount >= (sizeof (Bp->e820_map) / sizeof (Bp->e820_map[0]))) {
+      if (E820EntryCount >= ARRAY_SIZE (Bp->e820_map)) {
         break;
       }
       E820->type = (UINT32) E820Type;

@@ -1,4 +1,5 @@
-/* Copyright (c) 2015-2018, 2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2018, 2020-2021, The Linux Foundation. All rights
+ * reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -45,7 +46,7 @@
 #define CHIP_BASE_BAND_APQ "apq"
 #define CHIP_BASE_BAND_MDM "mdm"
 
-#define BIT(x) (1UL << x)
+#define BIT(x) (1ULL << x)
 
 extern RamPartitionEntry *RamPartitionEntries;
 
@@ -115,6 +116,7 @@ EFI_STATUS ReadRamPartitions (RamPartitionEntry **RamPartitions,
                   UINT32 *NumPartitions);
 EFI_STATUS GetGranuleSize (UINT32 *MinPasrGranuleSize);
 VOID GetPageSize (UINT32 *PageSize);
+EFI_STATUS GetDdrSize (UINT64 *DdrSize);
 EFI_STATUS BoardDdrType (UINT32 *Type);
 UINT32 BoardPlatformHlosSubType (VOID);
 #endif

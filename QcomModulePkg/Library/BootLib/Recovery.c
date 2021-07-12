@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -159,8 +159,9 @@ ReadFromPartitionOffset (EFI_GUID *Ptype, VOID **Msg,
 
   BlkIo = HandleInfoList[0].BlkIo;
   MsgSize = ROUND_TO_PAGE (Size, BlkIo->Media->BlockSize - 1);
-  PartitionSize = (BlkIo->Media->LastBlock + 1) * BlkIo->Media->BlockSize;
-  if (MsgSize > PartitionSize) {
+  PartitionSize = GetPartitionSize (BlkIo);
+  if (MsgSize > PartitionSize ||
+    !PartitionSize) {
     return EFI_OUT_OF_RESOURCES;
   }
 
@@ -387,10 +388,10 @@ GetFfbmCommand (CHAR8 *FfbmString, UINT32 Sz)
   if (!AsciiStrnCmp (FfbmData, QmmiCmd, AsciiStrLen (QmmiCmd))||
     !AsciiStrnCmp (FfbmData, Ffbm02Cmd, AsciiStrLen (Ffbm02Cmd))) {
     /* if ffbm-02 or qmmi string is in misc partition,
-       then write qmmi to kernel cmd line*/
-    AsciiStrnCpy (FfbmString, QmmiCmd, AsciiStrLen (QmmiCmd));
+       then write qmmi to kernel cmd line */
+    AsciiStrnCpyS (FfbmString, Sz, QmmiCmd, AsciiStrLen (QmmiCmd));
   } else if (!AsciiStrnCmp (FfbmData, FfbmCmd, AsciiStrLen (FfbmCmd))) {
-    AsciiStrnCpy (FfbmString, FfbmData, Sz);
+    AsciiStrnCpyS (FfbmString, Sz, FfbmData, Sz);
   } else {
     Status = EFI_NOT_FOUND;
   }

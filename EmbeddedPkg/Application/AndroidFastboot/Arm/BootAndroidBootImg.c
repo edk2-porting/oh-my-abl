@@ -2,31 +2,18 @@
 
   Copyright (c) 2013-2015, ARM Ltd. All rights reserved.<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #include "AndroidFastbootApp.h"
 
 #include <Protocol/DevicePath.h>
+#include <Protocol/LoadedImage.h>
 
-#include <Library/BdsLib.h>
 #include <Library/DevicePathLib.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/UefiLib.h>
-
-#include <Guid/ArmGlobalVariableHob.h>
-
-#define LINUX_LOADER_COMMAND_LINE       L"%s -f %s -c %s"
-
-// This GUID is defined in the INGF file of ArmPkg/Application/LinuxLoader
-CONST EFI_GUID mLinuxLoaderAppGuid = { 0x701f54f2, 0x0d70, 0x4b89, { 0xbc, 0x0a, 0xd9, 0xca, 0x25, 0x37, 0x90, 0x59 }};
 
 // Device Path representing an image in memory
 #pragma pack(1)
@@ -57,6 +44,69 @@ STATIC CONST MEMORY_DEVICE_PATH MemoryDevicePathTemplate =
   } // End
 };
 
+
+/**
+  Start an EFI Application from a Device Path
+
+  @param  ParentImageHandle     Handle of the calling image
+  @param  DevicePath            Location of the EFI Application
+
+  @retval EFI_SUCCESS           All drivers have been connected
+  @retval EFI_NOT_FOUND         The Linux kernel Device Path has not been found
+  @retval EFI_OUT_OF_RESOURCES  There is not enough resource memory to store the matching results.
+
+**/
+STATIC
+EFI_STATUS
+StartEfiApplication (
+  IN EFI_HANDLE                  ParentImageHandle,
+  IN EFI_DEVICE_PATH_PROTOCOL    *DevicePath,
+  IN UINTN                       LoadOptionsSize,
+  IN VOID*                       LoadOptions
+  )
+{
+  EFI_STATUS                   Status;
+  EFI_HANDLE                   ImageHandle;
+  EFI_LOADED_IMAGE_PROTOCOL*   LoadedImage;
+
+  // Load the image from the device path with Boot Services function
+  Status = gBS->LoadImage (TRUE, ParentImageHandle, DevicePath, NULL, 0,
+                  &ImageHandle);
+  if (EFI_ERROR (Status)) {
+    //
+    // With EFI_SECURITY_VIOLATION retval, the Image was loaded and an ImageHandle was created
+    // with a valid EFI_LOADED_IMAGE_PROTOCOL, but the image can not be started right now.
+    // If the caller doesn't have the option to defer the execution of an image, we should
+    // unload image for the EFI_SECURITY_VIOLATION to avoid resource leak.
+    //
+    if (Status == EFI_SECURITY_VIOLATION) {
+      gBS->UnloadImage (ImageHandle);
+    }
+    return Status;
+  }
+
+  // Passed LoadOptions to the EFI Application
+  if (LoadOptionsSize != 0) {
+    Status = gBS->HandleProtocol (ImageHandle, &gEfiLoadedImageProtocolGuid,
+                    (VOID **) &LoadedImage);
+    if (EFI_ERROR (Status)) {
+      return Status;
+    }
+
+    LoadedImage->LoadOptionsSize  = LoadOptionsSize;
+    LoadedImage->LoadOptions      = LoadOptions;
+  }
+
+  // Before calling the image, enable the Watchdog Timer for  the 5 Minute period
+  gBS->SetWatchdogTimer (5 * 60, 0x0000, 0x00, NULL);
+  // Start the image
+  Status = gBS->StartImage (ImageHandle, NULL, NULL);
+  // Clear the Watchdog Timer after the image returns
+  gBS->SetWatchdogTimer (0x0000, 0x0000, 0x0000, NULL);
+
+  return Status;
+}
+
 EFI_STATUS
 BootAndroidBootImg (
   IN UINTN    BufferSize,
@@ -64,17 +114,13 @@ BootAndroidBootImg (
   )
 {
   EFI_STATUS                          Status;
-  CHAR8                               KernelArgs[BOOTIMG_KERNEL_ARGS_SIZE];
+  CHAR8                               KernelArgs[ANDROID_BOOTIMG_KERNEL_ARGS_SIZE];
   VOID                               *Kernel;
   UINTN                               KernelSize;
   VOID                               *Ramdisk;
   UINTN                               RamdiskSize;
   MEMORY_DEVICE_PATH                  KernelDevicePath;
-  MEMORY_DEVICE_PATH*                 RamdiskDevicePath;
-  CHAR16*                             KernelDevicePathTxt;
-  CHAR16*                             RamdiskDevicePathTxt;
-  EFI_DEVICE_PATH*                    LinuxLoaderDevicePath;
-  CHAR16*                             LoadOptions;
+  CHAR16                              *LoadOptions, *NewLoadOptions;
 
   Status = ParseAndroidBootImg (
             Buffer,
@@ -95,55 +141,38 @@ BootAndroidBootImg (
   KernelDevicePath.Node1.StartingAddress = (EFI_PHYSICAL_ADDRESS)(UINTN) Kernel;
   KernelDevicePath.Node1.EndingAddress   = (EFI_PHYSICAL_ADDRESS)(UINTN) Kernel + KernelSize;
 
-  RamdiskDevicePath = NULL;
-  if (RamdiskSize != 0) {
-    RamdiskDevicePath = (MEMORY_DEVICE_PATH*)DuplicateDevicePath ((EFI_DEVICE_PATH_PROTOCOL*) &MemoryDevicePathTemplate);
-
-    RamdiskDevicePath->Node1.StartingAddress = (EFI_PHYSICAL_ADDRESS)(UINTN) Ramdisk;
-    RamdiskDevicePath->Node1.EndingAddress   = ((EFI_PHYSICAL_ADDRESS)(UINTN) Ramdisk) + RamdiskSize;
-  }
-
-  //
-  // Boot Linux using the Legacy Linux Loader
-  //
-
-  Status = LocateEfiApplicationInFvByGuid (&mLinuxLoaderAppGuid, &LinuxLoaderDevicePath);
-  if (EFI_ERROR (Status)) {
-    Print (L"Couldn't Boot Linux: %d\n", Status);
-    return EFI_DEVICE_ERROR;
-  }
-
-  KernelDevicePathTxt = ConvertDevicePathToText ((EFI_DEVICE_PATH_PROTOCOL *) &KernelDevicePath, FALSE, FALSE);
-  if (KernelDevicePathTxt == NULL) {
-    return EFI_OUT_OF_RESOURCES;
-  }
-
-  RamdiskDevicePathTxt = ConvertDevicePathToText ((EFI_DEVICE_PATH_PROTOCOL *) RamdiskDevicePath, FALSE, FALSE);
-  if (RamdiskDevicePathTxt == NULL) {
-    return EFI_OUT_OF_RESOURCES;
-  }
-
-  // Initialize Legacy Linux loader command line
-  LoadOptions = CatSPrint (NULL, LINUX_LOADER_COMMAND_LINE, KernelDevicePathTxt, RamdiskDevicePathTxt, KernelArgs);
+  // Initialize Linux command line
+  LoadOptions = CatSPrint (NULL, L"%a", KernelArgs);
   if (LoadOptions == NULL) {
     return EFI_OUT_OF_RESOURCES;
   }
 
-  Status = BdsStartEfiApplication (gImageHandle, LinuxLoaderDevicePath, StrSize (LoadOptions), LoadOptions);
+  if (RamdiskSize != 0) {
+    NewLoadOptions = CatSPrint (LoadOptions, L" initrd=0x%x,0x%x",
+                       (UINTN)Ramdisk, RamdiskSize);
+    FreePool (LoadOptions);
+    if (NewLoadOptions == NULL) {
+      return EFI_OUT_OF_RESOURCES;
+    }
+    LoadOptions = NewLoadOptions;
+  }
+
+  Status = StartEfiApplication (gImageHandle,
+             (EFI_DEVICE_PATH_PROTOCOL *) &KernelDevicePath,
+             StrSize (LoadOptions),
+             LoadOptions);
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "Couldn't Boot Linux: %d\n", Status));
-    return EFI_DEVICE_ERROR;
+    Status = EFI_DEVICE_ERROR;
+    goto FreeLoadOptions;
   }
-
-  if (RamdiskDevicePath) {
-    FreePool (RamdiskDevicePathTxt);
-    FreePool (RamdiskDevicePath);
-  }
-
-  FreePool (KernelDevicePathTxt);
 
   // If we got here we do a confused face because BootLinuxFdt returned,
   // reporting success.
   DEBUG ((EFI_D_ERROR, "WARNING: BdsBootLinuxFdt returned EFI_SUCCESS.\n"));
   return EFI_SUCCESS;
+
+FreeLoadOptions:
+  FreePool (LoadOptions);
+  return Status;
 }

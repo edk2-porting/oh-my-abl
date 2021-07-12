@@ -1,13 +1,7 @@
 #
 #  Copyright (c) 2011-2013, ARM Limited. All rights reserved.
 #
-#  This program and the accompanying materials
-#  are licensed and made available under the terms and conditions of the BSD License
-#  which accompanies this distribution.  The full text of the license may be found at
-#  http://opensource.org/licenses/bsd-license.php
-#
-#  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
 #
 
 from arm_ds.debugger_v1 import DebugException
@@ -87,16 +81,14 @@ class EfiSectionTE:
             filename = self.base_te + debug_rva + 0xc
         else:
             filename = self.base_te + debug_rva + 0x10
-        filename = struct.unpack("200s", self.ec.getMemoryService().read(filename, 200, 32))[0]
+        filename = struct.unpack("400s", self.ec.getMemoryService().read(filename, 400, 32))[0]
         return filename[0:string.find(filename,'\0')]
 
     def get_debug_elfbase(self):
         stripped_size = struct.unpack("<H", self.ec.getMemoryService().read(self.base_te + 0x6, 2, 32))[0]
         stripped_size -= EfiSectionTE.SIZEOF_EFI_TE_IMAGE_HEADER
 
-        base_of_code = self.ec.getMemoryService().readMemory32(self.base_te + 0xC)
-
-        return self.base_te + base_of_code - stripped_size
+        return self.base_te - stripped_size
 
 class EfiSectionPE32:
     def __init__(self, ec, base_pe32):
@@ -127,20 +119,11 @@ class EfiSectionPE32:
             filename = self.base_pe32 + debug_rva + 0xc
         else:
             filename = self.base_pe32 + debug_rva + 0x10
-        filename = struct.unpack("200s", self.ec.getMemoryService().read(str(filename), 200, 32))[0]
+        filename = struct.unpack("400s", self.ec.getMemoryService().read(str(filename), 400, 32))[0]
         return filename[0:string.find(filename,'\0')]
 
     def get_debug_elfbase(self):
-        # Offset from dos hdr to PE file hdr
-        pe_file_header = self.base_pe32 + self.ec.getMemoryService().readMemory32(self.base_pe32 + 0x3C)
-
-        base_of_code = self.base_pe32 + self.ec.getMemoryService().readMemory32(pe_file_header + 0x28)
-        base_of_data = self.base_pe32 + self.ec.getMemoryService().readMemory32(pe_file_header + 0x2C)
-
-        if (base_of_code < base_of_data) and (base_of_code != 0):
-            return base_of_code
-        else:
-            return base_of_data
+        return self.base_pe32
 
 class EfiSectionPE64:
     def __init__(self, ec, base_pe64):
@@ -149,11 +132,10 @@ class EfiSectionPE64:
 
     def get_debug_filepath(self):
         # Offset from dos hdr to PE file hdr (EFI_IMAGE_NT_HEADERS64)
-        #file_header_offset = self.ec.getMemoryService().readMemory32(self.base_pe64 + 0x3C)
-        file_header_offset = 0x0
+        file_header_offset = self.ec.getMemoryService().readMemory32(self.base_pe64 + 0x3C)
 
         # Offset to debug dir in PE hdrs
-        debug_dir_entry_rva = self.ec.getMemoryService().readMemory32(self.base_pe64 + file_header_offset + 0x138)
+        debug_dir_entry_rva = self.ec.getMemoryService().readMemory32(self.base_pe64 + file_header_offset + 0xB8)
         if debug_dir_entry_rva == 0:
             raise Exception("EfiFileSectionPE64","No Debug Directory")
 
@@ -172,20 +154,11 @@ class EfiSectionPE64:
             filename = self.base_pe64 + debug_rva + 0xc
         else:
             filename = self.base_pe64 + debug_rva + 0x10
-        filename = struct.unpack("200s", self.ec.getMemoryService().read(str(filename), 200, 32))[0]
+        filename = struct.unpack("400s", self.ec.getMemoryService().read(str(filename), 400, 32))[0]
         return filename[0:string.find(filename,'\0')]
 
     def get_debug_elfbase(self):
-        # Offset from dos hdr to PE file hdr
-        pe_file_header = self.base_pe64 + self.ec.getMemoryService().readMemory32(self.base_pe64 + 0x3C)
-
-        base_of_code = self.base_pe64 + self.ec.getMemoryService().readMemory32(pe_file_header + 0x28)
-        base_of_data = self.base_pe64 + self.ec.getMemoryService().readMemory32(pe_file_header + 0x2C)
-
-        if (base_of_code < base_of_data) and (base_of_code != 0):
-            return base_of_code
-        else:
-            return base_of_data
+        return self.base_pe64
 
 class FirmwareFile:
     EFI_FV_FILETYPE_RAW                   = 0x01

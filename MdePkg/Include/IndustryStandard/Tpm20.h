@@ -6,13 +6,7 @@
   Check http://trustedcomputinggroup.org for latest specification updates.
 
 Copyright (c) 2013 - 2015, Intel Corporation. All rights reserved. <BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -675,7 +669,10 @@ typedef UINT32 TPM_RH;
 #define TPM_RH_LOCKOUT     (TPM_RH)(0x4000000A)
 #define TPM_RH_ENDORSEMENT (TPM_RH)(0x4000000B)
 #define TPM_RH_PLATFORM    (TPM_RH)(0x4000000C)
-#define TPM_RH_LAST        (TPM_RH)(0x4000000C)
+#define TPM_RH_PLATFORM_NV (TPM_RH)(0x4000000D)
+#define TPM_RH_AUTH_00     (TPM_RH)(0x40000010)
+#define TPM_RH_AUTH_FF     (TPM_RH)(0x4000010F)
+#define TPM_RH_LAST        (TPM_RH)(0x4000010F)
 
 // Table 28 - TPM_HC Constants
 typedef TPM_HANDLE TPM_HC;

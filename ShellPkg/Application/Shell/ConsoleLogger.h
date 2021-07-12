@@ -2,13 +2,7 @@
   Provides interface to shell console logger.
 
   Copyright (c) 2009 - 2010, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
 #ifndef _CONSOLE_LOGGER_HEADER_
@@ -58,7 +52,6 @@ typedef struct _CONSOLE_LOGGER_PRIVATE_DATA{
   @sa InstallProtocolInterface
 **/
 EFI_STATUS
-EFIAPI
 ConsoleLoggerInstall(
   IN CONST UINTN ScreensToSave,
   OUT CONSOLE_LOGGER_PRIVATE_DATA **ConsoleInfo
@@ -74,7 +67,6 @@ ConsoleLoggerInstall(
   @return other           The operation failed.  This was from UninstallProtocolInterface.
 **/
 EFI_STATUS
-EFIAPI
 ConsoleLoggerUninstall(
   IN OUT CONSOLE_LOGGER_PRIVATE_DATA *ConsoleInfo
   );
@@ -92,7 +84,6 @@ ConsoleLoggerUninstall(
   @param[in] ConsoleInfo  The pointer to the instance of the console logger information.
 **/
 EFI_STATUS
-EFIAPI
 ConsoleLoggerDisplayHistory(
   IN CONST BOOLEAN  Forward,
   IN CONST UINTN    Rows,
@@ -109,7 +100,6 @@ ConsoleLoggerDisplayHistory(
   @sa UpdateDisplayFromHistory
 **/
 EFI_STATUS
-EFIAPI
 ConsoleLoggerStopHistory(
   IN CONSOLE_LOGGER_PRIVATE_DATA *ConsoleInfo
   );
@@ -122,13 +112,12 @@ ConsoleLoggerStopHistory(
   @return other           The operation failed.
 **/
 EFI_STATUS
-EFIAPI
 UpdateDisplayFromHistory(
   IN CONSOLE_LOGGER_PRIVATE_DATA *ConsoleInfo
   );
 
 /**
-  Reset the text output device hardware and optionaly run diagnostics
+  Reset the text output device hardware and optionally run diagnostics
 
   @param This                 Pointer to EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL
   @param ExtendedVerification Indicates that a more extensive test may be performed
@@ -316,11 +305,10 @@ ConsoleLoggerEnableCursor (
 
   @param[in] ConsoleInfo  The pointer to the instance of the console logger information.
 
-  This will be used when a mode has changed or a reset ocurred to verify all
+  This will be used when a mode has changed or a reset occurred to verify all
   history buffers.
 **/
 EFI_STATUS
-EFIAPI
 ConsoleLoggerResetBuffers(
   IN CONSOLE_LOGGER_PRIVATE_DATA *ConsoleInfo
   );

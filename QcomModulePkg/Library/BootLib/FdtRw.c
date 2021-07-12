@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020, 2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2006 David Gibson, IBM Corporation.
  *
  * libfdt is dual licensed: you can use it either under the terms of
@@ -103,10 +103,13 @@ STATIC BOOLEAN IsNodeAdded (CONST CHAR8 *NodeName, UINT32 NameLen)
   return FALSE;
 }
 
-STATIC VOID FdtAppendToNodeList (CONST CHAR8 *NodeName, INT32 NodeOffset)
+/* Node offset is from big to small order */
+STATIC VOID FdtAddToNodeList (CONST CHAR8 *NodeName, INT32 NodeOffset)
 {
   FDT_FIRST_LEVEL_NODE *Node;
   UINT32 NameLen;
+  FDT_FIRST_LEVEL_NODE *CurNode = NULL;
+  FDT_FIRST_LEVEL_NODE *PreNode = NULL;
 
   NameLen = GetNodeNameLen (NodeName);
   if (IsNodeAdded (NodeName, NameLen)) {
@@ -115,16 +118,31 @@ STATIC VOID FdtAppendToNodeList (CONST CHAR8 *NodeName, INT32 NodeOffset)
 
   Node = AllocateZeroPool (sizeof (*Node));
   if (Node) {
-    Node->Next = NodeList;
-    NodeList = Node;
+    Node->NodeOffset = NodeOffset;
     Node->NodeName = AllocateZeroPool (NameLen + 1);
     if (Node->NodeName) {
       CopyMem ((VOID *)Node->NodeName, NodeName, NameLen);
-
-      Node->NodeOffset = NodeOffset;
     } else {
-        FdtDeleteNodeList ();
+      FdtDeleteNodeList ();
+      return;
     }
+
+    PreNode = NodeList;
+    for (CurNode = NodeList; CurNode; CurNode = CurNode->Next) {
+      if (NodeOffset > CurNode->NodeOffset) {
+        break;
+      }
+      PreNode = CurNode;
+    }
+
+    if (PreNode &&
+        (PreNode != CurNode)) {
+      PreNode->Next = Node;
+      Node->Next = CurNode;
+      return;
+    }
+    Node->Next = PreNode;
+    NodeList = Node;
   } else {
     FdtDeleteNodeList ();
   }
@@ -160,7 +178,7 @@ VOID FdtUpdateNodeOffsetInList (INT32 NodeOffset, INT32 DiffLen)
   }
 
   for (Node = NodeList; Node; Node = Node->Next) {
-    if (Node->NodeOffset > NodeOffset) {
+    if (Node->NodeOffset >= NodeOffset) {
       Node->NodeOffset +=  DiffLen;
     } else {
       break;
@@ -261,7 +279,7 @@ STATIC INT32 FdtSubnodeOffsetNamelen (CONST VOID *Fdt,
           /* short match: Some error occurs  */
           return 0;
         }
-        FdtAppendToNodeList (Ptr, Offset);
+        FdtAddToNodeList (Ptr, Offset);
       }
       /* Return the offset if find the node */
       if (FdtNodeNameEq (Fdt, Offset, Name, NameLen)) {
@@ -425,4 +443,60 @@ INT32 FdtSetProp (VOID *Fdt, INT32 Offset, CONST CHAR8 *Name,
     Ret = fdt_setprop (Fdt, Offset, Name, Val, Len);
   }
   return Ret;
+}
+
+/**
+ * FdtAddSubnode - creates a new node
+ * @Fdt: pointer to the device tree blob
+ * @ParentOffset: structure block offset of a node
+ * @Name: name of the subnode to locate
+ *
+ * fdt_add_subnode() creates a new node as a subnode of the node at
+ * structure block offset parentoffset, with the given name (which
+ * should include the unit address, if any).
+ *
+ * This function will insert data into the blob, and will therefore
+ * change the offsets of some existing nodes.
+
+ * returns:
+ * structure block offset of the created nodeequested subnode (>=0), on
+ *  success
+ * -FDT_ERR_NOTFOUND, if the requested subnode does not exist
+ * -FDT_ERR_BADOFFSET, if parentoffset did not point to an FDT_BEGIN_NODE
+ *  tag
+ * -FDT_ERR_EXISTS, if the node at parentoffset already has a subnode of
+ *  the given name
+ * -FDT_ERR_NOSPACE, if there is insufficient free space in the
+ *  blob to contain the new node
+ * -FDT_ERR_NOSPACE,
+ * -FDT_ERR_BADLAYOUT,
+ * -FDT_ERR_BADMAGIC,
+ * -FDT_ERR_BADVERSION,
+ * -FDT_ERR_BADSTATE,
+ * -FDT_ERR_BADSTRUCTURE,
+ * -FDT_ERR_TRUNCATED, standard meanings.
+ */
+
+INT32 FdtAddSubnode (VOID *Fdt, INT32 ParentOffset, CONST CHAR8 *Name)
+{
+  struct fdt_node_header *Nh;
+  INT32 OldLen, NewLen;
+  INT32 Offset = 0;
+
+  Offset = fdt_add_subnode_namelen (Fdt, ParentOffset,
+                                    Name, AsciiStrLen (Name));
+  if (FixedPcdGetBool (EnableNewNodeSearchFuc)) {
+    if (Offset > 0) {
+      OldLen = 0;
+      Nh = (VOID *)Fdt + fdt_off_dt_struct (Fdt) + Offset;
+      NewLen = sizeof (*Nh) + FDT_TAGALIGN (AsciiStrLen (Name) + 1) +
+               FDT_TAGSIZE;
+
+      /* Update the node's offset in the list */
+      FdtUpdateNodeOffsetInList (
+         Offset, FDT_TAGALIGN (NewLen) - FDT_TAGALIGN (OldLen));
+    }
+    FdtAddToNodeList (Name, Offset);
+  }
+  return Offset;
 }

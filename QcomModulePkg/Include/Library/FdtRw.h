@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -41,6 +41,7 @@ INT32 FdtGetPropLen (VOID *Fdt, INT32 Offset, CONST CHAR8 *Name);
 VOID FdtUpdateNodeOffsetInList (INT32 NodeOffset, INT32 DiffLen);
 INT32 FdtSetProp (VOID *Fdt, INT32 Offset, CONST CHAR8 *Name,
                     CONST VOID *Val, INT32 Len);
+INT32 FdtAddSubnode (VOID *Fdt, INT32 ParentOffset, CONST CHAR8 *Name);
 
 #define FDT_ALIGN(x, a) (((x) + (a)-1) & ~((a)-1))
 #define FDT_TAGALIGN(x) (FDT_ALIGN((x), FDT_TAGSIZE))

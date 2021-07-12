@@ -1,14 +1,10 @@
 /** @file
   Header file for real time clock driver.
 
-Copyright (c) 2006 - 2015, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
+Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2017, AMD Inc. All rights reserved.<BR>
 
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -18,6 +14,8 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
 
 #include <Uefi.h>
+
+#include <Guid/Acpi.h>
 
 #include <Protocol/RealTimeClock.h>
 
@@ -34,15 +32,14 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #include <Library/PcdLib.h>
 #include <Library/ReportStatusCodeLib.h>
 
-
 typedef struct {
   EFI_LOCK  RtcLock;
   INT16     SavedTimeZone;
   UINT8     Daylight;
+  UINT8     CenturyRtcAddress;
 } PC_RTC_MODULE_GLOBALS;
 
-#define PCAT_RTC_ADDRESS_REGISTER 0x70
-#define PCAT_RTC_DATA_REGISTER    0x71
+extern PC_RTC_MODULE_GLOBALS  mModuleGlobal;
 
 //
 // Dallas DS12C887 Real Time Clock
@@ -70,13 +67,6 @@ typedef struct {
 #define RTC_INIT_HOUR   0
 #define RTC_INIT_DAY    1
 #define RTC_INIT_MONTH  1
-
-//
-// Register initial values
-//
-#define RTC_INIT_REGISTER_A 0x26
-#define RTC_INIT_REGISTER_B 0x02
-#define RTC_INIT_REGISTER_D 0x0
 
 #pragma pack(1)
 //
@@ -120,7 +110,7 @@ typedef struct {
   UINT8 Uf : 1;       // Update End Interrupt Flag
   UINT8 Af : 1;       // Alarm Interrupt Flag
   UINT8 Pf : 1;       // Periodic Interrupt Flag
-  UINT8 Irqf : 1;     // Iterrupt Request Flag = PF & PIE | AF & AIE | UF & UIE
+  UINT8 Irqf : 1;     // Interrupt Request Flag = PF & PIE | AF & AIE | UF & UIE
 } RTC_REGISTER_C_BITS;
 
 typedef union {
@@ -244,7 +234,7 @@ PcRtcGetWakeupTime (
 /**
   The user Entry Point for PcRTC module.
 
-  This is the entrhy point for PcRTC module. It installs the UEFI runtime service
+  This is the entry point for PcRTC module. It installs the UEFI runtime service
   including GetTime(),SetTime(),GetWakeupTime(),and SetWakeupTime().
 
   @param  ImageHandle    The firmware allocated handle for the EFI image.
@@ -276,9 +266,9 @@ RtcTimeFieldsValid (
   );
 
 /**
-  Converts time from EFI_TIME format defined by UEFI spec to RTC's.
+  Converts time from EFI_TIME format defined by UEFI spec to RTC format.
 
-  This function converts time from EFI_TIME format defined by UEFI spec to RTC's.
+  This function converts time from EFI_TIME format defined by UEFI spec to RTC format.
   If data mode of RTC is BCD, then converts EFI_TIME to it.
   If RTC is in 12-hour format, then converts EFI_TIME to it.
 
@@ -322,7 +312,7 @@ ConvertRtcTimeToEfiTime (
   @param    Timeout  Tell how long it should take to wait.
 
   @retval   EFI_DEVICE_ERROR   RTC device error.
-  @retval   EFI_SUCCESS        RTC is updated and ready.  
+  @retval   EFI_SUCCESS        RTC is updated and ready.
 **/
 EFI_STATUS
 RtcWaitToUpdate (
@@ -355,4 +345,30 @@ IsLeapYear (
   IN EFI_TIME   *Time
   );
 
+/**
+  Get the century RTC address from the ACPI FADT table.
+
+  @return  The century RTC address or 0 if not found.
+**/
+UINT8
+GetCenturyRtcAddress (
+  VOID
+  );
+
+/**
+  Notification function of ACPI Table change.
+
+  This is a notification function registered on ACPI Table change event.
+  It saves the Century address stored in ACPI FADT table.
+
+  @param  Event        Event whose notification function is being invoked.
+  @param  Context      Pointer to the notification function's context.
+
+**/
+VOID
+EFIAPI
+PcRtcAcpiTableChangeCallback (
+  IN EFI_EVENT        Event,
+  IN VOID             *Context
+  );
 #endif

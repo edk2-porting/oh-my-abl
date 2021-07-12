@@ -4,14 +4,9 @@
 
   Copyright (c) 2010 - 2015, Intel Corporation. All rights reserved.<BR>
   Copyright (c) 2015, Linaro Ltd. All rights reserved.<BR>
+  (C) Copyright 2016 Hewlett Packard Enterprise Development LP<BR>
 
-  This program and the accompanying materials are licensed and made available under
-  the terms and conditions of the BSD License that accompanies this distribution.
-  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php.
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -31,11 +26,14 @@ SECTIONS {
     *(.got .got.*)
 
     /*
-     * The contents of AutoGen.c files are constant from the POV of the program,
-     * but most of its contents end up in .data or .bss by default since few of
+     * The contents of AutoGen.c files are mostly constant from the POV of the
+     * program, but most of it ends up in .data or .bss by default since few of
      * the variable definitions that get emitted are declared as CONST.
+     * Unfortunately, we cannot pull it into the .text section entirely, since
+     * patchable PCDs are also emitted here, but we can at least move all of the
+     * emitted GUIDs here.
      */
-    *:AutoGen.obj(.data .data.* .bss .bss.*)
+    *:AutoGen.obj(.data.g*Guid)
   }
 
   /*
@@ -46,16 +44,26 @@ SECTIONS {
    */
   .data ALIGN(ALIGNOF(.text)) : ALIGN(CONSTANT(COMMONPAGESIZE)) {
     *(.data .data.* .gnu.linkonce.d.*)
-    *(.bss .bss.* *COM*)
+    *(.bss .bss.*)
   }
 
   .eh_frame ALIGN(CONSTANT(COMMONPAGESIZE)) : {
     KEEP (*(.eh_frame))
   }
 
-  .rela ALIGN(CONSTANT(COMMONPAGESIZE)) : {
+  .rela (INFO) : {
     *(.rela .rela.*)
   }
+
+  .hii : ALIGN(CONSTANT(COMMONPAGESIZE)) {
+    KEEP (*(.hii))
+  }
+
+  /*
+   * Retain the GNU build id but in a non-allocatable section so GenFw
+   * does not copy it into the PE/COFF image.
+   */
+  .build-id (INFO) : { *(.note.gnu.build-id) }
 
   /DISCARD/ : {
     *(.note.GNU-stack)
@@ -64,7 +72,8 @@ SECTIONS {
     *(.dynsym)
     *(.dynstr)
     *(.dynamic)
-    *(.hash)
+    *(.hash .gnu.hash)
     *(.comment)
+    *(COMMON)
   }
 }

@@ -5,21 +5,19 @@
   Copyright (C) 2013 - 2014, Red Hat, Inc.
   Copyright (c) 2011 - 2013, Intel Corporation. All rights reserved.<BR>
 
-  This program and the accompanying materials are licensed and made available
-  under the terms and conditions of the BSD License which accompanies this
-  distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS, WITHOUT
-  WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
+
+#include <Uefi.h>
 
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>
 #include <Library/IoLib.h>
-#include <Library/PcdLib.h>
 #include <Library/QemuFwCfgLib.h>
+#include <Library/UefiBootServicesTableLib.h>
+
+#include <Protocol/FdtClient.h>
 
 STATIC UINTN mFwCfgSelectorAddress;
 STATIC UINTN mFwCfgDataAddress;
@@ -38,55 +36,46 @@ VOID (EFIAPI READ_BYTES_FUNCTION) (
   IN VOID  *Buffer OPTIONAL
   );
 
+/**
+  Writes bytes from a buffer to firmware configuration
+
+  @param[in] Size    Size in bytes to write
+  @param[in] Buffer  Buffer to transfer data from (OPTIONAL if Size is 0)
+
+**/
+typedef
+VOID (EFIAPI WRITE_BYTES_FUNCTION) (
+  IN UINTN Size,
+  IN VOID  *Buffer OPTIONAL
+  );
+
+/**
+  Skips bytes in firmware configuration
+
+  @param[in] Size  Size in bytes to skip
+
+**/
+typedef
+VOID (EFIAPI SKIP_BYTES_FUNCTION) (
+  IN UINTN Size
+  );
+
 //
 // Forward declaration of the two implementations we have.
 //
 STATIC READ_BYTES_FUNCTION MmioReadBytes;
+STATIC WRITE_BYTES_FUNCTION MmioWriteBytes;
+STATIC SKIP_BYTES_FUNCTION MmioSkipBytes;
 STATIC READ_BYTES_FUNCTION DmaReadBytes;
+STATIC WRITE_BYTES_FUNCTION DmaWriteBytes;
+STATIC SKIP_BYTES_FUNCTION DmaSkipBytes;
 
 //
-// This points to the one we detect at runtime.
+// These correspond to the implementation we detect at runtime.
 //
 STATIC READ_BYTES_FUNCTION *InternalQemuFwCfgReadBytes = MmioReadBytes;
-
-//
-// Communication structure for DmaReadBytes(). All fields are encoded in big
-// endian.
-//
-#pragma pack (1)
-typedef struct {
-  UINT32 Control;
-  UINT32 Length;
-  UINT64 Address;
-} FW_CFG_DMA_ACCESS;
-#pragma pack ()
-
-//
-// Macros for the FW_CFG_DMA_ACCESS.Control bitmap (in native encoding).
-//
-#define FW_CFG_DMA_CTL_ERROR  BIT0
-#define FW_CFG_DMA_CTL_READ   BIT1
-#define FW_CFG_DMA_CTL_SKIP   BIT2
-#define FW_CFG_DMA_CTL_SELECT BIT3
-
-
-/**
-  Returns a boolean indicating if the firmware configuration interface is
-  available for library-internal purposes.
-
-  This function never changes fw_cfg state.
-
-  @retval TRUE   The interface is available internally.
-  @retval FALSE  The interface is not available internally.
-**/
-BOOLEAN
-EFIAPI
-InternalQemuFwCfgIsAvailable (
-  VOID
-  )
-{
-  return (BOOLEAN)(mFwCfgSelectorAddress != 0 && mFwCfgDataAddress != 0);
-}
+STATIC WRITE_BYTES_FUNCTION *InternalQemuFwCfgWriteBytes = MmioWriteBytes;
+STATIC SKIP_BYTES_FUNCTION *InternalQemuFwCfgSkipBytes = MmioSkipBytes;
 
 
 /**
@@ -105,7 +94,7 @@ QemuFwCfgIsAvailable (
   VOID
   )
 {
-  return InternalQemuFwCfgIsAvailable ();
+  return (BOOLEAN)(mFwCfgSelectorAddress != 0 && mFwCfgDataAddress != 0);
 }
 
 
@@ -115,10 +104,75 @@ QemuFwCfgInitialize (
   VOID
   )
 {
-  mFwCfgSelectorAddress = (UINTN)PcdGet64 (PcdFwCfgSelectorAddress);
-  mFwCfgDataAddress     = (UINTN)PcdGet64 (PcdFwCfgDataAddress);
+  EFI_STATUS                    Status;
+  FDT_CLIENT_PROTOCOL           *FdtClient;
+  CONST UINT64                  *Reg;
+  UINT32                        RegSize;
+  UINTN                         AddressCells, SizeCells;
+  UINT64                        FwCfgSelectorAddress;
+  UINT64                        FwCfgSelectorSize;
+  UINT64                        FwCfgDataAddress;
+  UINT64                        FwCfgDataSize;
+  UINT64                        FwCfgDmaAddress;
+  UINT64                        FwCfgDmaSize;
 
-  if (InternalQemuFwCfgIsAvailable ()) {
+  Status = gBS->LocateProtocol (&gFdtClientProtocolGuid, NULL,
+                  (VOID **)&FdtClient);
+  ASSERT_EFI_ERROR (Status);
+
+  Status = FdtClient->FindCompatibleNodeReg (FdtClient, "qemu,fw-cfg-mmio",
+                         (CONST VOID **)&Reg, &AddressCells, &SizeCells,
+                         &RegSize);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_WARN,
+      "%a: No 'qemu,fw-cfg-mmio' compatible DT node found (Status == %r)\n",
+      __FUNCTION__, Status));
+    return EFI_SUCCESS;
+  }
+
+  ASSERT (AddressCells == 2);
+  ASSERT (SizeCells == 2);
+  ASSERT (RegSize == 2 * sizeof (UINT64));
+
+  FwCfgDataAddress     = SwapBytes64 (Reg[0]);
+  FwCfgDataSize        = 8;
+  FwCfgSelectorAddress = FwCfgDataAddress + FwCfgDataSize;
+  FwCfgSelectorSize    = 2;
+
+  //
+  // The following ASSERT()s express
+  //
+  //   Address + Size - 1 <= MAX_UINTN
+  //
+  // for both registers, that is, that the last byte in each MMIO range is
+  // expressible as a MAX_UINTN. The form below is mathematically
+  // equivalent, and it also prevents any unsigned overflow before the
+  // comparison.
+  //
+  ASSERT (FwCfgSelectorAddress <= MAX_UINTN - FwCfgSelectorSize + 1);
+  ASSERT (FwCfgDataAddress     <= MAX_UINTN - FwCfgDataSize     + 1);
+
+  mFwCfgSelectorAddress = FwCfgSelectorAddress;
+  mFwCfgDataAddress     = FwCfgDataAddress;
+
+  DEBUG ((EFI_D_INFO, "Found FwCfg @ 0x%Lx/0x%Lx\n", FwCfgSelectorAddress,
+    FwCfgDataAddress));
+
+  if (SwapBytes64 (Reg[1]) >= 0x18) {
+    FwCfgDmaAddress = FwCfgDataAddress + 0x10;
+    FwCfgDmaSize    = 0x08;
+
+    //
+    // See explanation above.
+    //
+    ASSERT (FwCfgDmaAddress <= MAX_UINTN - FwCfgDmaSize + 1);
+
+    DEBUG ((EFI_D_INFO, "Found FwCfg DMA @ 0x%Lx\n", FwCfgDmaAddress));
+  } else {
+    FwCfgDmaAddress = 0;
+  }
+
+  if (QemuFwCfgIsAvailable ()) {
     UINT32 Signature;
 
     QemuFwCfgSelectItem (QemuFwCfgItemSignature);
@@ -128,14 +182,16 @@ QemuFwCfgInitialize (
       // For DMA support, we require the DTB to advertise the register, and the
       // feature bitmap (which we read without DMA) to confirm the feature.
       //
-      if (PcdGet64 (PcdFwCfgDmaAddress) != 0) {
+      if (FwCfgDmaAddress != 0) {
         UINT32 Features;
 
         QemuFwCfgSelectItem (QemuFwCfgItemInterfaceVersion);
         Features = QemuFwCfgRead32 ();
-        if ((Features & BIT1) != 0) {
-          mFwCfgDmaAddress = PcdGet64 (PcdFwCfgDmaAddress);
+        if ((Features & FW_CFG_F_DMA) != 0) {
+          mFwCfgDmaAddress = FwCfgDmaAddress;
           InternalQemuFwCfgReadBytes = DmaReadBytes;
+          InternalQemuFwCfgWriteBytes = DmaWriteBytes;
+          InternalQemuFwCfgSkipBytes = DmaSkipBytes;
         }
       }
     } else {
@@ -162,7 +218,7 @@ QemuFwCfgSelectItem (
   IN FIRMWARE_CONFIG_ITEM QemuFwCfgItem
   )
 {
-  if (InternalQemuFwCfgIsAvailable ()) {
+  if (QemuFwCfgIsAvailable ()) {
     MmioWrite16 (mFwCfgSelectorAddress, SwapBytes16 ((UINT16)QemuFwCfgItem));
   }
 }
@@ -220,18 +276,33 @@ MmioReadBytes (
 
 
 /**
-  Fast READ_BYTES_FUNCTION.
+  Transfer an array of bytes, or skip a number of bytes, using the DMA
+  interface.
+
+  @param[in]     Size     Size in bytes to transfer or skip.
+
+  @param[in,out] Buffer   Buffer to read data into or write data from. Ignored,
+                          and may be NULL, if Size is zero, or Control is
+                          FW_CFG_DMA_CTL_SKIP.
+
+  @param[in]     Control  One of the following:
+                          FW_CFG_DMA_CTL_WRITE - write to fw_cfg from Buffer.
+                          FW_CFG_DMA_CTL_READ  - read from fw_cfg into Buffer.
+                          FW_CFG_DMA_CTL_SKIP  - skip bytes in fw_cfg.
 **/
 STATIC
 VOID
-EFIAPI
-DmaReadBytes (
-  IN UINTN Size,
-  IN VOID  *Buffer OPTIONAL
+DmaTransferBytes (
+  IN     UINTN  Size,
+  IN OUT VOID   *Buffer OPTIONAL,
+  IN     UINT32 Control
   )
 {
   volatile FW_CFG_DMA_ACCESS Access;
   UINT32                     Status;
+
+  ASSERT (Control == FW_CFG_DMA_CTL_WRITE || Control == FW_CFG_DMA_CTL_READ ||
+    Control == FW_CFG_DMA_CTL_SKIP);
 
   if (Size == 0) {
     return;
@@ -239,7 +310,7 @@ DmaReadBytes (
 
   ASSERT (Size <= MAX_UINT32);
 
-  Access.Control = SwapBytes32 (FW_CFG_DMA_CTL_READ);
+  Access.Control = SwapBytes32 (Control);
   Access.Length  = SwapBytes32 ((UINT32)Size);
   Access.Address = SwapBytes64 ((UINT64)(UINTN)Buffer);
 
@@ -275,6 +346,21 @@ DmaReadBytes (
 
 
 /**
+  Fast READ_BYTES_FUNCTION.
+**/
+STATIC
+VOID
+EFIAPI
+DmaReadBytes (
+  IN UINTN Size,
+  IN VOID  *Buffer OPTIONAL
+  )
+{
+  DmaTransferBytes (Size, Buffer, FW_CFG_DMA_CTL_READ);
+}
+
+
+/**
   Reads firmware configuration bytes into a buffer
 
   If called multiple times, then the data read will continue at the offset of
@@ -291,12 +377,47 @@ QemuFwCfgReadBytes (
   IN VOID  *Buffer
   )
 {
-  if (InternalQemuFwCfgIsAvailable ()) {
+  if (QemuFwCfgIsAvailable ()) {
     InternalQemuFwCfgReadBytes (Size, Buffer);
   } else {
     ZeroMem (Buffer, Size);
   }
 }
+
+
+/**
+  Slow WRITE_BYTES_FUNCTION.
+**/
+STATIC
+VOID
+EFIAPI
+MmioWriteBytes (
+  IN UINTN Size,
+  IN VOID  *Buffer OPTIONAL
+  )
+{
+  UINTN Idx;
+
+  for (Idx = 0; Idx < Size; ++Idx) {
+    MmioWrite8 (mFwCfgDataAddress, ((UINT8 *)Buffer)[Idx]);
+  }
+}
+
+
+/**
+  Fast WRITE_BYTES_FUNCTION.
+**/
+STATIC
+VOID
+EFIAPI
+DmaWriteBytes (
+  IN UINTN Size,
+  IN VOID  *Buffer OPTIONAL
+  )
+{
+  DmaTransferBytes (Size, Buffer, FW_CFG_DMA_CTL_WRITE);
+}
+
 
 /**
   Write firmware configuration bytes from a buffer
@@ -315,12 +436,71 @@ QemuFwCfgWriteBytes (
   IN VOID                   *Buffer
   )
 {
-  if (InternalQemuFwCfgIsAvailable ()) {
-    UINTN Idx;
+  if (QemuFwCfgIsAvailable ()) {
+    InternalQemuFwCfgWriteBytes (Size, Buffer);
+  }
+}
 
-    for (Idx = 0; Idx < Size; ++Idx) {
-      MmioWrite8 (mFwCfgDataAddress, ((UINT8 *)Buffer)[Idx]);
-    }
+
+/**
+  Slow SKIP_BYTES_FUNCTION.
+**/
+STATIC
+VOID
+EFIAPI
+MmioSkipBytes (
+  IN UINTN Size
+  )
+{
+  UINTN ChunkSize;
+  UINT8 SkipBuffer[256];
+
+  //
+  // Emulate the skip by reading data in chunks, and throwing it away. The
+  // implementation below doesn't affect the static data footprint for client
+  // modules. Large skips are not expected, therefore this fallback is not
+  // performance critical. The size of SkipBuffer is thought not to exert a
+  // large pressure on the stack.
+  //
+  while (Size > 0) {
+    ChunkSize = MIN (Size, sizeof SkipBuffer);
+    MmioReadBytes (ChunkSize, SkipBuffer);
+    Size -= ChunkSize;
+  }
+}
+
+
+/**
+  Fast SKIP_BYTES_FUNCTION.
+**/
+STATIC
+VOID
+EFIAPI
+DmaSkipBytes (
+  IN UINTN Size
+  )
+{
+  DmaTransferBytes (Size, NULL, FW_CFG_DMA_CTL_SKIP);
+}
+
+
+/**
+  Skip bytes in the firmware configuration item.
+
+  Increase the offset of the firmware configuration item without transferring
+  bytes between the item and a caller-provided buffer. Subsequent read, write
+  or skip operations will commence at the increased offset.
+
+  @param[in] Size  Number of bytes to skip.
+**/
+VOID
+EFIAPI
+QemuFwCfgSkipBytes (
+  IN UINTN Size
+  )
+{
+  if (QemuFwCfgIsAvailable ()) {
+    InternalQemuFwCfgSkipBytes (Size);
   }
 }
 
@@ -425,7 +605,7 @@ QemuFwCfgFindFile (
   UINT32 Count;
   UINT32 Idx;
 
-  if (!InternalQemuFwCfgIsAvailable ()) {
+  if (!QemuFwCfgIsAvailable ()) {
     return RETURN_UNSUPPORTED;
   }
 
@@ -450,21 +630,4 @@ QemuFwCfgFindFile (
   }
 
   return RETURN_NOT_FOUND;
-}
-
-
-/**
-  Determine if S3 support is explicitly enabled.
-
-  @retval TRUE   if S3 support is explicitly enabled.
-          FALSE  otherwise. This includes unavailability of the firmware
-                 configuration interface.
-**/
-BOOLEAN
-EFIAPI
-QemuFwCfgS3Enabled (
-  VOID
-  )
-{
-  return FALSE;
 }

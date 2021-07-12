@@ -2,14 +2,9 @@
   Last PEIM.
   Responsibility of this module is to load the DXE Core from a Firmware Volume.
 
-Copyright (c) 2006 - 2012, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2016 HP Development Company, L.P.
+Copyright (c) 2006 - 2019, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -24,6 +19,12 @@ CONST EFI_DXE_IPL_PPI mDxeIplPpi = {
   DxeLoadCore
 };
 
+CONST EFI_PEI_PPI_DESCRIPTOR mDxeIplPpiList = {
+  EFI_PEI_PPI_DESCRIPTOR_PPI | EFI_PEI_PPI_DESCRIPTOR_TERMINATE_LIST,
+  &gEfiDxeIplPpiGuid,
+  (VOID *) &mDxeIplPpi
+};
+
 CONST EFI_PEI_GUIDED_SECTION_EXTRACTION_PPI mCustomGuidedSectionExtractionPpi = {
   CustomGuidedSectionExtract
 };
@@ -32,17 +33,10 @@ CONST EFI_PEI_DECOMPRESS_PPI mDecompressPpi = {
   Decompress
 };
 
-CONST EFI_PEI_PPI_DESCRIPTOR mPpiList[] = {
-  {
-    EFI_PEI_PPI_DESCRIPTOR_PPI,
-    &gEfiDxeIplPpiGuid,
-    (VOID *) &mDxeIplPpi
-  },
-  {
-    (EFI_PEI_PPI_DESCRIPTOR_PPI | EFI_PEI_PPI_DESCRIPTOR_TERMINATE_LIST),
-    &gEfiPeiDecompressPpiGuid,
-    (VOID *) &mDecompressPpi
-  }
+CONST EFI_PEI_PPI_DESCRIPTOR mDecompressPpiList = {
+  (EFI_PEI_PPI_DESCRIPTOR_PPI | EFI_PEI_PPI_DESCRIPTOR_TERMINATE_LIST),
+  &gEfiPeiDecompressPpiGuid,
+  (VOID *) &mDecompressPpi
 };
 
 CONST EFI_PEI_PPI_DESCRIPTOR gEndOfPeiSignalPpi = {
@@ -51,17 +45,23 @@ CONST EFI_PEI_PPI_DESCRIPTOR gEndOfPeiSignalPpi = {
   NULL
 };
 
+CONST EFI_PEI_NOTIFY_DESCRIPTOR mMemoryDiscoveredNotifyList = {
+  (EFI_PEI_PPI_DESCRIPTOR_NOTIFY_DISPATCH | EFI_PEI_PPI_DESCRIPTOR_TERMINATE_LIST),
+  &gEfiPeiMemoryDiscoveredPpiGuid,
+  InstallIplPermanentMemoryPpis
+};
+
 /**
   Entry point of DXE IPL PEIM.
-  
-  This function installs DXE IPL PPI and Decompress PPI.  It also reloads
+
+  This function installs DXE IPL PPI.  It also reloads
   itself to memory on non-S3 resume boot path.
 
   @param  FileHandle  Handle of the file being invoked.
   @param  PeiServices Describes the list of possible PEI Services.
 
   @retval EFI_SUCESS  The entry point of DXE IPL PEIM executes successfully.
-  @retval Others      Some error occurs during the execution of this function. 
+  @retval Others      Some error occurs during the execution of this function.
 
 **/
 EFI_STATUS
@@ -73,34 +73,93 @@ PeimInitializeDxeIpl (
 {
   EFI_STATUS                                Status;
   EFI_BOOT_MODE                             BootMode;
-  EFI_GUID                                  *ExtractHandlerGuidTable;
-  UINTN                                     ExtractHandlerNumber;
-  EFI_PEI_PPI_DESCRIPTOR                    *GuidPpi;
-  
+  VOID                                      *Dummy;
+
   BootMode = GetBootModeHob ();
 
   if (BootMode != BOOT_ON_S3_RESUME) {
     Status = PeiServicesRegisterForShadow (FileHandle);
     if (Status == EFI_SUCCESS) {
       //
-      // EFI_SUCESS means it is the first time to call register for shadow. 
-      // 
+      // EFI_SUCESS means it is the first time to call register for shadow.
+      //
       return Status;
     }
-    
+
     //
     // Ensure that DXE IPL is shadowed to permanent memory.
     //
     ASSERT (Status == EFI_ALREADY_STARTED);
+
+    //
+    // DXE core load requires permanent memory.
+    //
+    Status = PeiServicesLocatePpi (
+               &gEfiPeiMemoryDiscoveredPpiGuid,
+               0,
+               NULL,
+               (VOID **) &Dummy
+               );
+    ASSERT_EFI_ERROR (Status);
+    if (EFI_ERROR (Status)) {
+      return Status;
+    }
+
+    //
+    // Now the permanent memory exists, install the PPIs for decompression
+    // and section extraction.
+    //
+    Status = InstallIplPermanentMemoryPpis (NULL, NULL, NULL);
+    ASSERT_EFI_ERROR (Status);
+  } else {
+    //
+    // Install memory discovered PPI notification to install PPIs for
+    // decompression and section extraction.
+    //
+    Status = PeiServicesNotifyPpi (&mMemoryDiscoveredNotifyList);
+    ASSERT_EFI_ERROR (Status);
   }
-     
+
   //
-  // Get custom extract guided section method guid list 
+  // Install DxeIpl PPI.
+  //
+  Status = PeiServicesInstallPpi (&mDxeIplPpiList);
+  ASSERT_EFI_ERROR(Status);
+
+  return Status;
+}
+
+/**
+   This function installs the PPIs that require permanent memory.
+
+   @param  PeiServices      Indirect reference to the PEI Services Table.
+   @param  NotifyDescriptor Address of the notification descriptor data structure.
+   @param  Ppi              Address of the PPI that was installed.
+
+   @return EFI_SUCCESS      The PPIs were installed successfully.
+   @return Others           Some error occurs during the execution of this function.
+
+**/
+EFI_STATUS
+EFIAPI
+InstallIplPermanentMemoryPpis (
+  IN EFI_PEI_SERVICES           **PeiServices,
+  IN EFI_PEI_NOTIFY_DESCRIPTOR  *NotifyDescriptor,
+  IN VOID                       *Ppi
+  )
+{
+  EFI_STATUS                    Status;
+  EFI_GUID                      *ExtractHandlerGuidTable;
+  UINTN                         ExtractHandlerNumber;
+  EFI_PEI_PPI_DESCRIPTOR        *GuidPpi;
+
+  //
+  // Get custom extract guided section method guid list
   //
   ExtractHandlerNumber = ExtractGuidedSectionGetGuidList (&ExtractHandlerGuidTable);
-  
+
   //
-  // Install custom extraction guid PPI
+  // Install custom guided section extraction PPI
   //
   if (ExtractHandlerNumber > 0) {
     GuidPpi = (EFI_PEI_PPI_DESCRIPTOR *) AllocatePool (ExtractHandlerNumber * sizeof (EFI_PEI_PPI_DESCRIPTOR));
@@ -113,18 +172,18 @@ PeimInitializeDxeIpl (
       ASSERT_EFI_ERROR(Status);
     }
   }
-  
+
   //
-  // Install DxeIpl and Decompress PPIs.
+  // Install Decompress PPI.
   //
-  Status = PeiServicesInstallPpi (mPpiList);
+  Status = PeiServicesInstallPpi (&mDecompressPpiList);
   ASSERT_EFI_ERROR(Status);
 
   return Status;
 }
 
 /**
-   Validate variable data for the MemoryTypeInformation. 
+   Validate variable data for the MemoryTypeInformation.
 
    @param MemoryData       Variable data.
    @param MemoryDataSize   Variable data length.
@@ -171,16 +230,16 @@ ValidateMemoryTypeInfoVariable (
 }
 
 /**
-   Main entry point to last PEIM. 
+   Main entry point to last PEIM.
 
    This function finds DXE Core in the firmware volume and transfer the control to
    DXE core.
-    
+
    @param This          Entry point for DXE IPL PPI.
    @param PeiServices   General purpose services available to every PEIM.
    @param HobList       Address to the Pei HOB list.
-   
-   @return EFI_SUCCESS              DXE core was successfully loaded. 
+
+   @return EFI_SUCCESS              DXE core was successfully loaded.
    @return EFI_OUT_OF_RESOURCES     There are not enough resources to load DXE core.
 
 **/
@@ -206,7 +265,9 @@ DxeLoadCore (
   UINTN                                     DataSize;
   EFI_PEI_S3_RESUME2_PPI                    *S3Resume;
   EFI_PEI_RECOVERY_MODULE_PPI               *PeiRecovery;
+  EDKII_PEI_CAPSULE_ON_DISK_PPI             *PeiCapsuleOnDisk;
   EFI_MEMORY_TYPE_INFORMATION               MemoryData[EfiMaxMemoryType + 1];
+  VOID                                      *CapsuleOnDiskModePpi;
 
   //
   // if in S3 Resume, restore configure
@@ -230,7 +291,7 @@ DxeLoadCore (
         );
     }
     ASSERT_EFI_ERROR (Status);
-    
+
     Status = S3Resume->S3RestoreConfig2 (S3Resume);
     ASSERT_EFI_ERROR (Status);
   } else if (BootMode == BOOT_IN_RECOVERY_MODE) {
@@ -245,7 +306,7 @@ DxeLoadCore (
     if (EFI_ERROR (Status)) {
       DEBUG ((DEBUG_ERROR, "Locate Recovery PPI Failed.(Status = %r)\n", Status));
       //
-      // Report Status code the failure of locating Recovery PPI 
+      // Report Status code the failure of locating Recovery PPI
       //
       REPORT_STATUS_CODE (
         EFI_ERROR_CODE | EFI_ERROR_MAJOR,
@@ -271,6 +332,32 @@ DxeLoadCore (
     //
     // Now should have a HOB with the DXE core
     //
+  } else if (BootMode == BOOT_ON_FLASH_UPDATE) {
+    //
+    // If Capsule On Disk mode, call storage stack to read Capsule Relocation file
+    // IoMmmu is highly recommmended to enable before reading
+    //
+    Status = PeiServicesLocatePpi (
+               &gEdkiiPeiBootInCapsuleOnDiskModePpiGuid,
+               0,
+               NULL,
+               &CapsuleOnDiskModePpi
+               );
+    if (!EFI_ERROR(Status)) {
+      Status = PeiServicesLocatePpi (
+                 &gEdkiiPeiCapsuleOnDiskPpiGuid,
+                 0,
+                 NULL,
+                 (VOID **) &PeiCapsuleOnDisk
+                 );
+
+      //
+      // Whether failed, still goes to Firmware Update boot path. BDS will clear corresponding indicator and reboot later on
+      //
+      if (!EFI_ERROR (Status)) {
+        Status = PeiCapsuleOnDisk->LoadCapsuleOnDisk (PeiServices, PeiCapsuleOnDisk);
+      }
+    }
   }
 
   if (GetFirstGuidHob ((CONST EFI_GUID *)&gEfiMemoryTypeInformationGuid) == NULL) {
@@ -285,8 +372,8 @@ DxeLoadCore (
                );
     if (!EFI_ERROR (Status)) {
       DataSize = sizeof (MemoryData);
-      Status = Variable->GetVariable ( 
-                           Variable, 
+      Status = Variable->GetVariable (
+                           Variable,
                            EFI_MEMORY_TYPE_INFORMATION_VARIABLE_NAME,
                            &gEfiMemoryTypeInformationGuid,
                            NULL,
@@ -376,7 +463,7 @@ DxeLoadCore (
    instance that contains DxeCore.
 
    @return FileHandle of DxeCore to load DxeCore.
-   
+
 **/
 EFI_PEI_FILE_HANDLE
 DxeIplFindDxeCore (
@@ -387,7 +474,7 @@ DxeIplFindDxeCore (
   UINTN                 Instance;
   EFI_PEI_FV_HANDLE     VolumeHandle;
   EFI_PEI_FILE_HANDLE   FileHandle;
-  
+
   Instance    = 0;
   while (TRUE) {
     //
@@ -402,7 +489,7 @@ DxeIplFindDxeCore (
       REPORT_STATUS_CODE (EFI_PROGRESS_CODE, (EFI_SOFTWARE_PEI_MODULE | EFI_SW_PEI_CORE_EC_DXE_CORRUPT));
     }
     ASSERT_EFI_ERROR (Status);
-    
+
     //
     // Find the DxeCore file type from the beginning in this firmware volume.
     //
@@ -455,7 +542,7 @@ DxeIplFindDxeCore (
                                 output buffer. If the input
                                 section's GuidedSectionHeader.
                                 Attributes field has the
-                                EFI_GUIDED_SECTION_AUTH_STATUS_VALID 
+                                EFI_GUIDED_SECTION_AUTH_STATUS_VALID
                                 bit as clear,
                                 AuthenticationStatus must return
                                 zero. These bits reflect the
@@ -465,14 +552,14 @@ DxeIplFindDxeCore (
                                 EFI_SUCCESS, the value of
                                 AuthenticationStatus is
                                 undefined.
-  
+
   @retval EFI_SUCCESS           The InputSection was
                                 successfully processed and the
                                 section contents were returned.
-  
+
   @retval EFI_OUT_OF_RESOURCES  The system has insufficient
                                 resources to process the request.
-  
+
   @retval EFI_INVALID_PARAMETER The GUID in InputSection does
                                 not match this instance of the
                                 GUIDed Section Extraction PPI.
@@ -493,7 +580,7 @@ CustomGuidedSectionExtract (
   UINT32          ScratchBufferSize;
   UINT32          OutputBufferSize;
   UINT16          SectionAttribute;
-  
+
   //
   // Init local variable
   //
@@ -508,12 +595,12 @@ CustomGuidedSectionExtract (
              &ScratchBufferSize,
              &SectionAttribute
              );
-  
+
   if (EFI_ERROR (Status)) {
     DEBUG ((DEBUG_ERROR, "GetInfo from guided section Failed - %r\n", Status));
     return Status;
   }
-  
+
   if (ScratchBufferSize != 0) {
     //
     // Allocate scratch buffer
@@ -524,24 +611,19 @@ CustomGuidedSectionExtract (
     }
   }
 
-  if (((SectionAttribute & EFI_GUIDED_SECTION_PROCESSING_REQUIRED) != 0) && OutputBufferSize > 0) {  
+  if (((SectionAttribute & EFI_GUIDED_SECTION_PROCESSING_REQUIRED) != 0) && OutputBufferSize > 0) {
     //
     // Allocate output buffer
     //
-    *OutputBuffer = AllocatePages (EFI_SIZE_TO_PAGES (OutputBufferSize) + 1);
+    *OutputBuffer = AllocatePages (EFI_SIZE_TO_PAGES (OutputBufferSize));
     if (*OutputBuffer == NULL) {
       return EFI_OUT_OF_RESOURCES;
     }
     DEBUG ((DEBUG_INFO, "Customized Guided section Memory Size required is 0x%x and address is 0x%p\n", OutputBufferSize, *OutputBuffer));
-    //
-    // *OutputBuffer still is one section. Adjust *OutputBuffer offset, 
-    // skip EFI section header to make section data at page alignment.
-    //
-    *OutputBuffer = (VOID *)((UINT8 *) *OutputBuffer + EFI_PAGE_SIZE - sizeof (EFI_COMMON_SECTION_HEADER));
   }
-  
+
   Status = ExtractGuidedSectionDecode (
-             InputSection, 
+             InputSection,
              OutputBuffer,
              ScratchBuffer,
              AuthenticationStatus
@@ -553,9 +635,9 @@ CustomGuidedSectionExtract (
     DEBUG ((DEBUG_ERROR, "Extract guided section Failed - %r\n", Status));
     return Status;
   }
-  
+
   *OutputSize = (UINTN) OutputBufferSize;
-  
+
   return EFI_SUCCESS;
 }
 
@@ -567,7 +649,7 @@ CustomGuidedSectionExtract (
    This function looks up the compression type field in the input section and
    applies the appropriate compression algorithm to compress the section to a
    callee allocated buffer.
-    
+
    @param  This                  Points to this instance of the
                                  EFI_PEI_DECOMPRESS_PEI PPI.
    @param  CompressionSection    Points to the compressed section.
@@ -575,14 +657,14 @@ CustomGuidedSectionExtract (
                                  sections.
    @param  OutputSize            Holds the returned size of the decompress
                                  section streams.
-   
+
    @retval EFI_SUCCESS           The section was decompressed successfully.
                                  OutputBuffer contains the resulting data and
                                  OutputSize contains the resulting size.
 
 **/
 EFI_STATUS
-EFIAPI 
+EFIAPI
 Decompress (
   IN CONST  EFI_PEI_DECOMPRESS_PPI  *This,
   IN CONST  EFI_COMPRESSION_SECTION *CompressionSection,
@@ -616,7 +698,7 @@ Decompress (
     UncompressedLength = CompressionSection->UncompressedLength;
     CompressionType = CompressionSection->CompressionType;
   }
-  
+
   //
   // This is a compression set, expand it
   //
@@ -648,17 +730,12 @@ Decompress (
         return EFI_OUT_OF_RESOURCES;
       }
       //
-      // Allocate destination buffer, extra one page for adjustment 
+      // Allocate destination buffer
       //
-      DstBuffer = AllocatePages (EFI_SIZE_TO_PAGES (DstBufferSize) + 1);
+      DstBuffer = AllocatePages (EFI_SIZE_TO_PAGES (DstBufferSize));
       if (DstBuffer == NULL) {
         return EFI_OUT_OF_RESOURCES;
       }
-      //
-      // DstBuffer still is one section. Adjust DstBuffer offset, skip EFI section header
-      // to make section data at page alignment.
-      //
-      DstBuffer = DstBuffer + EFI_PAGE_SIZE - sizeof (EFI_COMMON_SECTION_HEADER);
       //
       // Call decompress function
       //
@@ -689,15 +766,10 @@ Decompress (
     // Allocate destination buffer
     //
     DstBufferSize = UncompressedLength;
-    DstBuffer     = AllocatePages (EFI_SIZE_TO_PAGES (DstBufferSize) + 1);
+    DstBuffer     = AllocatePages (EFI_SIZE_TO_PAGES (DstBufferSize));
     if (DstBuffer == NULL) {
       return EFI_OUT_OF_RESOURCES;
     }
-    //
-    // Adjust DstBuffer offset, skip EFI section header
-    // to make section data at page alignment.
-    //
-    DstBuffer = DstBuffer + EFI_PAGE_SIZE - sizeof (EFI_COMMON_SECTION_HEADER);
     //
     // stream is not actually compressed, just encapsulated.  So just copy it.
     //
@@ -741,8 +813,8 @@ UpdateStackHob (
   while ((Hob.Raw = GetNextHob (EFI_HOB_TYPE_MEMORY_ALLOCATION, Hob.Raw)) != NULL) {
     if (CompareGuid (&gEfiHobMemoryAllocStackGuid, &(Hob.MemoryAllocationStack->AllocDescriptor.Name))) {
       //
-      // Build a new memory allocation HOB with old stack info with EfiBootServicesData type. Need to 
-      // avoid this region be reclaimed by DXE core as the IDT built in SEC might be on stack, and some 
+      // Build a new memory allocation HOB with old stack info with EfiBootServicesData type. Need to
+      // avoid this region be reclaimed by DXE core as the IDT built in SEC might be on stack, and some
       // PEIMs may also keep key information on stack
       //
       BuildMemoryAllocationHob (
@@ -760,3 +832,4 @@ UpdateStackHob (
     Hob.Raw = GET_NEXT_HOB (Hob);
   }
 }
+

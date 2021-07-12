@@ -1,14 +1,8 @@
 /** @file
   Post Code Library instance that writes post code values to I/O port 0x80.
 
-  Copyright (c) 2006 - 2010, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials                          
-  are licensed and made available under the terms and conditions of the BSD License         
-  which accompanies this distribution.  The full text of the license may be found at        
-  http://opensource.org/licenses/bsd-license.php.                                            
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,                     
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.             
+  Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -17,18 +11,19 @@
 #include <Library/PostCodeLib.h>
 #include <Library/PcdLib.h>
 #include <Library/IoLib.h>
+#include <Library/DebugLib.h>
 
 /**
   Sends an 32-bit value to a POST card.
 
-  Sends the 32-bit value specified by Value to a POST card, and returns Value.  
-  Some implementations of this library function may perform I/O operations 
-  directly to a POST card device.  Other implementations may send Value to 
-  ReportStatusCode(), and the status code reporting mechanism will eventually 
+  Sends the 32-bit value specified by Value to a POST card, and returns Value.
+  Some implementations of this library function may perform I/O operations
+  directly to a POST card device.  Other implementations may send Value to
+  ReportStatusCode(), and the status code reporting mechanism will eventually
   display the 32-bit value on the status reporting device.
-  
-  PostCode() must actively prevent recursion.  If PostCode() is called while 
-  processing another any other Post Code Library function, then 
+
+  PostCode() must actively prevent recursion.  If PostCode() is called while
+  processing another any other Post Code Library function, then
   PostCode() must return Value immediately.
 
   @param  Value  The 32-bit value to write to the POST card.
@@ -42,7 +37,24 @@ PostCode (
   IN UINT32  Value
   )
 {
-  IoWrite8 (0x80, (UINT8)(Value));
+  switch (PcdGet8 (PcdPort80DataWidth)) {
+  case 8:
+    IoWrite8 (0x80, (UINT8)(Value));
+    break;
+  case 16:
+    IoWrite16 (0x80, (UINT16)(Value));
+    break;
+  case 32:
+    IoWrite32 (0x80, Value);
+    break;
+  default:
+    //
+    // Assert on the invalid data width
+    //
+    ASSERT (FALSE);
+    break;
+  }
+
   return Value;
 }
 
@@ -51,21 +63,21 @@ PostCode (
   Sends an 32-bit value to a POST and associated ASCII string.
 
   Sends the 32-bit value specified by Value to a POST card, and returns Value.
-  If Description is not NULL, then the ASCII string specified by Description is 
-  also passed to the handler that displays the POST card value.  Some 
-  implementations of this library function may perform I/O operations directly 
-  to a POST card device.  Other implementations may send Value to ReportStatusCode(), 
-  and the status code reporting mechanism will eventually display the 32-bit 
-  value on the status reporting device.  
+  If Description is not NULL, then the ASCII string specified by Description is
+  also passed to the handler that displays the POST card value.  Some
+  implementations of this library function may perform I/O operations directly
+  to a POST card device.  Other implementations may send Value to ReportStatusCode(),
+  and the status code reporting mechanism will eventually display the 32-bit
+  value on the status reporting device.
 
-  PostCodeWithDescription()must actively prevent recursion.  If 
-  PostCodeWithDescription() is called while processing another any other Post 
-  Code Library function, then PostCodeWithDescription() must return Value 
+  PostCodeWithDescription()must actively prevent recursion.  If
+  PostCodeWithDescription() is called while processing another any other Post
+  Code Library function, then PostCodeWithDescription() must return Value
   immediately.
 
   @param  Value        The 32-bit value to write to the POST card.
-  @param  Description  The pointer to an ASCII string that is a description of the 
-                       POST code value.  This is an optional parameter that may 
+  @param  Description  The pointer to an ASCII string that is a description of the
+                       POST code value.  This is an optional parameter that may
                        be NULL.
 
   @return The 32-bit value to write to the POST card.
@@ -78,7 +90,7 @@ PostCodeWithDescription (
   IN CONST CHAR8  *Description  OPTIONAL
   )
 {
-  IoWrite8 (0x80, (UINT8)(Value));
+  PostCode (Value);
   return Value;
 }
 
@@ -86,12 +98,12 @@ PostCodeWithDescription (
 /**
   Returns TRUE if POST Codes are enabled.
 
-  This function returns TRUE if the POST_CODE_PROPERTY_POST_CODE_ENABLED 
+  This function returns TRUE if the POST_CODE_PROPERTY_POST_CODE_ENABLED
   bit of PcdPostCodePropertyMask is set.  Otherwise FALSE is returned.
 
-  @retval  TRUE   The POST_CODE_PROPERTY_POST_CODE_ENABLED bit of 
+  @retval  TRUE   The POST_CODE_PROPERTY_POST_CODE_ENABLED bit of
                   PcdPostCodeProperyMask is set.
-  @retval  FALSE  The POST_CODE_PROPERTY_POST_CODE_ENABLED bit of 
+  @retval  FALSE  The POST_CODE_PROPERTY_POST_CODE_ENABLED bit of
                   PcdPostCodeProperyMask is clear.
 
 **/

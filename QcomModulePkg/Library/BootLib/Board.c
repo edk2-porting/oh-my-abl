@@ -1,4 +1,5 @@
-/* Copyright (c) 2015-2018, 2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2018, 2020-2021, The Linux Foundation. All rights
+ * reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -431,6 +432,10 @@ BoardPmicModel (UINT32 PmicDeviceIndex)
   EFI_PM_DEVICE_INFO_TYPE pmic_info;
   UINT64 Revision;
 
+  if ( BoardPlatformType () == EFI_PLATFORMINFO_TYPE_RUMI ) {
+    return 0;
+  }
+
   Status = GetPmicInfo (PmicDeviceIndex, &pmic_info, &Revision);
   if (Status != EFI_SUCCESS) {
     DEBUG ((EFI_D_ERROR, "Error getting pmic model info: %r\n", Status));
@@ -450,13 +455,17 @@ BoardPmicTarget (UINT32 PmicDeviceIndex)
   EFI_PM_DEVICE_INFO_TYPE pmic_info;
   EFI_PM_DEVICE_INFO_EXT_TYPE pmic_info_ext;
 
+  if ( BoardPlatformType () == EFI_PLATFORMINFO_TYPE_RUMI ) {
+    return 0;
+  }
+
   Status = GetPmicInfo (PmicDeviceIndex, &pmic_info, &Revision);
   if (Status != EFI_SUCCESS) {
     DEBUG ((EFI_D_ERROR, "Error finding board pmic info: %r\n", Status));
     ASSERT (0);
   }
 
-  if (Revision >= PMIC_VERSION_REVISION) {
+  if (Revision <= PMIC_EXT_VERSION) {
     Status = GetPmicInfoExt (PmicDeviceIndex, &pmic_info_ext);
     if (Status != EFI_SUCCESS) {
       DEBUG ((EFI_D_VERBOSE, "Error finding board pmic info: %r\n", Status));
@@ -706,13 +715,22 @@ BoardHwPlatformName (CHAR8 *StrHwPlatform, UINT32 Len)
     StrHwPlatform[ChipIdValidLen - 1] = '\0';
 }
 
-EFI_STATUS BoardDdrType (UINT32 *Type)
+EFI_STATUS GetDdrSize (UINT64 *DdrSizeRet)
 {
   EFI_STATUS Status;
   RamPartitionEntry *RamPartitions = NULL;
   UINT32 i = 0;
+  STATIC UINT64 DdrSize;
   UINT32 NumPartitions = 0;
-  UINT64 DdrSize = 0;
+
+  if (DdrSizeRet == NULL) {
+    return EFI_INVALID_PARAMETER;
+  }
+
+  if (DdrSize) {
+    *DdrSizeRet = DdrSize;
+    return EFI_SUCCESS;
+  }
 
   Status = ReadRamPartitions (&RamPartitions, &NumPartitions);
   if (EFI_ERROR (Status)) {
@@ -720,9 +738,28 @@ EFI_STATUS BoardDdrType (UINT32 *Type)
     return Status;
   }
 
+  *DdrSizeRet = 0;
+
   for (i = 0; i < NumPartitions; i++) {
-    DdrSize += RamPartitions[i].AvailableLength;
+    *DdrSizeRet += RamPartitions[i].AvailableLength;
   }
+
+  DdrSize = *DdrSizeRet;
+
+  return Status;
+}
+
+EFI_STATUS BoardDdrType (UINT32 *Type)
+{
+  EFI_STATUS Status;
+  UINT64 DdrSize = 0;
+
+  Status = GetDdrSize (&DdrSize);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR, "Error getting DDR size %r\n", Status));
+    return Status;
+  }
+
   DEBUG ((EFI_D_INFO, "Total DDR Size: 0x%016lx \n", DdrSize));
 
   *Type = 0;

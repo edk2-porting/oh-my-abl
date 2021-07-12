@@ -1,3 +1,7 @@
 Build/
+.DS_Store
+*_extdep/
+*.pyc
+__pycache__/
 tags/
-build_modulepkg.log
+.vscode/

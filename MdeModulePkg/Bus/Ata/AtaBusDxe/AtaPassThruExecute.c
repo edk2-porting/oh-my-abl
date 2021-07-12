@@ -10,14 +10,9 @@
   for Security Protocol Specific layout. This implementation uses big endian for
   Cylinder register.
 
-  Copyright (c) 2009 - 2013, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2009 - 2018, Intel Corporation. All rights reserved.<BR>
+  (C) Copyright 2016 Hewlett Packard Enterprise Development LP<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 
 **/
@@ -413,7 +408,7 @@ DiscoverAtaDevice (
   //
   Acb = ZeroMem (&AtaDevice->Acb, sizeof (EFI_ATA_COMMAND_BLOCK));
   Acb->AtaCommand = ATA_CMD_IDENTIFY_DRIVE;
-  Acb->AtaDeviceHead = (UINT8) (BIT7 | BIT6 | BIT5 | (AtaDevice->PortMultiplierPort << 4));
+  Acb->AtaDeviceHead = (UINT8) (BIT7 | BIT6 | BIT5 | (AtaDevice->PortMultiplierPort == 0xFFFF ? 0 : (AtaDevice->PortMultiplierPort << 4)));
 
   //
   // Prepare for ATA pass through packet.
@@ -494,7 +489,7 @@ TransferAtaDevice (
   Acb->AtaSectorNumber = (UINT8) StartLba;
   Acb->AtaCylinderLow = (UINT8) RShiftU64 (StartLba, 8);
   Acb->AtaCylinderHigh = (UINT8) RShiftU64 (StartLba, 16);
-  Acb->AtaDeviceHead = (UINT8) (BIT7 | BIT6 | BIT5 | (AtaDevice->PortMultiplierPort << 4));
+  Acb->AtaDeviceHead = (UINT8) (BIT7 | BIT6 | BIT5 | (AtaDevice->PortMultiplierPort == 0xFFFF ? 0 : (AtaDevice->PortMultiplierPort << 4)));
   Acb->AtaSectorCount = (UINT8) TransferLength;
   if (AtaDevice->Lba48Bit) {
     Acb->AtaSectorNumberExp = (UINT8) RShiftU64 (StartLba, 24);
@@ -541,7 +536,7 @@ TransferAtaDevice (
   //
   // As AtaBus is used to manage ATA devices, we have to use the lowest transfer rate to
   // calculate the possible maximum timeout value for each read/write operation.
-  // The timout value is rounded up to nearest integar and here an additional 30s is added
+  // The timeout value is rounded up to nearest integer and here an additional 30s is added
   // to follow ATA spec in which it mentioned that the device may take up to 30s to respond
   // commands in the Standby/Idle mode.
   //
@@ -632,14 +627,14 @@ AtaTerminateNonBlockingTask (
 
   //
   // Aborting operation has been done. From now on, don't need to abort normal operation.
-  //  
+  //
   OldTpl = gBS->RaiseTPL (TPL_NOTIFY);
   AtaDevice->Abort = FALSE;
   gBS->RestoreTPL (OldTpl);
 }
 
 /**
-  Call back funtion when the event is signaled.
+  Call back function when the event is signaled.
 
   @param[in]  Event     The Event this notify function registered to.
   @param[in]  Context   Pointer to the context data registered to the
@@ -1026,7 +1021,7 @@ TrustTransferAtaDevice (
   //
   Acb->AtaCylinderHigh  = (UINT8) SecurityProtocolSpecificData;
   Acb->AtaCylinderLow   = (UINT8) (SecurityProtocolSpecificData >> 8);
-  Acb->AtaDeviceHead    = (UINT8) (BIT7 | BIT6 | BIT5 | (AtaDevice->PortMultiplierPort << 4));
+  Acb->AtaDeviceHead = (UINT8) (BIT7 | BIT6 | BIT5 | (AtaDevice->PortMultiplierPort == 0xFFFF ? 0 : (AtaDevice->PortMultiplierPort << 4)));
 
   //
   // Prepare for ATA pass through packet.

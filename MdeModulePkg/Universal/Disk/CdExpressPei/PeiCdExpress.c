@@ -1,25 +1,20 @@
 /** @file
   Source file for CD recovery PEIM
 
-Copyright (c) 2006 - 2015, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2006 - 2019, Intel Corporation. All rights reserved.<BR>
 
-This program and the accompanying materials
-are licensed and made available under the terms and conditions
-of the BSD License which accompanies this distribution.  The
-full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #include "PeiCdExpress.h"
 
 PEI_CD_EXPRESS_PRIVATE_DATA *mPrivateData = NULL;
+CHAR8 *mRecoveryFileName;
+UINTN mRecoveryFileNameSize;
 
 /**
-  Installs the Device Recovery Module PPI, Initialize BlockIo Ppi 
+  Installs the Device Recovery Module PPI, Initialize BlockIo Ppi
   installation notification
 
   @param  FileHandle            The file handle of the image.
@@ -46,6 +41,16 @@ CdExpressPeimEntry (
   PrivateData = AllocatePages (EFI_SIZE_TO_PAGES (sizeof (*PrivateData)));
   if (PrivateData == NULL) {
     return EFI_OUT_OF_RESOURCES;
+  }
+
+  mRecoveryFileNameSize = PcdGetSize(PcdRecoveryFileName) / sizeof(CHAR16);
+  mRecoveryFileName = AllocatePool(mRecoveryFileNameSize);
+  if (mRecoveryFileName == NULL) {
+    return EFI_OUT_OF_RESOURCES;
+  }
+  Status = UnicodeStrToAsciiStrS(PcdGetPtr(PcdRecoveryFileName), mRecoveryFileName, mRecoveryFileNameSize);
+  if (EFI_ERROR(Status)) {
+    return Status;
   }
 
   //
@@ -106,8 +111,8 @@ CdExpressPeimEntry (
 }
 
 /**
-  BlockIo installation notification function. 
-  
+  BlockIo installation notification function.
+
   This function finds out all the current Block IO PPIs in the system and add them
   into private data.
 
@@ -263,7 +268,7 @@ UpdateBlocksAndVolumes (
       if (EFI_ERROR (Status)) {
         continue;
       }
-  
+
       PrivateData->CapsuleCount++;
     }
 
@@ -399,7 +404,7 @@ FindRecoveryCapsules (
 
   @retval EFI_SUCCESS                   The recovery capsule is successfully found in the volume.
   @retval EFI_NOT_FOUND                 The recovery capsule is not found in the volume.
-  @retval Others                        
+  @retval Others
 
 **/
 EFI_STATUS
@@ -466,24 +471,25 @@ RetrieveCapsuleFileFromRoot (
       }
     }
 
-    if (Index != (sizeof (PEI_RECOVERY_FILE_NAME) - 1)) {
+    if (Index != mRecoveryFileNameSize - 1) {
       Buffer += FileRecord->Length;
       continue;
     }
 
-    if (!StringCmp (FileRecord->FileID, (UINT8 *) PEI_RECOVERY_FILE_NAME, sizeof (PEI_RECOVERY_FILE_NAME) - 1, FALSE)) {
+    if (!StringCmp (FileRecord->FileID, (UINT8 *)mRecoveryFileName, mRecoveryFileNameSize - 1, FALSE)) {
       Buffer += FileRecord->Length;
       continue;
     }
 
     PrivateData->CapsuleData[PrivateData->CapsuleCount].CapsuleStartLBA = FileRecord->LocationOfExtent[0];
-    PrivateData->CapsuleData[PrivateData->CapsuleCount].CapsuleSize =
+    PrivateData->CapsuleData[PrivateData->CapsuleCount].CapsuleBlockAlignedSize =
       (
         FileRecord->DataLength[0] /
         PEI_CD_BLOCK_SIZE +
         1
       ) *
       PEI_CD_BLOCK_SIZE;
+    PrivateData->CapsuleData[PrivateData->CapsuleCount].CapsuleSize = FileRecord->DataLength[0];
 
     return EFI_SUCCESS;
   }
@@ -495,18 +501,18 @@ RetrieveCapsuleFileFromRoot (
   Returns the number of DXE capsules residing on the device.
 
   This function searches for DXE capsules from the associated device and returns
-  the number and maximum size in bytes of the capsules discovered. Entry 1 is 
-  assumed to be the highest load priority and entry N is assumed to be the lowest 
+  the number and maximum size in bytes of the capsules discovered. Entry 1 is
+  assumed to be the highest load priority and entry N is assumed to be the lowest
   priority.
 
-  @param[in]  PeiServices              General-purpose services that are available 
+  @param[in]  PeiServices              General-purpose services that are available
                                        to every PEIM
   @param[in]  This                     Indicates the EFI_PEI_DEVICE_RECOVERY_MODULE_PPI
                                        instance.
-  @param[out] NumberRecoveryCapsules   Pointer to a caller-allocated UINTN. On 
-                                       output, *NumberRecoveryCapsules contains 
-                                       the number of recovery capsule images 
-                                       available for retrieval from this PEIM 
+  @param[out] NumberRecoveryCapsules   Pointer to a caller-allocated UINTN. On
+                                       output, *NumberRecoveryCapsules contains
+                                       the number of recovery capsule images
+                                       available for retrieval from this PEIM
                                        instance.
 
   @retval EFI_SUCCESS        One or more capsules were discovered.
@@ -542,18 +548,18 @@ GetNumberRecoveryCapsules (
   This function gets the size and type of the capsule specified by CapsuleInstance.
 
   @param[in]  PeiServices       General-purpose services that are available to every PEIM
-  @param[in]  This              Indicates the EFI_PEI_DEVICE_RECOVERY_MODULE_PPI 
+  @param[in]  This              Indicates the EFI_PEI_DEVICE_RECOVERY_MODULE_PPI
                                 instance.
-  @param[in]  CapsuleInstance   Specifies for which capsule instance to retrieve 
-                                the information.  This parameter must be between 
-                                one and the value returned by GetNumberRecoveryCapsules() 
+  @param[in]  CapsuleInstance   Specifies for which capsule instance to retrieve
+                                the information.  This parameter must be between
+                                one and the value returned by GetNumberRecoveryCapsules()
                                 in NumberRecoveryCapsules.
-  @param[out] Size              A pointer to a caller-allocated UINTN in which 
-                                the size of the requested recovery module is 
+  @param[out] Size              A pointer to a caller-allocated UINTN in which
+                                the size of the requested recovery module is
                                 returned.
-  @param[out] CapsuleType       A pointer to a caller-allocated EFI_GUID in which 
-                                the type of the requested recovery capsule is 
-                                returned.  The semantic meaning of the value 
+  @param[out] CapsuleType       A pointer to a caller-allocated EFI_GUID in which
+                                the type of the requested recovery capsule is
+                                returned.  The semantic meaning of the value
                                 returned is defined by the implementation.
 
   @retval EFI_SUCCESS        One or more capsules were discovered.
@@ -581,10 +587,6 @@ GetRecoveryCapsuleInfo (
     return Status;
   }
 
-  if (FeaturePcdGet (PcdFrameworkCompatibilitySupport)) {
-    CapsuleInstance = CapsuleInstance + 1;
-  }
-
   if ((CapsuleInstance == 0) || (CapsuleInstance > NumberRecoveryCapsules)) {
     return EFI_NOT_FOUND;
   }
@@ -607,12 +609,12 @@ GetRecoveryCapsuleInfo (
   This function, by whatever mechanism, retrieves a DXE capsule from some device
   and loads it into memory. Note that the published interface is device neutral.
 
-  @param[in]     PeiServices       General-purpose services that are available 
+  @param[in]     PeiServices       General-purpose services that are available
                                    to every PEIM
   @param[in]     This              Indicates the EFI_PEI_DEVICE_RECOVERY_MODULE_PPI
                                    instance.
   @param[in]     CapsuleInstance   Specifies which capsule instance to retrieve.
-  @param[out]    Buffer            Specifies a caller-allocated buffer in which 
+  @param[out]    Buffer            Specifies a caller-allocated buffer in which
                                    the requested recovery capsule will be returned.
 
   @retval EFI_SUCCESS        The capsule was loaded correctly.
@@ -641,10 +643,6 @@ LoadRecoveryCapsule (
     return Status;
   }
 
-  if (FeaturePcdGet (PcdFrameworkCompatibilitySupport)) {
-    CapsuleInstance = CapsuleInstance + 1;
-  }
-
   if ((CapsuleInstance == 0) || (CapsuleInstance > NumberRecoveryCapsules)) {
     return EFI_NOT_FOUND;
   }
@@ -659,7 +657,7 @@ LoadRecoveryCapsule (
                           BlockIo2Ppi,
                           PrivateData->CapsuleData[CapsuleInstance - 1].IndexBlock,
                           PrivateData->CapsuleData[CapsuleInstance - 1].CapsuleStartLBA,
-                          PrivateData->CapsuleData[CapsuleInstance - 1].CapsuleSize,
+                          PrivateData->CapsuleData[CapsuleInstance - 1].CapsuleBlockAlignedSize,
                           Buffer
                           );
   } else {
@@ -668,7 +666,7 @@ LoadRecoveryCapsule (
                           BlockIoPpi,
                           PrivateData->CapsuleData[CapsuleInstance - 1].IndexBlock,
                           PrivateData->CapsuleData[CapsuleInstance - 1].CapsuleStartLBA,
-                          PrivateData->CapsuleData[CapsuleInstance - 1].CapsuleSize,
+                          PrivateData->CapsuleData[CapsuleInstance - 1].CapsuleBlockAlignedSize,
                           Buffer
                           );
   }

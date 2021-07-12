@@ -1,4 +1,4 @@
-/* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -26,10 +26,17 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <Library/DebugLib.h>
 #include <Protocol/EFIScm.h>
 #include <Protocol/scm_sip_interface.h>
 #include <Library/HypervisorMvCalls.h>
+
+#include <PiDxe.h>
+#include <Guid/DxeServices.h>
+#include <Library/DxeServicesTableLib.h>
+#include <Library/DebugLib.h>
+#include <Library/UefiLib.h>
+
+#define HYP_DISABLE_UART_LOGGING    0x86000000
 
 STATIC BOOLEAN VmEnabled = FALSE;
 STATIC HypBootInfo *HypInfo = NULL;
@@ -81,6 +88,41 @@ HypBootInfo *GetVmData (VOID)
   return HypInfo;
 }
 
+STATIC EFI_STATUS MapHypInfo (HypBootInfo *HypInfo)
+{
+  EFI_STATUS  Status;
+
+  Status = EfiGetSystemConfigurationTable (&gEfiDxeServicesTableGuid,
+                                                            (VOID **) &gDS);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR, "Could not retieve DXE services table\n"));
+    return Status;
+  }
+
+  Status = gDS->AddMemorySpace (EfiGcdMemoryTypeReserved,
+                                (EFI_PHYSICAL_ADDRESS) HypInfo,
+                                SIZE_4KB,
+                                EFI_MEMORY_WB);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR, "Failed to add memory space :0x%lx 0x%lx\n",
+            (EFI_PHYSICAL_ADDRESS) HypInfo,
+            SIZE_4KB));
+  }
+
+  Status = gDS->SetMemorySpaceAttributes ((EFI_PHYSICAL_ADDRESS) HypInfo,
+                                           SIZE_4KB,
+                                           EFI_MEMORY_WB);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR,
+            "Fail to set memory attibute: addr=0x%lx, size=0xlx\n",
+            (EFI_PHYSICAL_ADDRESS) HypInfo,
+            SIZE_4KB));
+    return Status;
+  }
+
+  return Status;
+}
+
 STATIC
 EFI_STATUS
 SetHypInfo (BootParamlist *BootParamlistPtr,
@@ -123,6 +165,14 @@ SetHypInfo (BootParamlist *BootParamlistPtr,
   return EFI_SUCCESS;
 }
 
+VOID DisableHypUartUsageForLogging (VOID)
+{
+  ARM_SMC_ARGS ArmSmcArgs;
+
+  ArmSmcArgs.Arg0 = HYP_DISABLE_UART_LOGGING;
+  ArmCallSmc (&ArmSmcArgs);
+}
+
 EFI_STATUS
 CheckAndSetVmData (BootParamlist *BootParamlistPtr)
 {
@@ -132,6 +182,12 @@ CheckAndSetVmData (BootParamlist *BootParamlistPtr)
   if (HypInfo == NULL) {
     DEBUG ((EFI_D_ERROR, "HypInfo is NULL\n"));
     return EFI_UNSUPPORTED;
+  }
+
+  Status = MapHypInfo (HypInfo);
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "Failed to map HypInfo!! Status:%r\n", Status));
+    return Status;
   }
 
   Status = SetHypInfo (BootParamlistPtr, HypInfo);

@@ -2,13 +2,7 @@
 *
 *  Copyright (c) 2011-2014, ARM Limited. All rights reserved.
 *
-*  This program and the accompanying materials
-*  are licensed and made available under the terms and conditions of the BSD License
-*  which accompanies this distribution.  The full text of the license may be found at
-*  http://opensource.org/licenses/bsd-license.php
-*
-*  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-*  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+*  SPDX-License-Identifier: BSD-2-Clause-Patent
 *
 **/
 
@@ -119,6 +113,10 @@ Digit2Val( int c)
     c = toupper(c) - 7;   // Adjust so 'A' is ('9' + 1)
   }
   return c - '0';   // Value returned is between 0 and 35, inclusive.
+}
+
+static inline size_t strnlen (const char* str, size_t strsz ) {
+  return AsciiStrnLenS (str, strsz);
 }
 
 /* Determines if a particular character represents a space character */

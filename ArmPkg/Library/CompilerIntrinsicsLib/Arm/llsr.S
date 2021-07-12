@@ -2,22 +2,12 @@
 #
 # Copyright (c) 2013, ARM. All rights reserved.<BR>
 #
-# This program and the accompanying materials
-# are licensed and made available under the terms and conditions of the BSD License
-# which accompanies this distribution.  The full text of the license may be found at
-# http://opensource.org/licenses/bsd-license.php
-#
-# THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-# WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+# SPDX-License-Identifier: BSD-2-Clause-Patent
 #
 #------------------------------------------------------------------------------
 
+#include <AsmMacroIoLib.h>
 
-.text
-.align 2
-GCC_ASM_EXPORT(__aeabi_llsr)
-
-#
 #VOID
 #EFIAPI
 #__aeabi_llsr (
@@ -26,7 +16,7 @@ GCC_ASM_EXPORT(__aeabi_llsr)
 # IN  UINT32  Size
 # );
 #
-ASM_PFX(__aeabi_llsr):
+ASM_FUNC(__aeabi_llsr)
     subs     r3,r2,#0x20
     bpl      1f
     rsb      r3,r2,#0x20

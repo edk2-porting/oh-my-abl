@@ -1,15 +1,9 @@
 /** @file
   The functions and routines to handle the route caches and route table.
 
-  Copyright (c) 2009 - 2010, Intel Corporation. All rights reserved.<BR>
+  Copyright (c) 2009 - 2016, Intel Corporation. All rights reserved.<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php.
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -50,7 +44,7 @@ Ip6RouteCacheHash (
   @param[in]  GatewayAddress  The next hop address. This is an optional parameter
                               that may be NULL.
 
-  @return NULL if failed to allocate memeory; otherwise, the newly created route entry.
+  @return NULL if failed to allocate memory; otherwise, the newly created route entry.
 
 **/
 IP6_ROUTE_ENTRY *
@@ -111,7 +105,7 @@ Ip6FreeRouteEntry (
   2. The local route entries have precedence over the default route entry.
 
   @param[in]  RtTable       The route table to search from.
-  @param[in]  Destination   The destionation address to search. If NULL, search
+  @param[in]  Destination   The destination address to search. If NULL, search
                             the route table by NextHop.
   @param[in]  NextHop       The next hop address. If NULL, search the route table
                             by Destination.
@@ -135,7 +129,7 @@ Ip6FindRouteEntry (
 
   RtEntry = NULL;
 
-  for (Index = IP6_PREFIX_NUM - 1; Index >= 0; Index--) {
+  for (Index = IP6_PREFIX_MAX; Index >= 0; Index--) {
     NET_LIST_FOR_EACH (Entry, &RtTable->RouteArea[Index]) {
       RtEntry = NET_LIST_USER_STRUCT (Entry, IP6_ROUTE_ENTRY, Link);
 
@@ -216,7 +210,7 @@ Ip6FreeRouteCacheEntry (
 
 /**
   Find a route cache with the destination and source address. This is
-  used by the ICMPv6 redirect messasge process.
+  used by the ICMPv6 redirect message process.
 
   @param[in]  RtTable       The route table to search the cache for.
   @param[in]  Dest          The destination address.
@@ -300,7 +294,7 @@ Ip6BuildEfiRouteTable (
   //
   Count = 0;
 
-  for (Index = IP6_PREFIX_NUM - 1; Index >= 0; Index--) {
+  for (Index = IP6_PREFIX_MAX; Index >= 0; Index--) {
 
     NET_LIST_FOR_EACH (Entry, &(RouteTable->RouteArea[Index])) {
       RtEntry = NET_LIST_USER_STRUCT (Entry, IP6_ROUTE_ENTRY, Link);
@@ -346,7 +340,7 @@ Ip6CreateRouteTable (
   RtTable->RefCnt   = 1;
   RtTable->TotalNum = 0;
 
-  for (Index = 0; Index < IP6_PREFIX_NUM; Index++) {
+  for (Index = 0; Index <= IP6_PREFIX_MAX; Index++) {
     InitializeListHead (&RtTable->RouteArea[Index]);
   }
 
@@ -385,7 +379,7 @@ Ip6CleanRouteTable (
   //
   // Free all the route table entry and its route cache.
   //
-  for (Index = 0; Index < IP6_PREFIX_NUM; Index++) {
+  for (Index = 0; Index <= IP6_PREFIX_MAX; Index++) {
     NET_LIST_FOR_EACH_SAFE (Entry, Next, &RtTable->RouteArea[Index]) {
       RtEntry = NET_LIST_USER_STRUCT (Entry, IP6_ROUTE_ENTRY, Link);
       RemoveEntryList (Entry);

@@ -2,13 +2,7 @@
 *
 *  Copyright (c) 2011-2013, ARM Limited. All rights reserved.
 *
-*  This program and the accompanying materials
-*  are licensed and made available under the terms and conditions of the BSD License
-*  which accompanies this distribution.  The full text of the license may be found at
-*  http://opensource.org/licenses/bsd-license.php
-*
-*  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-*  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+*  SPDX-License-Identifier: BSD-2-Clause-Patent
 *
 **/
 
@@ -23,16 +17,21 @@
 #define TTBR_SHAREABLE                       BIT1
 #define TTBR_NON_SHAREABLE                   0
 #define TTBR_INNER_CACHEABLE                 BIT0
-#define TTBR_NON_INNER_CACHEABLE             BIT0
+#define TTBR_INNER_NON_CACHEABLE             0
 #define TTBR_RGN_INNER_NON_CACHEABLE         0
 #define TTBR_RGN_INNER_WRITE_BACK_ALLOC      BIT6
 #define TTBR_RGN_INNER_WRITE_THROUGH         BIT0
 #define TTBR_RGN_INNER_WRITE_BACK_NO_ALLOC   (BIT0|BIT6)
 
-#define TTBR_WRITE_THROUGH_NO_ALLOC     ( TTBR_RGN_OUTER_WRITE_BACK_ALLOC | TTBR_RGN_INNER_WRITE_BACK_ALLOC )
-#define TTBR_WRITE_BACK_NO_ALLOC        ( TTBR_RGN_OUTER_WRITE_BACK_NO_ALLOC | TTBR_RGN_INNER_WRITE_BACK_NO_ALLOC )
-#define TTBR_NON_CACHEABLE              ( TTBR_RGN_OUTER_NON_CACHEABLE | TTBR_RGN_INNER_NON_CACHEABLE )
-#define TTBR_WRITE_BACK_ALLOC           ( TTBR_RGN_OUTER_WRITE_BACK_ALLOC | TTBR_RGN_INNER_WRITE_BACK_ALLOC )
+#define TTBR_WRITE_THROUGH              ( TTBR_RGN_OUTER_WRITE_THROUGH | TTBR_INNER_CACHEABLE | TTBR_SHAREABLE)
+#define TTBR_WRITE_BACK_NO_ALLOC        ( TTBR_RGN_OUTER_WRITE_BACK_NO_ALLOC | TTBR_INNER_CACHEABLE | TTBR_SHAREABLE)
+#define TTBR_NON_CACHEABLE              ( TTBR_RGN_OUTER_NON_CACHEABLE | TTBR_INNER_NON_CACHEABLE )
+#define TTBR_WRITE_BACK_ALLOC           ( TTBR_RGN_OUTER_WRITE_BACK_ALLOC | TTBR_INNER_CACHEABLE | TTBR_SHAREABLE)
+
+#define TTBR_MP_WRITE_THROUGH           ( TTBR_RGN_OUTER_WRITE_THROUGH | TTBR_RGN_INNER_WRITE_THROUGH | TTBR_SHAREABLE)
+#define TTBR_MP_WRITE_BACK_NO_ALLOC     ( TTBR_RGN_OUTER_WRITE_BACK_NO_ALLOC | TTBR_RGN_INNER_WRITE_BACK_NO_ALLOC | TTBR_SHAREABLE)
+#define TTBR_MP_NON_CACHEABLE           ( TTBR_RGN_OUTER_NON_CACHEABLE | TTBR_RGN_INNER_NON_CACHEABLE )
+#define TTBR_MP_WRITE_BACK_ALLOC        ( TTBR_RGN_OUTER_WRITE_BACK_ALLOC | TTBR_RGN_INNER_WRITE_BACK_ALLOC | TTBR_SHAREABLE)
 
 
 #define TRANSLATION_TABLE_SECTION_COUNT                 4096
@@ -175,14 +174,14 @@
 #define TT_DESCRIPTOR_SECTION_WRITE_BACK(NonSecure)         (TT_DESCRIPTOR_SECTION_TYPE_SECTION                                                           | \
                                                             ((NonSecure) ?  TT_DESCRIPTOR_SECTION_NS : 0)    | \
                                                             TT_DESCRIPTOR_SECTION_NG_GLOBAL                         | \
-                                                            TT_DESCRIPTOR_SECTION_S_NOT_SHARED                      | \
+                                                            TT_DESCRIPTOR_SECTION_S_SHARED                          | \
                                                             TT_DESCRIPTOR_SECTION_DOMAIN(0)                         | \
                                                             TT_DESCRIPTOR_SECTION_AP_RW_RW                          | \
                                                             TT_DESCRIPTOR_SECTION_CACHE_POLICY_WRITE_BACK_ALLOC)
 #define TT_DESCRIPTOR_SECTION_WRITE_THROUGH(NonSecure)      (TT_DESCRIPTOR_SECTION_TYPE_SECTION                                                           | \
                                                             ((NonSecure) ?  TT_DESCRIPTOR_SECTION_NS : 0)    | \
                                                             TT_DESCRIPTOR_SECTION_NG_GLOBAL                         | \
-                                                            TT_DESCRIPTOR_SECTION_S_NOT_SHARED                      | \
+                                                            TT_DESCRIPTOR_SECTION_S_SHARED                          | \
                                                             TT_DESCRIPTOR_SECTION_DOMAIN(0)                         | \
                                                             TT_DESCRIPTOR_SECTION_AP_RW_RW                          | \
                                                             TT_DESCRIPTOR_SECTION_CACHE_POLICY_WRITE_THROUGH_NO_ALLOC)
@@ -192,6 +191,7 @@
                                                             TT_DESCRIPTOR_SECTION_S_NOT_SHARED                      | \
                                                             TT_DESCRIPTOR_SECTION_DOMAIN(0)                         | \
                                                             TT_DESCRIPTOR_SECTION_AP_RW_RW                          | \
+                                                            TT_DESCRIPTOR_SECTION_XN_MASK                           | \
                                                             TT_DESCRIPTOR_SECTION_CACHE_POLICY_SHAREABLE_DEVICE)
 #define TT_DESCRIPTOR_SECTION_UNCACHED(NonSecure)          (TT_DESCRIPTOR_SECTION_TYPE_SECTION                                                           | \
                                                            ((NonSecure) ?  TT_DESCRIPTOR_SECTION_NS : 0)    | \
@@ -203,24 +203,31 @@
 
 #define TT_DESCRIPTOR_PAGE_WRITE_BACK              (TT_DESCRIPTOR_PAGE_TYPE_PAGE                                                           | \
                                                         TT_DESCRIPTOR_PAGE_NG_GLOBAL                                                      | \
-                                                        TT_DESCRIPTOR_PAGE_S_NOT_SHARED                                                   | \
+                                                        TT_DESCRIPTOR_PAGE_S_SHARED                                                       | \
                                                         TT_DESCRIPTOR_PAGE_AP_RW_RW                                                       | \
                                                         TT_DESCRIPTOR_PAGE_CACHE_POLICY_WRITE_BACK_ALLOC)
 #define TT_DESCRIPTOR_PAGE_WRITE_THROUGH           (TT_DESCRIPTOR_PAGE_TYPE_PAGE                                                           | \
                                                         TT_DESCRIPTOR_PAGE_NG_GLOBAL                                                      | \
-                                                        TT_DESCRIPTOR_PAGE_S_NOT_SHARED                                                   | \
+                                                        TT_DESCRIPTOR_PAGE_S_SHARED                                                       | \
                                                         TT_DESCRIPTOR_PAGE_AP_RW_RW                                                       | \
                                                         TT_DESCRIPTOR_PAGE_CACHE_POLICY_WRITE_THROUGH_NO_ALLOC)
 #define TT_DESCRIPTOR_PAGE_DEVICE                  (TT_DESCRIPTOR_PAGE_TYPE_PAGE                                                           | \
                                                         TT_DESCRIPTOR_PAGE_NG_GLOBAL                                                      | \
                                                         TT_DESCRIPTOR_PAGE_S_NOT_SHARED                                                   | \
                                                         TT_DESCRIPTOR_PAGE_AP_RW_RW                                                       | \
+                                                        TT_DESCRIPTOR_PAGE_XN_MASK                                                        | \
                                                         TT_DESCRIPTOR_PAGE_CACHE_POLICY_SHAREABLE_DEVICE)
 #define TT_DESCRIPTOR_PAGE_UNCACHED                (TT_DESCRIPTOR_PAGE_TYPE_PAGE                                                           | \
                                                         TT_DESCRIPTOR_PAGE_NG_GLOBAL                                                      | \
                                                         TT_DESCRIPTOR_PAGE_S_NOT_SHARED                                                   | \
                                                         TT_DESCRIPTOR_PAGE_AP_RW_RW                                                       | \
                                                         TT_DESCRIPTOR_PAGE_CACHE_POLICY_NON_CACHEABLE)
+
+// First Level Descriptors
+typedef UINT32    ARM_FIRST_LEVEL_DESCRIPTOR;
+
+// Second Level Descriptors
+typedef UINT32    ARM_PAGE_TABLE_ENTRY;
 
 UINT32
 ConvertSectionAttributesToPageAttributes (

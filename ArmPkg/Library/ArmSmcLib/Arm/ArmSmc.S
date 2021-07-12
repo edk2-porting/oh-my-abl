@@ -1,23 +1,15 @@
 //
 //  Copyright (c) 2012-2014, ARM Limited. All rights reserved.
 //
-//  This program and the accompanying materials
-//  are licensed and made available under the terms and conditions of the BSD License
-//  which accompanies this distribution.  The full text of the license may be found at
-//  http://opensource.org/licenses/bsd-license.php
-//
-//  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-//  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+//  SPDX-License-Identifier: BSD-2-Clause-Patent
 //
 //
 
-.text
-.align 3
+#include <AsmMacroIoLib.h>
+
 .arch_extension sec
 
-GCC_ASM_EXPORT(ArmCallSmc)
-
-ASM_PFX(ArmCallSmc):
+ASM_FUNC(ArmCallSmc)
     push    {r4-r8}
     // r0 will be popped just after the SMC call
     push    {r0}

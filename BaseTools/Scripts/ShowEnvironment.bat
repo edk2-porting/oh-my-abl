@@ -6,13 +6,7 @@
 @REM run as stand-alone application.
 @REM
 @REM Copyright (c) 2014, Intel Corporation. All rights reserved.<BR>
-@REM This program and the accompanying materials
-@REM are licensed and made available under the terms and conditions of the BSD License
-@REM which accompanies this distribution.  The full text of the license may be found at
-@REM http://opensource.org/licenses/bsd-license.php
-@REM
-@REM THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-@REM WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+@REM SPDX-License-Identifier: BSD-2-Clause-Patent
 @REM
 @echo off
 @set SE_SVN_REVISION=$Revision: 8 $
@@ -52,10 +46,9 @@ if defined SRC_CONF @goto SetEnv
 @if not defined EDK_TOOLS_PATH @echo     EDK_TOOLS_PATH       = Not Set
 @if defined BASE_TOOLS_PATH @echo     BASE_TOOLS_PATH      = %BASE_TOOLS_PATH%
 @if defined EDK_TOOLS_BIN @echo     EDK_TOOLS_BIN        = %EDK_TOOLS_BIN%
-@if defined PYTHON_FREEZER_PATH @echo     PYTHON_FREEZER_PATH  = %PYTHON_FREEZER_PATH%
 @if "%NT32PKG%"=="TRUE" (
     @echo.
-    @echo NOTE: Please configure your build to use the following TOOL_CHAIN_TAG 
+    @echo NOTE: Please configure your build to use the following TOOL_CHAIN_TAG
     @echo       when building NT32Pkg/Nt32Pkg.dsc
     @if defined VCINSTALLDIR @call :CheckVsVer
     @set TEST_VS=
@@ -130,6 +123,17 @@ if defined SRC_CONF @goto SetEnv
     @echo     TOOL_CHAIN_TAG       = VS2013
     @goto :EOF
 )
+
+@set "TEST_VS=C:\Program Files (x86)\Microsoft Visual Studio 14.0\"
+@if "%VSINSTALLDIR%"=="%TEST_VS%" (
+    @echo     TOOL_CHAIN_TAG       = VS2015x86
+    @goto :EOF
+)
+@set "TEST_VS=C:\Program Files\Microsoft Visual Studio 14.0\"
+@if "%VSINSTALLDIR%"=="%TEST_VS%" (
+    @echo     TOOL_CHAIN_TAG       = VS2015
+    @goto :EOF
+)
 @goto :EOF
 
 :SetEnv
@@ -153,7 +157,7 @@ if defined SRC_CONF @goto SetEnv
     @copy /Y "%SRC_CONF%\tools_def.template" "%WORKSPACE%\Conf\tools_def.txt" > nul
     @set FIRST_COPY=TRUE
 )
-@if not exist "%WORKSPACE%\Conf\build_rule.txt" (   
+@if not exist "%WORKSPACE%\Conf\build_rule.txt" (
     @if "%MISSING_BUILD_RULE_TEMPLATE%"=="TRUE" @goto MissingTemplates
     @echo copying ... build_rule.template to %WORKSPACE%\Conf\build_rule.txt
     @copy /Y "%SRC_CONF%\build_rule.template" "%WORKSPACE%\Conf\build_rule.txt" > nul
@@ -171,11 +175,11 @@ if defined SRC_CONF @goto SetEnv
     @if "%MISSING_TARGET_TEMPLATE%"=="TRUE" @goto MissingTemplates
     @echo over-write ... target.template to %WORKSPACE%\Conf\target.txt
     @copy /Y "%SRC_CONF%\target.template" "%WORKSPACE%\Conf\target.txt" > nul
-    
+
     @if "%MISSING_TOOLS_DEF_TEMPLATE%"=="TRUE" @goto MissingTemplates
     @echo over-write ... tools_def.template to %WORKSPACE%\Conf\tools_def.txt
     @copy /Y "%SRC_CONF%\tools_def.template" "%WORKSPACE%\Conf\tools_def.txt" > nul
-    
+
     @if "%MISSING_BUILD_RULE_TEMPLATE%"=="TRUE" @goto MissingTemplates
     @echo over-write ... build_rule.template to %WORKSPACE%\Conf\build_rule.txt
     @copy /Y "%SRC_CONF%\build_rule.template" "%WORKSPACE%\Conf\build_rule.txt" > nul

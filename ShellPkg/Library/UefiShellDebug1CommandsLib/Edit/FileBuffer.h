@@ -1,14 +1,8 @@
 /** @file
   Declares filebuffer interface functions.
 
-  Copyright (c) 2005 - 2011, Intel Corporation. All rights reserved. <BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2005 - 2018, Intel Corporation. All rights reserved. <BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -25,7 +19,6 @@
   @param EFI_OUT_OF_RESOURCES   A memory allocation failed.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferInit (
   VOID
   );
@@ -36,7 +29,6 @@ FileBufferInit (
   @retval EFI_SUCCESS   The cleanup was successful.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferCleanup (
   VOID
   );
@@ -48,12 +40,11 @@ FileBufferCleanup (
   @retval EFI_LOAD_ERROR  There was an error finding what to write.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferRefresh (
   VOID
   );
 
-/** 
+/**
   Dispatch input to different handler
   @param[in] Key                The input key.  One of:
                                     ASCII KEY
@@ -68,7 +59,6 @@ FileBufferRefresh (
   @retval EFI_OUT_OF_RESOURCES  A memory allocation failed.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferHandleInput (
   IN CONST EFI_INPUT_KEY * Key
   );
@@ -84,7 +74,6 @@ FileBufferHandleInput (
   @retval EFI_SUCCESS           The backup operation was successful.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferBackup (
   VOID
   );
@@ -95,7 +84,6 @@ FileBufferBackup (
   @retval EFI_SUCCESS           The operation was successful.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferRestorePosition (
   VOID
   );
@@ -104,30 +92,28 @@ FileBufferRestorePosition (
   Set FileName field in FileBuffer.
 
   @param Str                    The file name to set.
-  
+
   @retval EFI_SUCCESS           The filename was successfully set.
   @retval EFI_OUT_OF_RESOURCES  A memory allocation failed.
   @retval EFI_INVALID_PARAMETER Str is not a valid filename.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferSetFileName (
   IN CONST CHAR16 *Str
   );
 
 /**
   Read a file from disk into the FileBuffer.
-  
+
   @param[in] FileName           The filename to read.
   @param[in] Recover            TRUE if is for recover mode, no information printouts.
-  
+
   @retval EFI_SUCCESS            The load was successful.
   @retval EFI_LOAD_ERROR         The load failed.
   @retval EFI_OUT_OF_RESOURCES   A memory allocation failed.
   @retval EFI_INVALID_PARAMETER  FileName is a directory.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferRead (
   IN CONST CHAR16  *FileName,
   IN CONST BOOLEAN Recover
@@ -139,11 +125,10 @@ FileBufferRead (
   @param[in] FileName           The file name for writing.
 
   @retval EFI_SUCCESS           Data was written.
-  @retval EFI_LOAD_ERROR        
+  @retval EFI_LOAD_ERROR
   @retval EFI_OUT_OF_RESOURCES  There were not enough resources to write the file.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferSave (
   CONST CHAR16 *FileName
   );
@@ -155,7 +140,6 @@ FileBufferSave (
   @param[in] NewFilePosCol    The column of file position ( start from 1 ).
 **/
 VOID
-EFIAPI
 FileBufferMovePosition (
   IN CONST UINTN NewFilePosRow,
   IN CONST UINTN NewFilePosCol
@@ -164,7 +148,7 @@ FileBufferMovePosition (
 /**
   Cut current line out and return a pointer to it.
 
-  @param[out] CutLine    Upon a successful return pointer to the pointer to 
+  @param[out] CutLine    Upon a successful return pointer to the pointer to
                         the allocated cut line.
 
   @retval EFI_SUCCESS             The cut was successful.
@@ -172,7 +156,6 @@ FileBufferMovePosition (
   @retval EFI_OUT_OF_RESOURCES    A memory allocation failed.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferCutLine (
   OUT EFI_EDITOR_LINE **CutLine
   );
@@ -184,7 +167,6 @@ FileBufferCutLine (
   @retval EFI_OUT_OF_RESOURCES    A memory allocation failed.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferPasteLine (
   VOID
   );
@@ -199,7 +181,6 @@ FileBufferPasteLine (
   @retval EFI_NOT_FOUND     The string Str was not found.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferSearch (
   IN CONST CHAR16  *Str,
   IN CONST UINTN Offset
@@ -217,7 +198,6 @@ FileBufferSearch (
   @retval EFI_OUT_OF_RESOURCES    A memory allocation failed.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferReplace (
   IN CONST CHAR16   *Replace,
   IN CONST UINTN    SearchLen
@@ -231,7 +211,6 @@ FileBufferReplace (
   @param[in] Offset       The column to start at.
 **/
 EFI_STATUS
-EFIAPI
 FileBufferReplaceAll (
   IN CHAR16 *SearchStr,
   IN CHAR16 *ReplaceStr,
@@ -245,7 +224,6 @@ FileBufferReplaceAll (
   @param[in] TextY      The new y-coordinate.
 **/
 VOID
-EFIAPI
 FileBufferAdjustMousePosition (
   IN CONST INT32 TextX,
   IN CONST INT32 TextY
@@ -255,7 +233,6 @@ FileBufferAdjustMousePosition (
   Set the modified state to TRUE.
 **/
 VOID
-EFIAPI
 FileBufferSetModified (
   VOID
   );

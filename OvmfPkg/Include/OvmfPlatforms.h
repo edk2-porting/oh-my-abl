@@ -4,13 +4,7 @@
   Copyright (C) 2015, Red Hat, Inc.
   Copyright (c) 2014, Gabriel L. Somlo <somlo@cmu.edu>
 
-  This program and the accompanying materials are licensed and made
-  available under the terms and conditions of the BSD License which
-  accompanies this distribution.   The full text of the license may
-  be found at http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 **/
 
 #ifndef __OVMF_PLATFORMS_H__
@@ -26,6 +20,12 @@
 //
 #define OVMF_HOSTBRIDGE_DID \
   PCI_LIB_ADDRESS (0, 0, 0, PCI_DEVICE_ID_OFFSET)
+
+//
+// Values we program into the PM base address registers
+//
+#define PIIX4_PMBA_VALUE  0xB000
+#define ICH9_PMBASE_VALUE 0x0600
 
 //
 // Common bits in same-purpose registers

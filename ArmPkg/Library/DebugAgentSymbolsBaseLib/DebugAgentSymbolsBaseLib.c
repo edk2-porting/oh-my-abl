@@ -3,18 +3,11 @@
 *
 *  Copyright (c) 2011-2014, ARM Limited. All rights reserved.
 *
-*  This program and the accompanying materials
-*  are licensed and made available under the terms and conditions of the BSD License
-*  which accompanies this distribution.  The full text of the license may be found at
-*  http://opensource.org/licenses/bsd-license.php
-*
-*  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-*  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+*  SPDX-License-Identifier: BSD-2-Clause-Patent
 *
 **/
 
 #include <Uefi.h>
-#include <Library/ArmLib.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>
@@ -259,7 +252,7 @@ GetImageContext (
   function and pass it into InitializeDebugAgent(). InitializeDebugAgent() is
   responsible to invoke the passing-in function at the end of InitializeDebugAgent().
 
-  If the parameter Function is not NULL, Debug Agent Libary instance will invoke it by
+  If the parameter Function is not NULL, Debug Agent Library instance will invoke it by
   passing in the Context to be its parameter.
 
   If Function() is NULL, Debug Agent Library instance will return after setup debug
@@ -283,13 +276,7 @@ InitializeDebugAgent (
   EFI_FFS_FILE_HEADER   *FfsHeader;
   PE_COFF_LOADER_IMAGE_CONTEXT  ImageContext;
 
-  // Now we've got UART, check the Debug Agent Vector Table
-  // Note: The AArch64 Vector table must be 2k-byte aligned - if this assertion fails ensure
-  // 'Align=4K' is defined into your FDF for this module.
-  ASSERT (((UINTN)DebugAgentVectorTable & ARM_VECTOR_TABLE_ALIGNMENT) == 0);
-  ArmWriteVBar ((UINTN)DebugAgentVectorTable);
-
-  // We use InitFlag to know if DebugAgent has been intialized from
+  // We use InitFlag to know if DebugAgent has been initialized from
   // Sec (DEBUG_AGENT_INIT_PREMEM_SEC) or PrePi (DEBUG_AGENT_INIT_POSTMEM_SEC)
   // modules
   if (InitFlag == DEBUG_AGENT_INIT_PREMEM_SEC) {

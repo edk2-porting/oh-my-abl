@@ -2,13 +2,7 @@
 
   Copyright (c) 2011 - 2014, ARM Ltd. All rights reserved.<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -31,9 +25,6 @@ UINT32               mNorFlashDeviceCount;
 NOR_FLASH_INSTANCE  mNorFlashInstanceTemplate = {
   NOR_FLASH_SIGNATURE, // Signature
   NULL, // Handle ... NEED TO BE FILLED
-
-  FALSE, // Initialized
-  NULL, // Initialize
 
   0, // DeviceBaseAddress ... NEED TO BE FILLED
   0, // RegionBaseAddress ... NEED TO BE FILLED
@@ -69,7 +60,6 @@ NOR_FLASH_INSTANCE  mNorFlashInstanceTemplate = {
     NorFlashDiskIoWriteDisk        // WriteDisk
   },
 
-  FALSE, // SupportFvb ... NEED TO BE FILLED
   {
     FvbGetAttributes, // GetAttributes
     FvbSetAttributes, // SetAttributes
@@ -86,10 +76,14 @@ NOR_FLASH_INSTANCE  mNorFlashInstanceTemplate = {
       {
         HARDWARE_DEVICE_PATH,
         HW_VENDOR_DP,
-        { (UINT8)sizeof(VENDOR_DEVICE_PATH), (UINT8)((sizeof(VENDOR_DEVICE_PATH)) >> 8) }
+        {
+          (UINT8)(OFFSET_OF (NOR_FLASH_DEVICE_PATH, End)),
+          (UINT8)(OFFSET_OF (NOR_FLASH_DEVICE_PATH, End) >> 8)
+        }
       },
       { 0x0, 0x0, 0x0, { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 } }, // GUID ... NEED TO BE FILLED
     },
+    0, // Index
     {
       END_DEVICE_PATH_TYPE,
       END_ENTIRE_DEVICE_PATH_SUBTYPE,
@@ -103,10 +97,9 @@ NorFlashCreateInstance (
   IN UINTN                  NorFlashDeviceBase,
   IN UINTN                  NorFlashRegionBase,
   IN UINTN                  NorFlashSize,
-  IN UINT32                 MediaId,
+  IN UINT32                 Index,
   IN UINT32                 BlockSize,
   IN BOOLEAN                SupportFvb,
-  IN CONST GUID             *NorFlashGuid,
   OUT NOR_FLASH_INSTANCE**  NorFlashInstance
   )
 {
@@ -125,11 +118,12 @@ NorFlashCreateInstance (
   Instance->Size = NorFlashSize;
 
   Instance->BlockIoProtocol.Media = &Instance->Media;
-  Instance->Media.MediaId = MediaId;
+  Instance->Media.MediaId = Index;
   Instance->Media.BlockSize = BlockSize;
   Instance->Media.LastBlock = (NorFlashSize / BlockSize)-1;
 
-  CopyGuid (&Instance->DevicePath.Vendor.Guid, NorFlashGuid);
+  CopyGuid (&Instance->DevicePath.Vendor.Guid, &gEfiCallerIdGuid);
+  Instance->DevicePath.Index = (UINT8)Index;
 
   Instance->ShadowBuffer = AllocateRuntimePool (BlockSize);;
   if (Instance->ShadowBuffer == NULL) {
@@ -137,8 +131,7 @@ NorFlashCreateInstance (
   }
 
   if (SupportFvb) {
-    Instance->SupportFvb = TRUE;
-    Instance->Initialize = NorFlashFvbInitialize;
+    NorFlashFvbInitialize (Instance);
 
     Status = gBS->InstallMultipleProtocolInterfaces (
                   &Instance->Handle,
@@ -152,8 +145,6 @@ NorFlashCreateInstance (
       return Status;
     }
   } else {
-    Instance->Initialized = TRUE;
-
     Status = gBS->InstallMultipleProtocolInterfaces (
                     &Instance->Handle,
                     &gEfiDevicePathProtocolGuid, &Instance->DevicePath,
@@ -744,6 +735,65 @@ NorFlashWriteBlocks (
   return Status;
 }
 
+#define BOTH_ALIGNED(a, b, align) ((((UINTN)(a) | (UINTN)(b)) & ((align) - 1)) == 0)
+
+/**
+  Copy Length bytes from Source to Destination, using aligned accesses only.
+  Note that this implementation uses memcpy() semantics rather then memmove()
+  semantics, i.e., SourceBuffer and DestinationBuffer should not overlap.
+
+  @param  DestinationBuffer The target of the copy request.
+  @param  SourceBuffer      The place to copy from.
+  @param  Length            The number of bytes to copy.
+
+  @return Destination
+
+**/
+STATIC
+VOID *
+AlignedCopyMem (
+  OUT     VOID                      *DestinationBuffer,
+  IN      CONST VOID                *SourceBuffer,
+  IN      UINTN                     Length
+  )
+{
+  UINT8             *Destination8;
+  CONST UINT8       *Source8;
+  UINT32            *Destination32;
+  CONST UINT32      *Source32;
+  UINT64            *Destination64;
+  CONST UINT64      *Source64;
+
+  if (BOTH_ALIGNED(DestinationBuffer, SourceBuffer, 8) && Length >= 8) {
+    Destination64 = DestinationBuffer;
+    Source64 = SourceBuffer;
+    while (Length >= 8) {
+      *Destination64++ = *Source64++;
+      Length -= 8;
+    }
+
+    Destination8 = (UINT8 *)Destination64;
+    Source8 = (CONST UINT8 *)Source64;
+  } else if (BOTH_ALIGNED(DestinationBuffer, SourceBuffer, 4) && Length >= 4) {
+    Destination32 = DestinationBuffer;
+    Source32 = SourceBuffer;
+    while (Length >= 4) {
+      *Destination32++ = *Source32++;
+      Length -= 4;
+    }
+
+    Destination8 = (UINT8 *)Destination32;
+    Source8 = (CONST UINT8 *)Source32;
+  } else {
+    Destination8 = DestinationBuffer;
+    Source8 = SourceBuffer;
+  }
+  while (Length-- != 0) {
+    *Destination8++ = *Source8++;
+  }
+  return DestinationBuffer;
+}
+
 EFI_STATUS
 NorFlashReadBlocks (
   IN NOR_FLASH_INSTANCE   *Instance,
@@ -791,7 +841,7 @@ NorFlashReadBlocks (
   SEND_NOR_COMMAND (Instance->DeviceBaseAddress, 0, P30_CMD_READ_ARRAY);
 
   // Readout the data
-  CopyMem(Buffer, (UINTN *)StartAddress, BufferSizeInBytes);
+  AlignedCopyMem (Buffer, (VOID *)StartAddress, BufferSizeInBytes);
 
   return EFI_SUCCESS;
 }
@@ -832,7 +882,7 @@ NorFlashRead (
   SEND_NOR_COMMAND (Instance->DeviceBaseAddress, 0, P30_CMD_READ_ARRAY);
 
   // Readout the data
-  CopyMem (Buffer, (UINTN *)(StartAddress + Offset), BufferSizeInBytes);
+  AlignedCopyMem (Buffer, (VOID *)(StartAddress + Offset), BufferSizeInBytes);
 
   return EFI_SUCCESS;
 }
@@ -864,10 +914,6 @@ NorFlashWriteSingleBlock (
   UINTN       PrevBlockAddress;
 
   PrevBlockAddress = 0;
-
-  if (!Instance->Initialized && Instance->Initialize) {
-    Instance->Initialize(Instance);
-  }
 
   DEBUG ((DEBUG_BLKIO, "NorFlashWriteSingleBlock(Parameters: Lba=%ld, Offset=0x%x, *NumBytes=0x%x, Buffer @ 0x%08x)\n", Lba, Offset, *NumBytes, Buffer));
 
@@ -1063,7 +1109,7 @@ NorFlashWriteSingleBlock (
   @retval EFI_SUCCESS           The data was read correctly from the device.
   @retval EFI_DEVICE_ERROR      The device reported an error while performing the read.
   @retval EFI_NO_MEDIA          There is no media in the device.
-  @retval EFI_MEDIA_CHNAGED     The MediaId does not matched the current device.
+  @retval EFI_MEDIA_CHANGED     The MediaId does not match the current device.
   @retval EFI_INVALID_PARAMETER The read request contains device addresses that are not
                                 valid for the device.
 
@@ -1108,7 +1154,7 @@ NorFlashDiskIoReadDisk (
   @retval EFI_WRITE_PROTECTED   The device can not be written to.
   @retval EFI_DEVICE_ERROR      The device reported an error while performing the write.
   @retval EFI_NO_MEDIA          There is no media in the device.
-  @retval EFI_MEDIA_CHNAGED     The MediaId does not matched the current device.
+  @retval EFI_MEDIA_CHANGED     The MediaId does not match the current device.
   @retval EFI_INVALID_PARAMETER The write request contains device addresses that are not
                                  valid for the device.
 
@@ -1263,7 +1309,6 @@ NorFlashInitialise (
       Index,
       NorFlashDevices[Index].BlockSize,
       ContainVariableStorage,
-      &NorFlashDevices[Index].Guid,
       &mNorFlashInstances[Index]
     );
     if (EFI_ERROR(Status)) {

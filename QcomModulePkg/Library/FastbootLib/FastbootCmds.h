@@ -2,7 +2,8 @@
  * Copyright (c) 2009, Google Inc.
  * All rights reserved.
  *
- * Copyright (c) 2015-2018, 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2018, 2020-2021, The Linux Foundation.
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,12 +34,15 @@
 #ifndef __FASTBOOT_CMDS_H__
 #define __FASTBOOT_CMDS_H__
 
+#include <Library/BootLinux.h>
 #include <Library/BaseLib.h>
 #include <Library/DebugLib.h>
 #include <Library/LinuxLoaderLib.h>
 #include <Library/MemoryAllocationLib.h>
 #include <Library/PartitionTableUpdate.h>
 #include <Protocol/EFIKernelInterface.h>
+
+#include "Board.h"
 
 #define ENDPOINT_IN 0x01
 #define ENDPOINT_OUT 0x81
@@ -47,7 +51,13 @@
 #define MAX_RSP_SIZE 64
 #define ERASE_BUFF_SIZE 256 * 1024
 #define ERASE_BUFF_BLOCKS 256 * 2
-#define USB_BUFFER_SIZE 1024 * 1024 * 16
+
+#define USB_BUFFER_SIZE \
+  (IsLEVariant () \
+   && (CheckRootDeviceType () == NAND \
+       || CheckRootDeviceType () == EMMC) ? \
+   (1024 * 1024 * 4) : (1024 * 1024 * 16))
+
 #define VERSION_STR_LEN 96
 #define FASTBOOT_STRING_MAX_LENGTH 256
 #define FASTBOOT_COMMAND_MAX_LENGTH 64
@@ -70,8 +80,13 @@
 #define F2FS_MAGIC_OFFSET_SB 0x0
 #define F2FS_FS_MAGIC 0xF2F52010
 
-/* Divide allocatable free Memory to 3/4th */
-#define EFI_FREE_MEM_DIVISOR(BYTES) (((BYTES) * 3) / 4)
+/* Divide allocatable free memory by 3/4ths or 85/100ths */
+#define EFI_FREE_MEM_DIVISOR(BYTES) \
+  (IsLEVariant () \
+   && (CheckRootDeviceType () == NAND \
+       || CheckRootDeviceType () == EMMC) ? \
+   (((BYTES) * 90) / 100) : (((BYTES) * 3) / 4))
+
 /* 64MB */
 #define MIN_BUFFER_SIZE (67108864)
 /* 1.5GB */

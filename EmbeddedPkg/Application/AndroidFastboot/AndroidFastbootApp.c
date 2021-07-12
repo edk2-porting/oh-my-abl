@@ -2,13 +2,7 @@
 
   Copyright (c) 2013-2014, ARM Ltd. All rights reserved.<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -45,9 +39,9 @@ typedef enum {
 STATIC ANDROID_FASTBOOT_STATE mState = ExpectCmdState;
 
 // When in ExpectDataState, the number of bytes of data to expect:
-STATIC UINT32 mNumDataBytes;
+STATIC UINT64 mNumDataBytes;
 // .. and the number of bytes so far received this data phase
-STATIC UINT32 mBytesReceivedSoFar;
+STATIC UINT64 mBytesReceivedSoFar;
 // .. and the buffer to save data into
 STATIC UINT8 *mDataBuffer = NULL;
 
@@ -99,7 +93,7 @@ HandleDownload (
   IN CHAR8 *NumBytesString
   )
 {
-  CHAR8       Response[12] = "DATA";
+  CHAR8       Response[13];
   CHAR16      OutputString[FASTBOOT_STRING_MAX_LENGTH];
 
   // Argument is 8-character ASCII string hex representation of number of bytes
@@ -127,8 +121,10 @@ HandleDownload (
   if (mDataBuffer == NULL) {
     SEND_LITERAL ("FAILNot enough memory");
   } else {
-    AsciiStrnCpy (Response + 4, NumBytesString, 8);
-    mTransport->Send (sizeof(Response), Response, &mFatalSendErrorEvent);
+    ZeroMem (Response, sizeof Response);
+    AsciiSPrint (Response, sizeof Response, "DATA%x",
+      (UINT32)mNumDataBytes);
+    mTransport->Send (sizeof Response - 1, Response, &mFatalSendErrorEvent);
 
     mState = ExpectDataState;
     mBytesReceivedSoFar = 0;
@@ -257,8 +253,7 @@ AcceptCmd (
   }
 
   // Commands aren't null-terminated. Let's get a null-terminated version.
-  AsciiStrnCpy (Command, Data, Size);
-  Command[Size] = '\0';
+  AsciiStrnCpyS (Command, sizeof Command, Data, Size);
 
   // Parse command
   if (MATCH_CMD_LITERAL ("getvar", Command)) {
@@ -305,7 +300,7 @@ AcceptCmd (
   } else if (IS_LOWERCASE_ASCII (Command[0])) {
     // Commands starting with lowercase ASCII characters are reserved for the
     // Fastboot protocol. If we don't recognise it, it's probably the future
-    // and there are new commmands in the protocol.
+    // and there are new commands in the protocol.
     // (By the way, the "oem" command mentioned above makes this reservation
     //  redundant, but we handle it here to be spec-compliant)
     SEND_LITERAL ("FAILCommand not recognised. Check Fastboot version.");
@@ -425,6 +420,7 @@ FastbootAppEntryPoint (
   EFI_EVENT                       WaitEventArray[2];
   UINTN                           EventIndex;
   EFI_SIMPLE_TEXT_INPUT_PROTOCOL *TextIn;
+  EFI_INPUT_KEY                   Key;
 
   mDataBuffer = NULL;
 
@@ -507,12 +503,21 @@ FastbootAppEntryPoint (
 
   // Talk to the user
   mTextOut->OutputString (mTextOut,
-      L"Android Fastboot mode - version " ANDROID_FASTBOOT_VERSION ". Press any key to quit.\r\n");
+      L"Android Fastboot mode - version " ANDROID_FASTBOOT_VERSION ". Press RETURN or SPACE key to quit.\r\n");
 
   // Quit when the user presses any key, or mFinishedEvent is signalled
   WaitEventArray[0] = mFinishedEvent;
   WaitEventArray[1] = TextIn->WaitForKey;
-  gBS->WaitForEvent (2, WaitEventArray, &EventIndex);
+  while (1) {
+    gBS->WaitForEvent (2, WaitEventArray, &EventIndex);
+    Status = TextIn->ReadKeyStroke (gST->ConIn, &Key);
+    if (Key.ScanCode == SCAN_NULL) {
+      if ((Key.UnicodeChar == CHAR_CARRIAGE_RETURN) ||
+          (Key.UnicodeChar == L' ')) {
+        break;
+      }
+    }
+  }
 
   mTransport->Stop ();
   if (EFI_ERROR (Status)) {

@@ -1,14 +1,8 @@
 /** @file
 *
-*  Copyright (c) 2011-2014, ARM Limited. All rights reserved.
+*  Copyright (c) 2011-2017, ARM Limited. All rights reserved.
 *
-*  This program and the accompanying materials
-*  are licensed and made available under the terms and conditions of the BSD License
-*  which accompanies this distribution.  The full text of the license may be found at
-*  http://opensource.org/licenses/bsd-license.php
-*
-*  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-*  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+*  SPDX-License-Identifier: BSD-2-Clause-Patent
 *
 **/
 
@@ -17,53 +11,21 @@
 #include <Library/DebugAgentLib.h>
 #include <Library/PrePiLib.h>
 #include <Library/PrintLib.h>
-#include <Library/PeCoffGetEntryPointLib.h>
 #include <Library/PrePiHobListPointerLib.h>
 #include <Library/TimerLib.h>
 #include <Library/PerformanceLib.h>
 
 #include <Ppi/GuidedSectionExtraction.h>
 #include <Ppi/ArmMpCoreInfo.h>
-#include <Guid/LzmaDecompress.h>
-#include <Guid/ArmGlobalVariableHob.h>
+#include <Ppi/SecPerformance.h>
 
 #include "PrePi.h"
-#include "LzmaDecompress.h"
 
-#define IS_XIP() (((UINT32)FixedPcdGet32 (PcdFdBaseAddress) > mSystemMemoryEnd) || \
-                  ((FixedPcdGet32 (PcdFdBaseAddress) + FixedPcdGet32 (PcdFdSize)) < FixedPcdGet64 (PcdSystemMemoryBase)))
+#define IS_XIP() (((UINT64)FixedPcdGet64 (PcdFdBaseAddress) > mSystemMemoryEnd) || \
+                  ((FixedPcdGet64 (PcdFdBaseAddress) + FixedPcdGet32 (PcdFdSize)) < FixedPcdGet64 (PcdSystemMemoryBase)))
 
-// Not used when PrePi in run in XIP mode
-UINTN mGlobalVariableBase = 0;
-
-EFI_STATUS
-EFIAPI
-ExtractGuidedSectionLibConstructor (
-  VOID
-  );
-
-EFI_STATUS
-EFIAPI
-LzmaDecompressLibConstructor (
-  VOID
-  );
-
-VOID
-EFIAPI
-BuildGlobalVariableHob (
-  IN EFI_PHYSICAL_ADDRESS         GlobalVariableBase,
-  IN UINT32                       GlobalVariableSize
-  )
-{
-  ARM_HOB_GLOBAL_VARIABLE  *Hob;
-
-  Hob = CreateHob (EFI_HOB_TYPE_GUID_EXTENSION, sizeof (ARM_HOB_GLOBAL_VARIABLE));
-  ASSERT(Hob != NULL);
-
-  CopyGuid (&(Hob->Header.Name), &gArmGlobalVariableGuid);
-  Hob->GlobalVariableBase = GlobalVariableBase;
-  Hob->GlobalVariableSize = GlobalVariableSize;
-}
+UINT64 mSystemMemoryEnd = FixedPcdGet64(PcdSystemMemoryBase) +
+                          FixedPcdGet64(PcdSystemMemorySize) - 1;
 
 EFI_STATUS
 GetPlatformPpi (
@@ -93,7 +55,6 @@ VOID
 PrePiMain (
   IN  UINTN                     UefiMemoryBase,
   IN  UINTN                     StacksBase,
-  IN  UINTN                     GlobalVariableBase,
   IN  UINT64                    StartTimeStamp
   )
 {
@@ -105,11 +66,12 @@ PrePiMain (
   CHAR8                         Buffer[100];
   UINTN                         CharCount;
   UINTN                         StacksSize;
+  FIRMWARE_SEC_PERFORMANCE      Performance;
 
   // If ensure the FD is either part of the System Memory or totally outside of the System Memory (XIP)
   ASSERT (IS_XIP() ||
-          ((FixedPcdGet32 (PcdFdBaseAddress) >= FixedPcdGet64 (PcdSystemMemoryBase)) &&
-           ((UINT32)(FixedPcdGet32 (PcdFdBaseAddress) + FixedPcdGet32 (PcdFdSize)) <= (UINT32)mSystemMemoryEnd)));
+          ((FixedPcdGet64 (PcdFdBaseAddress) >= FixedPcdGet64 (PcdSystemMemoryBase)) &&
+           ((UINT64)(FixedPcdGet64 (PcdFdBaseAddress) + FixedPcdGet32 (PcdFdSize)) <= (UINT64)mSystemMemoryEnd)));
 
   // Initialize the architecture specific bits
   ArchInitialize ();
@@ -146,11 +108,8 @@ PrePiMain (
   }
   BuildStackHob (StacksBase, StacksSize);
 
-  // Declare the Global Variable HOB
-  BuildGlobalVariableHob (GlobalVariableBase, FixedPcdGet32 (PcdPeiGlobalVariableSize));
-
   //TODO: Call CpuPei as a library
-  BuildCpuHob (PcdGet8 (PcdPrePiCpuMemorySize), PcdGet8 (PcdPrePiCpuIoSize));
+  BuildCpuHob (ArmGetPhysicalAddressBits (), PcdGet8 (PcdPrePiCpuIoSize));
 
   if (ArmIsMpCore ()) {
     // Only MP Core platform need to produce gArmMpCoreInfoPpiGuid
@@ -168,6 +127,12 @@ PrePiMain (
     }
   }
 
+  // Store timer value logged at the beginning of firmware image execution
+  Performance.ResetEnd = GetTimeInNanoSecond (StartTimeStamp);
+
+  // Build SEC Performance Data Hob
+  BuildGuidDataHob (&gEfiFirmwarePerformanceGuid, &Performance, sizeof (Performance));
+
   // Set the Boot Mode
   SetBootMode (ArmPlatformGetBootMode ());
 
@@ -179,16 +144,7 @@ PrePiMain (
   PERF_START (NULL, "PEI", NULL, StartTimeStamp);
 
   // SEC phase needs to run library constructors by hand.
-  ExtractGuidedSectionLibConstructor ();
-  LzmaDecompressLibConstructor ();
-
-  // Build HOBs to pass up our version of stuff the DXE Core needs to save space
-  BuildPeCoffLoaderHob ();
-  BuildExtractSectionHob (
-    &gLzmaCustomDecompressGuid,
-    LzmaGuidedSectionGetInfo,
-    LzmaGuidedSectionExtraction
-    );
+  ProcessLibraryConstructorList ();
 
   // Assume the FV that contains the SEC (our code) also contains a compressed FV.
   Status = DecompressFirstFv ();
@@ -203,13 +159,10 @@ VOID
 CEntryPoint (
   IN  UINTN                     MpId,
   IN  UINTN                     UefiMemoryBase,
-  IN  UINTN                     StacksBase,
-  IN  UINTN                     GlobalVariableBase
+  IN  UINTN                     StacksBase
   )
 {
   UINT64   StartTimeStamp;
-
-  ASSERT(!ArmIsMpCore() || (PcdGet32 (PcdCoreCount) > 1));
 
   // Initialize the platform specific controllers
   ArmPlatformInitialize (MpId);
@@ -235,13 +188,12 @@ CEntryPoint (
   // Define the Global Variable region when we are not running in XIP
   if (!IS_XIP()) {
     if (ArmPlatformIsPrimaryCore (MpId)) {
-      mGlobalVariableBase = GlobalVariableBase;
       if (ArmIsMpCore()) {
         // Signal the Global Variable Region is defined (event: ARM_CPU_EVENT_DEFAULT)
         ArmCallSEV ();
       }
     } else {
-      // Wait the Primay core has defined the address of the Global Variable region (event: ARM_CPU_EVENT_DEFAULT)
+      // Wait the Primary core has defined the address of the Global Variable region (event: ARM_CPU_EVENT_DEFAULT)
       ArmCallWFE ();
     }
   }
@@ -249,7 +201,7 @@ CEntryPoint (
   // If not primary Jump to Secondary Main
   if (ArmPlatformIsPrimaryCore (MpId)) {
     // Goto primary Main.
-    PrimaryMain (UefiMemoryBase, StacksBase, GlobalVariableBase, StartTimeStamp);
+    PrimaryMain (UefiMemoryBase, StacksBase, StartTimeStamp);
   } else {
     SecondaryMain (MpId);
   }

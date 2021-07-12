@@ -2,13 +2,9 @@
 #  Implementation of EFI Http Utilities Protocol interfaces.
 #
 #  Copyright (c) 2015, Intel Corporation. All rights reserved.<BR>
+#  (C) Copyright 2016 Hewlett Packard Enterprise Development LP<BR>
 #
-#  This program and the accompanying materials
-#  are licensed and made available under the terms and conditions of the BSD License
-#  which accompanies this distribution. The full text of the license may be found at
-#  http://opensource.org/licenses/bsd-license.php.
-#  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
 #
 #
 ##
@@ -21,15 +17,15 @@
   VERSION_STRING            = 1.0
   ENTRY_POINT               = HttpUtilitiesDxeDriverEntryPoint
   UNLOAD_IMAGE              = HttpUtilitiesDxeUnload
+  MODULE_UNI_FILE           = HttpUtilitiesDxe.uni
 
 [Packages]
   MdePkg/MdePkg.dec
-  MdeModulePkg/MdeModulePkg.dec
+  NetworkPkg/NetworkPkg.dec
 
 [Sources]
   HttpUtilitiesDxe.h
   HttpUtilitiesDxe.c
-  HttpUtilitiesImpl.c
   HttpUtilitiesProtocol.c
 
 [LibraryClasses]
@@ -40,6 +36,7 @@
   BaseLib
   UefiLib
   DebugLib
+  HttpLib
 
 [Protocols]
   gEfiHttpUtilitiesProtocolGuid               ## PRODUCES
@@ -47,5 +44,5 @@
 [Depex]
   TRUE
 
-[Guids]
-
+[UserExtensions.TianoCore."ExtraFiles"]
+  HttpUtilitiesDxeExtra.uni

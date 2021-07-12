@@ -1,4 +1,4 @@
-/* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -40,7 +40,7 @@ typedef struct _EFI_DDRGETINFO_PROTOCOL EFI_DDRGETINFO_PROTOCOL;
 /**
   Protocol version.
 */
-#define EFI_DDRGETINFO_PROTOCOL_REVISION 0x0000000000040000
+#define EFI_DDRGETINFO_PROTOCOL_REVISION 0x0000000000050000
 
 /*Both the protocl version and the structure version should be same */
 #if (EFI_DDRGETINFO_PROTOCOL_REVISION != DDR_DETAILS_STRUCT_VERSION)
@@ -139,6 +139,29 @@ EFI_STATUS
    );
 
 /* ============================================================================
+**  Function : EFI_DDRGetInfo_GetDDRMaxEnabledFreq
+** ============================================================================
+*/
+/** @ingroup EFI_DDRGetInfo_GetDDRMaxEnabledFreq
+  @par Summary
+  Gets the DDR Max Enabled Freq
+
+  @param[in]   This             Pointer to the EFI_DDRGETINFO_PROTOCOL instance.
+  @param[out]  ddr_freq         Pointer to DDR Max Enabled frequency
+
+  @return
+  EFI_SUCCESS        -- Function completed successfully. \n
+  EFI_PROTOCOL_ERROR -- Error occurred during the operation.
+*/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_DDRGETINFO_GETDDRMAXENABLEDFREQ)(
+   IN EFI_DDRGETINFO_PROTOCOL *This,
+   OUT UINT32                 *ddr_freq
+   );
+
+
+/* ============================================================================
 **  Function : EFI_DDRGetInfo_SetDDRFreq
 ** ============================================================================
 */
@@ -160,6 +183,156 @@ EFI_STATUS
    IN UINT32                   ddr_freq
    );
 
+/* ============================================================================
+**  Function : EFI_DDRGETINFO_SETMAXNOMINALDDRFREQ
+** ============================================================================
+*/
+/** @ingroup EFI_DDRGETINFO_SETMAXNOMINALDDRFREQ
+  @par Summary
+  Gets the DDR Details
+
+  @param[in]   This            Pointer to the EFI_DDRGETINFO_PROTOCOL instance.
+
+  @return
+  EFI_SUCCESS        -- Function completed successfully. \n
+  EFI_PROTOCOL_ERROR -- Error occurred during the operation.
+*/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_DDRGETINFO_SETMAXNOMINALDDRFREQ)(
+   IN EFI_DDRGETINFO_PROTOCOL *This
+   );
+
+/* ============================================================================
+**  Function : EFI_DDRGETINFO_SETLOWESTDDRFREQ
+** ============================================================================
+*/
+/** @ingroup EFI_DDRGETINFO_SETLOWESTDDRFREQ
+  @par Summary
+  Gets the DDR Details
+
+  @param[in]   This            Pointer to the EFI_DDRGETINFO_PROTOCOL instance.
+
+  @return
+  EFI_SUCCESS        -- Function completed successfully. \n
+  EFI_PROTOCOL_ERROR -- Error occurred during the operation.
+*/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_DDRGETINFO_SETLOWESTDDRFREQ)(
+   IN EFI_DDRGETINFO_PROTOCOL *This
+   );
+
+/* ============================================================================
+**  Function : EFI_DDRGETINFO_GETDDRREGIONSDATA
+** ============================================================================
+*/
+/** @ingroup EFI_DDRGETINFO_GETDDRREGIONSDATA
+  @par Summary
+  Gets the DDR Details
+
+  @param[in]   This            Pointer to the EFI_DDRGETINFO_PROTOCOL instance.
+  @param[out]  DetailsEntry    Pointer to DDR Regions Data
+
+  @return
+  EFI_SUCCESS        -- Function completed successfully. \n
+  EFI_PROTOCOL_ERROR -- Error occurred during the operation.
+*/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_DDRGETINFO_GETDDRMAPPEDREGIONS)(
+   IN EFI_DDRGETINFO_PROTOCOL *This,
+   OUT struct ddr_regions_data_info   *GetDDRMappedRegions
+   );
+
+/* ============================================================================
+**  Function : EFI_DDRGetInfo_GetSHUBFreqTable
+** ============================================================================
+*/
+/** @ingroup EFI_DDRGetInfo_GetSHUBFreqTable
+  @par Summary
+  Gets the SHUB Clock plan table
+
+  @param[in]   This            Pointer to the EFI_DDRGETINFO_PROTOCOL instance.
+  @param[out]  ClkPlanTable    Pointer to SHUB clock plan Table
+
+  @return
+  EFI_SUCCESS        -- Function completed successfully. \n
+  EFI_PROTOCOL_ERROR -- Error occurred during the operation.
+*/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_DDRGETINFO_GETSHUBFREQTABLE)(
+   IN EFI_DDRGETINFO_PROTOCOL             *This,
+   OUT struct shub_freq_plan_entry_info   *clk_plan_tbl
+   );
+
+/* ============================================================================
+**  Function : EFI_DDRGetInfo_SetSHUBFreq
+** ============================================================================
+*/
+/** @ingroup EFI_DDRGetInfo_SetSHUBFreq
+  @par Summary
+  Sets the SHUB clock frequency
+
+  @param[in]   This         Pointer to the EFI_DDRGETINFO_PROTOCOL instance.
+  @param[out]  shub_freq    SHUB freq to be set in the system.
+
+  @return
+  EFI_SUCCESS        -- Function completed successfully. \n
+  EFI_PROTOCOL_ERROR -- Error occurred during the operation.
+*/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_DDRGETINFO_SETSHUBFREQ)(
+   IN EFI_DDRGETINFO_PROTOCOL    *This,
+   IN UINT32                     shub_freq
+   );
+
+/* ============================================================================
+**  Function : EFI_DDRGetInfo_GetSHUBFreq
+** ============================================================================
+*/
+/** @ingroup EFI_DDRGetInfo_GetSHUBFreq
+  @par Summary
+  Gets the Current SHUB Freq
+
+  @param[in]   This             Pointer to the EFI_DDRGETINFO_PROTOCOL instance.
+  @param[out]  shub_freq        Pointer to Current SHUB clock frequency
+
+  @return
+  EFI_SUCCESS        -- Function completed successfully. \n
+  EFI_PROTOCOL_ERROR -- Error occurred during the operation.
+*/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_DDRGETINFO_MEASURESHUBFREQ)(
+   IN EFI_DDRGETINFO_PROTOCOL   *This,
+   OUT UINT32                   *shub_freq
+   );
+
+/* ============================================================================
+**  Function : EFI_DDRGETINFO_GETXBL2QUANTUM_SMEM_DATA
+** ============================================================================
+*/
+/** @ingroup EFI_DDRGETINFO_GETXBL2QUANTUM_SMEM_DATA
+  @par Summary
+  Gets the loader to uefi smem data
+
+  @param[in]   This             Pointer to the EFI_DDRGETINFO_PROTOCOL instance.
+  @param[out]  xbl2quantum_smemdata     Pointer to loader to uefi smem data
+
+  @return
+  EFI_SUCCESS        -- Function completed successfully. \n
+  EFI_PROTOCOL_ERROR -- Error occurred during the operation.
+*/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_DDRGETINFO_GETXBL2QUANTUM_SMEM_DATA)(
+   IN EFI_DDRGETINFO_PROTOCOL   *This,
+   OUT XBL2QUANTUM_SMEM_STRUCT  *xbl2quantum_smemdata
+   );
+
 /*===========================================================================
   PROTOCOL INTERFACE
 ===========================================================================*/
@@ -175,6 +348,14 @@ struct _EFI_DDRGETINFO_PROTOCOL {
    EFI_DDRGETINFO_GETDDRFREQTABLE        GetDDRFreqTable;
    EFI_DDRGETINFO_GETDDRFREQ             GetDDRFreq;
    EFI_DDRGETINFO_SETDDRFREQ             SetDDRFreq;
+   EFI_DDRGETINFO_GETDDRMAXENABLEDFREQ   GetDDRMaxEnabledFreq;
+   EFI_DDRGETINFO_SETMAXNOMINALDDRFREQ   SetMaxNominalDDRFreq;
+   EFI_DDRGETINFO_SETLOWESTDDRFREQ       SetLowestDDRFreq;
+   EFI_DDRGETINFO_GETDDRMAPPEDREGIONS    GetDDRMappedRegions;
+   EFI_DDRGETINFO_GETSHUBFREQTABLE       GetSHUBFreqTable;
+   EFI_DDRGETINFO_SETSHUBFREQ            SetSHUBFreq;
+   EFI_DDRGETINFO_MEASURESHUBFREQ        MeasureSHUBFreq;
+   EFI_DDRGETINFO_GETXBL2QUANTUM_SMEM_DATA  GetXbl2QuantumSmemData;
 };
 
 #endif /* __EFIDDRGETINFO_H__ */

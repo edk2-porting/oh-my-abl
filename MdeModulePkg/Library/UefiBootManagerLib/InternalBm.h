@@ -1,15 +1,10 @@
 /** @file
   BDS library definition, include the file and data structure
 
-Copyright (c) 2004 - 2015, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+Copyright (c) 2004 - 2018, Intel Corporation. All rights reserved.<BR>
 (C) Copyright 2015 Hewlett Packard Enterprise Development LP<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -22,6 +17,7 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #include <IndustryStandard/PeImage.h>
 #include <IndustryStandard/Atapi.h>
 #include <IndustryStandard/Scsi.h>
+#include <IndustryStandard/Nvme.h>
 
 #include <Protocol/PciRootBridgeIo.h>
 #include <Protocol/BlockIo.h>
@@ -38,16 +34,20 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #include <Protocol/GraphicsOutput.h>
 #include <Protocol/UsbIo.h>
 #include <Protocol/DiskInfo.h>
+#include <Protocol/NvmExpressPassthru.h>
 #include <Protocol/IdeControllerInit.h>
 #include <Protocol/BootLogo.h>
 #include <Protocol/DriverHealth.h>
 #include <Protocol/FormBrowser2.h>
+#include <Protocol/VariableLock.h>
+#include <Protocol/RamDisk.h>
+#include <Protocol/DeferredImageLoad.h>
+#include <Protocol/PlatformBootManager.h>
 
-#include <Guid/ZeroGuid.h>
 #include <Guid/MemoryTypeInformation.h>
 #include <Guid/FileInfo.h>
 #include <Guid/GlobalVariable.h>
-#include <Guid/Performance.h>
+#include <Guid/StatusCodeDataTypeId.h>
 #include <Guid/StatusCodeDataTypeVariable.h>
 
 #include <Library/PrintLib.h>
@@ -65,7 +65,6 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #include <Library/PcdLib.h>
 #include <Library/PeCoffGetEntryPointLib.h>
 #include <Library/UefiBootManagerLib.h>
-#include <Library/TimerLib.h>
 #include <Library/DxeServicesLib.h>
 #include <Library/ReportStatusCodeLib.h>
 #include <Library/CapsuleLib.h>
@@ -91,8 +90,6 @@ typedef enum {
   BmMessageSataBoot,
   BmMessageUsbBoot,
   BmMessageScsiBoot,
-  BmMessageNetworkBoot,
-  BmMessageHttpBoot,
   BmMiscBoot
 } BM_BOOT_TYPE;
 
@@ -102,12 +99,29 @@ CHAR16 *
   IN EFI_HANDLE          Handle
   );
 
-#define BM_OPTION_NAME_LEN                          sizeof ("SysPrep####")
+//
+// PlatformRecovery#### is the load option with the longest name
+//
+#define BM_OPTION_NAME_LEN                          sizeof ("PlatformRecovery####")
 extern CHAR16  *mBmLoadOptionName[];
 
+//
+// Maximum number of reconnect retry to repair controller; it is to limit the
+// number of recursive call of BmRepairAllControllers.
+//
+#define MAX_RECONNECT_REPAIR                        10
+
+/**
+  Visitor function to be called by BmForEachVariable for each variable
+  in variable storage.
+
+  @param Name    Variable name.
+  @param Guid    Variable GUID.
+  @param Context The same context passed to BmForEachVariable.
+**/
 typedef
 VOID
-(*VARIABLE_VISITOR) (
+(*BM_VARIABLE_VISITOR) (
   CHAR16                *Name,
   EFI_GUID              *Guid,
   VOID                  *Context
@@ -120,8 +134,8 @@ VOID
   @param Context   The context passed to Visitor function.
 **/
 VOID
-ForEachVariable (
-  VARIABLE_VISITOR            Visitor,
+BmForEachVariable (
+  BM_VARIABLE_VISITOR         Visitor,
   VOID                        *Context
   );
 
@@ -134,10 +148,13 @@ typedef struct {
 
 /**
   Repair all the controllers according to the Driver Health status queried.
+
+  @param ReconnectRepairCount     To record the number of recursive call of
+                                  this function itself.
 **/
 VOID
 BmRepairAllControllers (
-  VOID
+  UINTN       ReconnectRepairCount
   );
 
 #define BM_HOTKEY_SIGNATURE SIGNATURE_32 ('b', 'm', 'h', 'k')
@@ -153,28 +170,6 @@ typedef struct {
 } BM_HOTKEY;
 
 #define BM_HOTKEY_FROM_LINK(a) CR (a, BM_HOTKEY, Link, BM_HOTKEY_SIGNATURE)
-
-/**
-  Get the image file buffer data and buffer size by its device path. 
-
-  @param FilePath  On input, a pointer to an allocated buffer containing the device
-                   path of the file.
-                   On output the pointer could be NULL when the function fails to
-                   load the boot option, or could point to an allocated buffer containing
-                   the device path of the file.
-                   It could be updated by either short-form device path expanding,
-                   or default boot file path appending.
-                   Caller is responsible to free it when it's non-NULL.
-  @param FileSize  A pointer to the size of the file buffer.
-
-  @retval NULL   File is NULL, or FileSize is NULL. Or, the file can't be found.
-  @retval other  The file buffer. The caller is responsible to free the memory.
-**/
-VOID *
-BmLoadEfiBootOption (
-  IN OUT EFI_DEVICE_PATH_PROTOCOL **FilePath,
-  OUT    UINTN                    *FileSize
-  );
 
 /**
   Get the Option Number that wasn't used.
@@ -194,50 +189,18 @@ BmGetFreeOptionNumber (
   );
 
 /**
+  This routine adjust the memory information for different memory type and
+  save them into the variables for next boot. It resets the system when
+  memory information is updated and the current boot option belongs to
+  boot category instead of application category. It doesn't count the
+  reserved memory occupied by RAM Disk.
 
-  Writes performance data of booting into the allocated memory.
-  OS can process these records.
-
-  @param  Event                 The triggered event.
-  @param  Context               Context for this event.
-
-**/
-VOID
-EFIAPI
-BmWriteBootToOsPerformanceData (
-  IN EFI_EVENT  Event,
-  IN VOID       *Context
-  );
-
-
-/**
-  Get the headers (dos, image, optional header) from an image
-
-  @param  Device                SimpleFileSystem device handle
-  @param  FileName              File name for the image
-  @param  DosHeader             Pointer to dos header
-  @param  Hdr                   The buffer in which to return the PE32, PE32+, or TE header.
-
-  @retval EFI_SUCCESS           Successfully get the machine type.
-  @retval EFI_NOT_FOUND         The file is not found.
-  @retval EFI_LOAD_ERROR        File is not a valid image file.
-
-**/
-EFI_STATUS
-BmGetImageHeader (
-  IN  EFI_HANDLE                  Device,
-  IN  CHAR16                      *FileName,
-  OUT EFI_IMAGE_DOS_HEADER        *DosHeader,
-  OUT EFI_IMAGE_OPTIONAL_HEADER_PTR_UNION   Hdr
-  );
-
-/**
-  This routine adjust the memory information for different memory type and 
-  save them into the variables for next boot.
+  @param Boot               TRUE if current boot option belongs to boot
+                            category instead of application category.
 **/
 VOID
 BmSetMemoryTypeInformationVariable (
-  VOID
+  IN BOOLEAN                    Boot
   );
 
 /**
@@ -279,9 +242,9 @@ BmConnectUsbShortFormDevicePath (
 
 /**
   Stop the hotkey processing.
-  
-  @param    Event          Event pointer related to hotkey service. 
-  @param    Context        Context pass to this function. 
+
+  @param    Event          Event pointer related to hotkey service.
+  @param    Context        Context pass to this function.
 **/
 VOID
 EFIAPI
@@ -299,15 +262,14 @@ BmStopHotkeyService (
                                  then EFI_INVALID_PARAMETER is returned.
   @param  VendorGuid             A unique identifier for the vendor.
   @param  Attributes             Attributes bitmask to set for the variable.
-  @param  DataSize               The size in bytes of the Data buffer. Unless the EFI_VARIABLE_APPEND_WRITE, 
-                                 EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS, or 
-                                 EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS attribute is set, a size of zero 
-                                 causes the variable to be deleted. When the EFI_VARIABLE_APPEND_WRITE attribute is 
-                                 set, then a SetVariable() call with a DataSize of zero will not cause any change to 
-                                 the variable value (the timestamp associated with the variable may be updated however 
-                                 even if no new data value is provided,see the description of the 
-                                 EFI_VARIABLE_AUTHENTICATION_2 descriptor below. In this case the DataSize will not 
-                                 be zero since the EFI_VARIABLE_AUTHENTICATION_2 descriptor will be populated). 
+  @param  DataSize               The size in bytes of the Data buffer. Unless the EFI_VARIABLE_APPEND_WRITE,
+                                 or EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS attribute is set, a size of zero
+                                 causes the variable to be deleted. When the EFI_VARIABLE_APPEND_WRITE attribute is
+                                 set, then a SetVariable() call with a DataSize of zero will not cause any change to
+                                 the variable value (the timestamp associated with the variable may be updated however
+                                 even if no new data value is provided,see the description of the
+                                 EFI_VARIABLE_AUTHENTICATION_2 descriptor below. In this case the DataSize will not
+                                 be zero since the EFI_VARIABLE_AUTHENTICATION_2 descriptor will be populated).
   @param  Data                   The contents for the variable.
 
   @retval EFI_SUCCESS            The firmware has successfully stored the variable and its data as
@@ -319,9 +281,8 @@ BmStopHotkeyService (
   @retval EFI_DEVICE_ERROR       The variable could not be retrieved due to a hardware error.
   @retval EFI_WRITE_PROTECTED    The variable in question is read-only.
   @retval EFI_WRITE_PROTECTED    The variable in question cannot be deleted.
-  @retval EFI_SECURITY_VIOLATION The variable could not be written due to EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS 
-                                 or EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACESS being set, but the AuthInfo 
-                                 does NOT pass the validation check carried out by the firmware.
+  @retval EFI_SECURITY_VIOLATION The variable could not be written due to EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACESS
+                                 being set, but the AuthInfo does NOT pass the validation check carried out by the firmware.
 
   @retval EFI_NOT_FOUND          The variable trying to be updated or deleted was not found.
 **/
@@ -332,42 +293,6 @@ BmSetVariableAndReportStatusCodeOnError (
   IN UINT32     Attributes,
   IN UINTN      DataSize,
   IN VOID       *Data
-  );
-
-/**
-  Get the load option by its device path.
-
-  @param FilePath  The device path pointing to a load option.
-                   It could be a short-form device path.
-  @param FullPath  Return the full device path of the load option after
-                   short-form device path expanding.
-                   Caller is responsible to free it.
-  @param FileSize  Return the load option size.
-
-  @return The load option buffer. Caller is responsible to free the memory.
-**/
-VOID *
-BmGetLoadOptionBuffer (
-  IN  EFI_DEVICE_PATH_PROTOCOL          *FilePath,
-  OUT EFI_DEVICE_PATH_PROTOCOL          **FullPath,
-  OUT UINTN                             *FileSize
-  );
-
-/**
-  Return whether the PE header of the load option is valid or not.
-
-  @param[in] Type       The load option type.
-  @param[in] FileBuffer The PE file buffer of the load option.
-  @param[in] FileSize   The size of the load option file.
-
-  @retval TRUE  The PE header of the load option is valid.
-  @retval FALSE The PE header of the load option is not valid.
-**/
-BOOLEAN
-BmIsLoadOptionPeHeaderValid (
-  IN EFI_BOOT_MANAGER_LOAD_OPTION_TYPE Type,
-  IN VOID                              *FileBuffer,
-  IN UINTN                             FileSize
   );
 
 /**
@@ -409,14 +334,6 @@ BmDelPartMatchInstance (
   );
 
 /**
-  Repair all the controllers according to the Driver Health status queried.
-**/
-VOID
-BmRepairAllControllers (
-  VOID
-  );
-
-/**
   Print the device path info.
 
   @param DevicePath           The device path need to print.
@@ -426,4 +343,126 @@ BmPrintDp (
   EFI_DEVICE_PATH_PROTOCOL            *DevicePath
   );
 
+/**
+  Convert a single character to number.
+  It assumes the input Char is in the scope of L'0' ~ L'9' and L'A' ~ L'F'
+
+  @param    Char   The input char which need to convert to int.
+
+  @return  The converted 8-bit number or (UINTN) -1 if conversion failed.
+**/
+UINTN
+BmCharToUint (
+  IN CHAR16                           Char
+  );
+
+/**
+  Return the boot description for the controller.
+
+  @param Handle                Controller handle.
+
+  @return  The description string.
+**/
+CHAR16 *
+BmGetBootDescription (
+  IN EFI_HANDLE                  Handle
+  );
+
+/**
+  Enumerate all boot option descriptions and append " 2"/" 3"/... to make
+  unique description.
+
+  @param BootOptions            Array of boot options.
+  @param BootOptionCount        Count of boot options.
+**/
+VOID
+BmMakeBootOptionDescriptionUnique (
+  EFI_BOOT_MANAGER_LOAD_OPTION         *BootOptions,
+  UINTN                                BootOptionCount
+  );
+
+/**
+  Get the file buffer from the specified Load File instance.
+
+  @param LoadFileHandle The specified Load File instance.
+  @param FilePath       The file path which will pass to LoadFile().
+
+  @return  The full device path pointing to the load option buffer.
+**/
+EFI_DEVICE_PATH_PROTOCOL *
+BmExpandLoadFile (
+  IN  EFI_HANDLE                      LoadFileHandle,
+  IN  EFI_DEVICE_PATH_PROTOCOL        *FilePath
+  );
+
+/**
+  Return the RAM Disk device path created by LoadFile.
+
+  @param FilePath  The source file path.
+
+  @return Callee-to-free RAM Disk device path
+**/
+EFI_DEVICE_PATH_PROTOCOL *
+BmGetRamDiskDevicePath (
+  IN EFI_DEVICE_PATH_PROTOCOL *FilePath
+  );
+
+/**
+  Destroy the RAM Disk.
+
+  The destroy operation includes to call RamDisk.Unregister to
+  unregister the RAM DISK from RAM DISK driver, free the memory
+  allocated for the RAM Disk.
+
+  @param RamDiskDevicePath    RAM Disk device path.
+**/
+VOID
+BmDestroyRamDisk (
+  IN EFI_DEVICE_PATH_PROTOCOL *RamDiskDevicePath
+  );
+
+/**
+  Get the next possible full path pointing to the load option.
+
+  @param FilePath  The device path pointing to a load option.
+                   It could be a short-form device path.
+  @param FullPath  The full path returned by the routine in last call.
+                   Set to NULL in first call.
+
+  @return The next possible full path pointing to the load option.
+          Caller is responsible to free the memory.
+**/
+EFI_DEVICE_PATH_PROTOCOL *
+BmGetNextLoadOptionDevicePath (
+  IN  EFI_DEVICE_PATH_PROTOCOL          *FilePath,
+  IN  EFI_DEVICE_PATH_PROTOCOL          *FullPath
+  );
+
+/**
+  Return the next matched load option buffer.
+  The routine keeps calling BmGetNextLoadOptionDevicePath() until a valid
+  load option is read.
+
+  @param Type      The load option type.
+                   It's used to check whether the load option is valid.
+                   When it's LoadOptionTypeMax, the routine only guarantees
+                   the load option is a valid PE image but doesn't guarantee
+                   the PE's subsystem type is valid.
+  @param FilePath  The device path pointing to a load option.
+                   It could be a short-form device path.
+  @param FullPath  Return the next full device path of the load option after
+                   short-form device path expanding.
+                   Caller is responsible to free it.
+                   NULL to return the first matched full device path.
+  @param FileSize  Return the load option size.
+
+  @return The load option buffer. Caller is responsible to free the memory.
+**/
+VOID *
+BmGetNextLoadOptionBuffer (
+  IN  EFI_BOOT_MANAGER_LOAD_OPTION_TYPE Type,
+  IN  EFI_DEVICE_PATH_PROTOCOL          *FilePath,
+  OUT EFI_DEVICE_PATH_PROTOCOL          **FullPath,
+  OUT UINTN                             *FileSize
+  );
 #endif // _INTERNAL_BM_H_

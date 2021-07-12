@@ -3,14 +3,8 @@
   network applications (and drivers) to establish wireless connection with an access
   point (AP).
 
-  Copyright (c) 2015, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution. The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2015 - 2016, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
   @par Revision Reference:
   This Protocol is introduced in UEFI Specification 2.5
@@ -20,22 +14,14 @@
 #ifndef __EFI_WIFI_PROTOCOL_H__
 #define __EFI_WIFI_PROTOCOL_H__
 
+#include <Protocol/WiFi2.h>
+
 #define EFI_WIRELESS_MAC_CONNECTION_PROTOCOL_GUID \
   { \
     0xda55bc9, 0x45f8, 0x4bb4, {0x87, 0x19, 0x52, 0x24, 0xf1, 0x8a, 0x4d, 0x45 } \
   }
 
 typedef struct _EFI_WIRELESS_MAC_CONNECTION_PROTOCOL EFI_WIRELESS_MAC_CONNECTION_PROTOCOL;
-
-///
-/// EFI_80211_BSS_TYPE
-///
-typedef enum {
-  IeeeInfrastructureBSS,
-  IeeeIndependentBSS,
-  IeeeMeshBSS,
-  IeeeAnyBss
-} EFI_80211_BSS_TYPE;
 
 ///
 /// EFI_80211_ACC_NET_TYPE
@@ -144,13 +130,6 @@ typedef enum {
   AuthenticationRejected,
   AuthenticateInvalidParameter
 } EFI_80211_AUTHENTICATE_RESULT_CODE;
-
-///
-/// EFI_80211_MAC_ADDRESS
-///
-typedef struct {
-  UINT8                              Addr[6];
-} EFI_80211_MAC_ADDRESS;
 
 ///
 /// EFI_80211_ELEMENT_HEADER

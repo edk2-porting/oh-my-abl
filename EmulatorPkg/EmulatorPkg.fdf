@@ -1,16 +1,10 @@
 ## @file
 # This is Emulator FDF file with UEFI HII features enabled
 #
-# Copyright (c) 2008 - 2015, Intel Corporation. All rights reserved.<BR>
+# Copyright (c) 2008 - 2018, Intel Corporation. All rights reserved.<BR>
 # Portions copyright (c) 2009 - 2011, Apple Inc. All rights reserved.<BR>
 #
-# This program and the accompanying materials
-# are licensed and made available under the terms and conditions of the BSD License
-# which accompanies this distribution. The full text of the license may be found at
-# http://opensource.org/licenses/bsd-license.php
-#
-# THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-# WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+# SPDX-License-Identifier: BSD-2-Clause-Patent
 #
 
 [FD.Fv_Recovery]
@@ -86,6 +80,7 @@ DATA = {
 gEmulatorPkgTokenSpaceGuid.PcdEmuFlashNvStorageFtwSpareBase|gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareSize
 
 [FV.FvRecovery]
+FvNameGuid         = 6D99E806-3D38-42c2-A095-5F4300BFD7DC
 FvAlignment        = 16         #FV alignment and FV attributes setting.
 ERASE_POLARITY     = 1
 MEMORY_MAPPED      = TRUE
@@ -161,7 +156,7 @@ INF  MdeModulePkg/Universal/Console/ConPlatformDxe/ConPlatformDxe.inf
 INF  MdeModulePkg/Universal/Console/ConSplitterDxe/ConSplitterDxe.inf
 INF  MdeModulePkg/Universal/Console/GraphicsConsoleDxe/GraphicsConsoleDxe.inf
 
-INF  EmbeddedPkg/SerialDxe/SerialDxe.inf
+INF  MdeModulePkg/Universal/SerialDxe/SerialDxe.inf
 INF  MdeModulePkg/Universal/Console/TerminalDxe/TerminalDxe.inf
 INF  MdeModulePkg/Universal/DevicePathDxe/DevicePathDxe.inf
 INF  MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
@@ -170,7 +165,6 @@ INF  MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
 INF  MdeModulePkg/Bus/Pci/PciBusDxe/PciBusDxe.inf
 INF  MdeModulePkg/Bus/Scsi/ScsiBusDxe/ScsiBusDxe.inf
 INF  MdeModulePkg/Bus/Scsi/ScsiDiskDxe/ScsiDiskDxe.inf
-INF  IntelFrameworkModulePkg/Bus/Pci/IdeBusDxe/IdeBusDxe.inf
 INF  MdeModulePkg/Universal/SmbiosDxe/SmbiosDxe.inf
 
 INF  EmulatorPkg/EmuBusDriverDxe/EmuBusDriverDxe.inf
@@ -183,9 +177,14 @@ INF  MdeModulePkg/Universal/HiiDatabaseDxe/HiiDatabaseDxe.inf
 INF  MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf
 INF  MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
 INF  MdeModulePkg/Universal/PrintDxe/PrintDxe.inf
-INF  IntelFrameworkModulePkg/Universal/BdsDxe/BdsDxe.inf
+INF  MdeModulePkg/Universal/BdsDxe/BdsDxe.inf
+!if "XCODE5" not in $(TOOL_CHAIN_TAG)
+INF  MdeModulePkg/Logo/LogoDxe.inf
+!endif
+INF  MdeModulePkg/Universal/LoadFileOnFv2/LoadFileOnFv2.inf
+INF  RuleOverride = UI MdeModulePkg/Application/UiApp/UiApp.inf
+INF  MdeModulePkg/Application/BootManagerMenuApp/BootManagerMenuApp.inf
 INF  MdeModulePkg/Universal/DriverSampleDxe/DriverSampleDxe.inf
-INF  MdeModulePkg/Application/HelloWorld/HelloWorld.inf
 
 #
 # Network stack drivers
@@ -193,41 +192,18 @@ INF  MdeModulePkg/Application/HelloWorld/HelloWorld.inf
 !if $(NETWORK_SUPPORT)
 INF  EmulatorPkg/EmuSnpDxe/EmuSnpDxe.inf
 !endif
-INF  MdeModulePkg/Universal/Network/DpcDxe/DpcDxe.inf
-INF  MdeModulePkg/Universal/Network/ArpDxe/ArpDxe.inf
-INF  MdeModulePkg/Universal/Network/Dhcp4Dxe/Dhcp4Dxe.inf
-INF  MdeModulePkg/Universal/Network/Ip4Dxe/Ip4Dxe.inf
-INF  MdeModulePkg/Universal/Network/MnpDxe/MnpDxe.inf
-INF  MdeModulePkg/Universal/Network/VlanConfigDxe/VlanConfigDxe.inf
-INF  MdeModulePkg/Universal/Network/Mtftp4Dxe/Mtftp4Dxe.inf
-INF  MdeModulePkg/Universal/Network/Tcp4Dxe/Tcp4Dxe.inf
-INF  MdeModulePkg/Universal/Network/Udp4Dxe/Udp4Dxe.inf
+!include NetworkPkg/Network.fdf.inc
 
-
-!if $(BUILD_FAT)
 INF FatPkg/EnhancedFatDxe/Fat.inf
-!else
-INF  RuleOverride = BINARY FatBinPkg/EnhancedFatDxe/Fat.inf
-!endif
 
-!if $(BUILD_NEW_SHELL)
+!if "XCODE5" not in $(TOOL_CHAIN_TAG)
+INF  ShellPkg/DynamicCommand/TftpDynamicCommand/TftpDynamicCommand.inf
+!endif
 INF  ShellPkg/Application/Shell/Shell.inf
-!else
-!if $(USE_NEW_SHELL)
-INF  RuleOverride = BINARY ShellBinPkg/UefiShell/UefiShell.inf
-!else
-INF  RuleOverride = BINARY EdkShellBinPkg/FullShell/FullShell.inf
-!endif
-!endif
-
-FILE FREEFORM = PCD(gEfiIntelFrameworkModulePkgTokenSpaceGuid.PcdLogoFile) {
-  SECTION RAW = MdeModulePkg/Logo/Logo.bmp
-}
-
 
 [Rule.Common.SEC]
   FILE SEC = $(NAMED_GUID)  {
-    PE32     PE32    Align=32       $(INF_OUTPUT)/$(MODULE_NAME).efi
+    PE32     PE32    Align=Auto     $(INF_OUTPUT)/$(MODULE_NAME).efi
     UI       STRING ="$(MODULE_NAME)" Optional
     VERSION  STRING ="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
   }
@@ -235,7 +211,7 @@ FILE FREEFORM = PCD(gEfiIntelFrameworkModulePkgTokenSpaceGuid.PcdLogoFile) {
 
 [Rule.Common.PEI_CORE]
   FILE PEI_CORE = $(NAMED_GUID) {
-    PE32     PE32    Align=32       $(INF_OUTPUT)/$(MODULE_NAME).efi
+    PE32     PE32    Align=Auto     $(INF_OUTPUT)/$(MODULE_NAME).efi
     UI       STRING ="$(MODULE_NAME)" Optional
     VERSION  STRING ="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
   }
@@ -243,7 +219,7 @@ FILE FREEFORM = PCD(gEfiIntelFrameworkModulePkgTokenSpaceGuid.PcdLogoFile) {
 [Rule.Common.PEIM]
   FILE PEIM = $(NAMED_GUID) {
      PEI_DEPEX PEI_DEPEX Optional        $(INF_OUTPUT)/$(MODULE_NAME).depex
-     PE32      PE32   Align=32       $(INF_OUTPUT)/$(MODULE_NAME).efi
+     PE32      PE32   Align=Auto     $(INF_OUTPUT)/$(MODULE_NAME).efi
      UI       STRING="$(MODULE_NAME)" Optional
      VERSION  STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
   }
@@ -302,6 +278,13 @@ FILE FREEFORM = PCD(gEfiIntelFrameworkModulePkgTokenSpaceGuid.PcdLogoFile) {
         VERSION  STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
       }
     }
+  }
+
+[Rule.Common.UEFI_APPLICATION.UI]
+  FILE APPLICATION = $(NAMED_GUID) {
+    PE32      PE32                     $(INF_OUTPUT)/$(MODULE_NAME).efi
+    UI        STRING="Enter Setup"
+    VERSION   STRING="$(INF_VERSION)" Optional BUILD_NUM=$(BUILD_NUMBER)
   }
 
 [Rule.Common.UEFI_DRIVER.BINARY]

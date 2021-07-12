@@ -24,11 +24,13 @@ MAKEPATH=$(ANDROID_TOP)/prebuilts/build-tools/linux-x86/bin/
   endif
 endif
 
+SECTOOLSV2_BIN=$(QCPATH)/sectools/Linux/sectools
+
 # Use host tools from prebuilts. Partner should determine the correct host tools to use
-PREBUILT_HOST_TOOLS := CC=$(ANDROID_TOP)/$(CLANG)\ \
-		       CXX=$(ANDROID_TOP)/$(CLANG_CXX)\ \
+PREBUILT_HOST_TOOLS := BUILD_CC=$(ANDROID_TOP)/$(CLANG)\ \
+		       BUILD_CXX=$(ANDROID_TOP)/$(CLANG_CXX)\ \
 		       LDPATH=$(LDOPT)\ \
-		       AR=$(ANDROID_TOP)/$(HOST_AR)
+		       BUILD_AR=$(ANDROID_TOP)/$(HOST_AR)
 PREBUILT_PYTHON_PATH=$(ANDROID_TOP)/prebuilts/python/linux-x86/2.7.5/bin/python2
 
 DISABLE_PARALLEL_DOWNLOAD_FLASH := DISABLE_PARALLEL_DOWNLOAD_FLASH=0
@@ -97,7 +99,7 @@ else
         VIRTUAL_AB_OTA := VIRTUAL_AB_OTA=0
 endif
 
-ifeq ($(BOARD_USES_RECOVERY_AS_BOOT),true)
+ifneq (,$(filter true,$(BOARD_USES_RECOVERY_AS_BOOT) $(BOARD_MOVE_RECOVERY_RESOURCES_TO_VENDOR_BOOT)))
 	BUILD_USES_RECOVERY_AS_BOOT := BUILD_USES_RECOVERY_AS_BOOT=1
 else
 	BUILD_USES_RECOVERY_AS_BOOT := BUILD_USES_RECOVERY_AS_BOOT=0
@@ -122,9 +124,18 @@ else
 	CLANG35_GCC_TOOLCHAIN := $(ANDROID_TOP)/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-$(TARGET_GCC_VERSION)
 endif
 
+# Final configurations before calling edk2's make
+# Always keep the following block towards the end of configurations.
+ifeq ($(BOARD_ABL_SIMPLE),true)
+	AB_RETRYCOUNT_DISABLE := AB_RETRYCOUNT_DISABLE=1
+	VERIFIED_BOOT := VERIFIED_BOOT=0
+	VERIFIED_BOOT_2 := VERIFIED_BOOT_2=0
+	VERIFIED_BOOT_LE := VERIFIED_BOOT_LE=0
+	DISABLE_PARALLEL_DOWNLOAD_FLASH := DISABLE_PARALLEL_DOWNLOAD_FLASH=1
+endif
 
 # ABL ELF output
-TARGET_ABL := $(PRODUCT_OUT)/abl.elf
+TARGET_ABL := $(PRODUCT_OUT)/unsigned_abl.elf
 TARGET_EMMC_BOOTLOADER := $(TARGET_ABL)
 ABL_OUT := $(TARGET_OUT_INTERMEDIATES)/ABL_OBJ
 
@@ -160,3 +171,22 @@ $(TARGET_ABL): $(LOCAL_ABL_SRC_FILE) | $(ABL_OUT) $(INSTALLED_KEYSTOREIMAGE_TARG
 		CLANG_GCC_TOOLCHAIN=$(CLANG35_GCC_TOOLCHAIN)\
 		TARGET_ARCHITECTURE=$(TARGET_ARCHITECTURE) \
 		BOARD_BOOTLOADER_PRODUCT_NAME=$(BOARD_BOOTLOADER_PRODUCT_NAME)
+
+
+define sec-image-generate
+	@echo "Generating signed appsbl using secimagev2 tool"
+	@rm -rf $(PRODUCT_OUT)/temp_signed_abl
+	( $(SECTOOLSV2_BIN) secure-image $(TARGET_EMMC_BOOTLOADER) \
+		--outfile $(PRODUCT_OUT)/abl.elf \
+		--image-id ABL \
+		--security-profile $(SECTOOLS_SECURITY_PROFILE) \
+		--sign \
+		--signing-mode TEST \
+		> $(PRODUCT_OUT)/secimage.log 2>&1 )
+	@echo "Completed secimagev2 signed appsbl (ABL) (logs in $(PRODUCT_OUT)/secimage.log)"
+endef
+
+
+SIGN_ABL := $(PRODUCT_OUT)/temp_signed_abl
+$(SIGN_ABL): $(TARGET_EMMC_BOOTLOADER)
+	$(call sec-image-generate)

@@ -1,14 +1,8 @@
 /** @file
   HMAC-SHA1 Wrapper Implementation over OpenSSL.
 
-Copyright (c) 2010 - 2012, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2010 - 2020, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -16,40 +10,59 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #include <openssl/hmac.h>
 
 /**
-  Retrieves the size, in bytes, of the context buffer required for HMAC-SHA1 operations.
+  Allocates and initializes one HMAC_CTX context for subsequent HMAC-SHA1 use.
 
-  @return  The size, in bytes, of the context buffer required for HMAC-SHA1 operations.
+  @return  Pointer to the HMAC_CTX context that has been initialized.
+           If the allocations fails, HmacSha1New() returns NULL.
 
 **/
-UINTN
+VOID *
 EFIAPI
-HmacSha1GetContextSize (
+HmacSha1New (
   VOID
   )
 {
   //
-  // Retrieves the OpenSSL HMAC-SHA1 Context Size
+  // Allocates & Initializes HMAC_CTX Context by OpenSSL HMAC_CTX_new()
   //
-  return (UINTN) (sizeof (HMAC_CTX));
+  return (VOID *) HMAC_CTX_new ();
 }
 
 /**
-  Initializes user-supplied memory pointed by HmacSha1Context as HMAC-SHA1 context for
-  subsequent use.
+  Release the specified HMAC_CTX context.
+
+  @param[in]  HmacSha1Ctx  Pointer to the HMAC_CTX context to be released.
+
+**/
+VOID
+EFIAPI
+HmacSha1Free (
+  IN  VOID  *HmacSha1Ctx
+  )
+{
+  //
+  // Free OpenSSL HMAC_CTX Context
+  //
+  HMAC_CTX_free ((HMAC_CTX *)HmacSha1Ctx);
+}
+
+/**
+  Set user-supplied key for subsequent use. It must be done before any
+  calling to HmacSha1Update().
 
   If HmacSha1Context is NULL, then return FALSE.
 
-  @param[out]  HmacSha1Context  Pointer to HMAC-SHA1 context being initialized.
+  @param[out]  HmacSha1Context  Pointer to HMAC-SHA1 context.
   @param[in]   Key              Pointer to the user-supplied key.
   @param[in]   KeySize          Key size in bytes.
 
-  @retval TRUE   HMAC-SHA1 context initialization succeeded.
-  @retval FALSE  HMAC-SHA1 context initialization failed.
+  @retval TRUE   The Key is set successfully.
+  @retval FALSE  The Key is set unsuccessfully.
 
 **/
 BOOLEAN
 EFIAPI
-HmacSha1Init (
+HmacSha1SetKey (
   OUT  VOID         *HmacSha1Context,
   IN   CONST UINT8  *Key,
   IN   UINTN        KeySize
@@ -62,11 +75,9 @@ HmacSha1Init (
     return FALSE;
   }
 
-  //
-  // OpenSSL HMAC-SHA1 Context Initialization
-  //
-  HMAC_CTX_init (HmacSha1Context);
-  HMAC_Init_ex (HmacSha1Context, Key, (UINT32) KeySize, EVP_sha1(), NULL);
+  if (HMAC_Init_ex ((HMAC_CTX *)HmacSha1Context, Key, (UINT32) KeySize, EVP_sha1(), NULL) != 1) {
+    return FALSE;
+  }
 
   return TRUE;
 }
@@ -98,7 +109,9 @@ HmacSha1Duplicate (
     return FALSE;
   }
 
-  CopyMem (NewHmacSha1Context, HmacSha1Context, sizeof (HMAC_CTX));
+  if (HMAC_CTX_copy ((HMAC_CTX *)NewHmacSha1Context, (HMAC_CTX *)HmacSha1Context) != 1) {
+    return FALSE;
+  }
 
   return TRUE;
 }
@@ -108,8 +121,8 @@ HmacSha1Duplicate (
 
   This function performs HMAC-SHA1 digest on a data buffer of the specified size.
   It can be called multiple times to compute the digest of long or discontinuous data streams.
-  HMAC-SHA1 context should be already correctly intialized by HmacSha1Init(), and should not
-  be finalized by HmacSha1Final(). Behavior with invalid context is undefined.
+  HMAC-SHA1 context should be initialized by HmacSha1New(), and should not be finalized by
+  HmacSha1Final(). Behavior with invalid context is undefined.
 
   If HmacSha1Context is NULL, then return FALSE.
 
@@ -146,7 +159,9 @@ HmacSha1Update (
   //
   // OpenSSL HMAC-SHA1 digest update
   //
-  HMAC_Update (HmacSha1Context, Data, DataSize);
+  if (HMAC_Update ((HMAC_CTX *)HmacSha1Context, Data, DataSize) != 1) {
+    return FALSE;
+  }
 
   return TRUE;
 }
@@ -157,8 +172,8 @@ HmacSha1Update (
   This function completes HMAC-SHA1 digest computation and retrieves the digest value into
   the specified memory. After this function has been called, the HMAC-SHA1 context cannot
   be used again.
-  HMAC-SHA1 context should be already correctly intialized by HmacSha1Init(), and should
-  not be finalized by HmacSha1Final(). Behavior with invalid HMAC-SHA1 context is undefined.
+  HMAC-SHA1 context should be initialized by HmacSha1New(), and should not be finalized by
+  HmacSha1Final(). Behavior with invalid HMAC-SHA1 context is undefined.
 
   If HmacSha1Context is NULL, then return FALSE.
   If HmacValue is NULL, then return FALSE.
@@ -190,8 +205,12 @@ HmacSha1Final (
   //
   // OpenSSL HMAC-SHA1 digest finalization
   //
-  HMAC_Final (HmacSha1Context, HmacValue, &Length);
-  HMAC_CTX_cleanup (HmacSha1Context);
+  if (HMAC_Final ((HMAC_CTX *)HmacSha1Context, HmacValue, &Length) != 1) {
+    return FALSE;
+  }
+  if (HMAC_CTX_reset ((HMAC_CTX *)HmacSha1Context) != 1) {
+    return FALSE;
+  }
 
   return TRUE;
 }

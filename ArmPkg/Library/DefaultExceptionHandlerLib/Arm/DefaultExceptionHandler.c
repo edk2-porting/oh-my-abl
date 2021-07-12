@@ -4,13 +4,7 @@
   Copyright (c) 2008 - 2010, Apple Inc. All rights reserved.<BR>
   Copyright (c) 2012, ARM Ltd. All rights reserved.<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -21,13 +15,19 @@
 #include <Library/PrintLib.h>
 #include <Library/ArmDisassemblerLib.h>
 #include <Library/SerialPortLib.h>
+#include <Library/UefiBootServicesTableLib.h>
+#include <Library/UefiLib.h>
 
 #include <Guid/DebugImageInfoTable.h>
 
 #include <Protocol/DebugSupport.h>
 #include <Library/DefaultExceptionHandlerLib.h>
 
-EFI_DEBUG_IMAGE_INFO_TABLE_HEADER *gDebugImageTableHeader = NULL;
+//
+// The number of elements in a CHAR8 array, including the terminating NUL, that
+// is meant to hold the string rendering of the CPSR.
+//
+#define CPSR_STRING_SIZE 32
 
 typedef struct {
   UINT32  BIT;
@@ -48,7 +48,8 @@ GetImageName (
   It is possible to add extra bits by adding them to CpsrChar array.
 
   @param  Cpsr         ARM CPSR register value
-  @param  ReturnStr    32 byte string that contains string version of CPSR
+  @param  ReturnStr    CPSR_STRING_SIZE byte string that contains string
+                       version of CPSR
 
 **/
 VOID
@@ -118,8 +119,10 @@ CpsrString (
     break;
   }
 
-  AsciiStrCat (Str, ModeStr);
-  return;
+  //
+  // See the interface contract in the leading comment block.
+  //
+  AsciiStrCatS (Str, CPSR_STRING_SIZE - (Str - ReturnStr), ModeStr);
 }
 
 CHAR8 *
@@ -165,7 +168,7 @@ STATIC CHAR8 *gExceptionTypeString[] = {
 /**
   This is the default action to take on an unexpected exception
 
-  Since this is exception context don't do anything crazy like try to allcoate memory.
+  Since this is exception context don't do anything crazy like try to allocate memory.
 
   @param  ExceptionType    Type of the exception
   @param  SystemContext    Register state at the time of the Exception
@@ -187,14 +190,18 @@ DefaultExceptionHandler (
 
   CharCount = AsciiSPrint (Buffer,sizeof (Buffer),"\n%a Exception PC at 0x%08x  CPSR 0x%08x ",
          gExceptionTypeString[ExceptionType], SystemContext.SystemContextArm->PC, SystemContext.SystemContextArm->CPSR);
-  SerialPortWrite ((UINT8 *) Buffer, CharCount);
+  SerialPortWrite ((UINT8 *)Buffer, CharCount);
+  if (gST->ConOut != NULL) {
+    AsciiPrint (Buffer);
+  }
 
   DEBUG_CODE_BEGIN ();
     CHAR8   *Pdb;
     UINT32  ImageBase;
     UINT32  PeCoffSizeOfHeader;
     UINT32  Offset;
-    CHAR8   CpsrStr[32];  // char per bit. Lower 5-bits are mode that is a 3 char string
+    CHAR8   CpsrStr[CPSR_STRING_SIZE];  // char per bit. Lower 5-bits are mode
+                                        // that is a 3 char string
     CHAR8   Buffer[80];
     UINT8   *DisAsm;
     UINT32  ItBlock;
@@ -258,6 +265,8 @@ DefaultExceptionHandler (
 
   DEBUG ((EFI_D_ERROR, "\n"));
   ASSERT (FALSE);
+
+  CpuDeadLoop ();   // may return if executing under a debugger
 
   // Clear the error registers that we have already displayed incase some one wants to keep going
   SystemContext.SystemContextArm->DFSR = 0;

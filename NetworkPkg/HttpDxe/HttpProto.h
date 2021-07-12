@@ -1,14 +1,9 @@
 /** @file
   The header files of miscellaneous routines for HttpDxe driver.
 
-Copyright (c) 2015, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2015 - 2018, Intel Corporation. All rights reserved.<BR>
+(C) Copyright 2016 Hewlett Packard Enterprise Development LP<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -26,6 +21,7 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
   ServiceBinding, \
   HTTP_SERVICE_SIGNATURE \
   )
+
 
 //
 // The state of HTTP protocol. It starts from UNCONFIGED.
@@ -45,6 +41,7 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #define HTTP_BUFFER_SIZE_DEAULT      65535
 #define HTTP_MAX_SYN_BACK_LOG        5
 #define HTTP_CONNECTION_TIMEOUT      60
+#define HTTP_RESPONSE_TIMEOUT        5
 #define HTTP_DATA_RETRIES            12
 #define HTTP_FIN_TIMEOUT             2
 #define HTTP_KEEP_ALIVE_PROBES       6
@@ -56,24 +53,47 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 typedef struct _HTTP_SERVICE {
   UINT32                        Signature;
   EFI_SERVICE_BINDING_PROTOCOL  ServiceBinding;
-  EFI_HANDLE                    ImageHandle;
+  EFI_HANDLE                    Ip4DriverBindingHandle;
+  EFI_HANDLE                    Ip6DriverBindingHandle;
   EFI_HANDLE                    ControllerHandle;
+  EFI_HANDLE                    Tcp4ChildHandle;
+  EFI_HANDLE                    Tcp6ChildHandle;
   LIST_ENTRY                    ChildrenList;
   UINTN                         ChildrenNumber;
-  EFI_HANDLE                    TcpChildHandle;
   INTN                          State;
 } HTTP_SERVICE;
 
 typedef struct {
-  EFI_TCP4_IO_TOKEN             TxToken;
-  EFI_TCP4_TRANSMIT_DATA        TxData;
+  EFI_TCP4_IO_TOKEN             Tx4Token;
+  EFI_TCP4_TRANSMIT_DATA        Tx4Data;
+  EFI_TCP6_IO_TOKEN             Tx6Token;
+  EFI_TCP6_TRANSMIT_DATA        Tx6Data;
+  EFI_TCP4_IO_TOKEN             Rx4Token;
+  EFI_TCP4_RECEIVE_DATA         Rx4Data;
+  EFI_TCP6_IO_TOKEN             Rx6Token;
+  EFI_TCP6_RECEIVE_DATA         Rx6Data;
   BOOLEAN                       IsTxDone;
-  EFI_TCP4_IO_TOKEN             RxToken;
-  EFI_TCP4_RECEIVE_DATA         RxData;
   BOOLEAN                       IsRxDone;
   UINTN                         BodyLen;
   EFI_HTTP_METHOD               Method;
 } HTTP_TCP_TOKEN_WRAP;
+
+typedef struct {
+  EFI_TLS_VERSION               Version;
+  EFI_TLS_CONNECTION_END        ConnectionEnd;
+  EFI_TLS_VERIFY                VerifyMethod;
+  EFI_TLS_VERIFY_HOST           VerifyHost;
+  EFI_TLS_SESSION_STATE         SessionState;
+} TLS_CONFIG_DATA;
+
+//
+// Callback data for HTTP_PARSER_CALLBACK()
+//
+typedef struct {
+  UINTN                         ParseDataLength;
+  VOID                          *ParseData;
+  VOID                          *Wrap;
+} HTTP_CALLBACK_DATA;
 
 typedef struct _HTTP_PROTOCOL {
   UINT32                        Signature;
@@ -83,27 +103,47 @@ typedef struct _HTTP_PROTOCOL {
   LIST_ENTRY                    Link;   // Link to all HTTP instance from the service.
   BOOLEAN                       InDestroy;
   INTN                          State;
+  EFI_HTTP_METHOD               Method;
 
-  EFI_HANDLE                    TcpChildHandle;
+  UINTN                         StatusCode;
+
+  EFI_EVENT                     TimeoutEvent;
+
+  EFI_HANDLE                    Tcp4ChildHandle;
   EFI_TCP4_PROTOCOL             *Tcp4;
   EFI_TCP4_CONFIG_DATA          Tcp4CfgData;
   EFI_TCP4_OPTION               Tcp4Option;
 
-  EFI_TCP4_CONNECTION_TOKEN     ConnToken;
-  BOOLEAN                       IsConnDone;
-  EFI_TCP4_CLOSE_TOKEN          CloseToken;
-  BOOLEAN                       IsCloseDone;
-
+  EFI_TCP4_CONNECTION_TOKEN     Tcp4ConnToken;
+  BOOLEAN                       IsTcp4ConnDone;
+  EFI_TCP4_CLOSE_TOKEN          Tcp4CloseToken;
+  BOOLEAN                       IsTcp4CloseDone;
   CHAR8                         *RemoteHost;
   UINT16                        RemotePort;
   EFI_IPv4_ADDRESS              RemoteAddr;
+
+  EFI_HANDLE                    Tcp6ChildHandle;
+  EFI_TCP6_PROTOCOL             *Tcp6;
+  EFI_TCP6_CONFIG_DATA          Tcp6CfgData;
+  EFI_TCP6_OPTION               Tcp6Option;
+
+  EFI_TCP6_CONNECTION_TOKEN     Tcp6ConnToken;
+  BOOLEAN                       IsTcp6ConnDone;
+  EFI_TCP6_CLOSE_TOKEN          Tcp6CloseToken;
+  BOOLEAN                       IsTcp6CloseDone;
+  EFI_IPv6_ADDRESS              RemoteIpv6Addr;
+
   //
-  // RxToken used for receiving HTTP header.
+  // Rx4Token or Rx6Token used for receiving HTTP header.
   //
-  EFI_TCP4_IO_TOKEN             RxToken;
-  EFI_TCP4_RECEIVE_DATA         RxData;
+  EFI_TCP4_IO_TOKEN             Rx4Token;
+  EFI_TCP4_RECEIVE_DATA         Rx4Data;
+  EFI_TCP6_IO_TOKEN             Rx6Token;
+  EFI_TCP6_RECEIVE_DATA         Rx6Data;
   BOOLEAN                       IsRxDone;
 
+  CHAR8                         **EndofHeader;
+  CHAR8                         **HttpHeaders;
   CHAR8                         *CacheBody;
   CHAR8                         *NextMsg;
   UINTN                         CacheLen;
@@ -113,17 +153,49 @@ typedef struct _HTTP_PROTOCOL {
   // HTTP message-body parser.
   //
   VOID                          *MsgParser;
-  
+  HTTP_CALLBACK_DATA            CallbackData;
+
   EFI_HTTP_VERSION              HttpVersion;
   UINT32                        TimeOutMillisec;
   BOOLEAN                       LocalAddressIsIPv6;
 
   EFI_HTTPv4_ACCESS_POINT       IPv4Node;
+  EFI_HTTPv6_ACCESS_POINT       Ipv6Node;
 
   NET_MAP                       TxTokens;
   NET_MAP                       RxTokens;
 
   CHAR8                         *Url;
+
+  //
+  // Https Support
+  //
+  BOOLEAN                          UseHttps;
+
+  EFI_SERVICE_BINDING_PROTOCOL     *TlsSb;
+  EFI_HANDLE                       TlsChildHandle; /// Tls ChildHandle
+  TLS_CONFIG_DATA                  TlsConfigData;
+  EFI_TLS_PROTOCOL                 *Tls;
+  EFI_TLS_CONFIGURATION_PROTOCOL   *TlsConfiguration;
+  EFI_TLS_SESSION_STATE            TlsSessionState;
+
+  //
+  // TlsTxData used for transmitting TLS related messages.
+  //
+  EFI_TCP4_IO_TOKEN                Tcp4TlsTxToken;
+  EFI_TCP4_TRANSMIT_DATA           Tcp4TlsTxData;
+  EFI_TCP6_IO_TOKEN                Tcp6TlsTxToken;
+  EFI_TCP6_TRANSMIT_DATA           Tcp6TlsTxData;
+  BOOLEAN                          TlsIsTxDone;
+
+  //
+  // TlsRxData used for receiving TLS related messages.
+  //
+  EFI_TCP4_IO_TOKEN                Tcp4TlsRxToken;
+  EFI_TCP4_RECEIVE_DATA            Tcp4TlsRxData;
+  EFI_TCP6_IO_TOKEN                Tcp6TlsRxToken;
+  EFI_TCP6_RECEIVE_DATA            Tcp6TlsRxData;
+  BOOLEAN                          TlsIsRxDone;
 } HTTP_PROTOCOL;
 
 typedef struct {
@@ -144,7 +216,7 @@ typedef struct {
   )
 
 /**
-  The common notify function used in HTTP driver. 
+  The common notify function used in HTTP driver.
 
   @param[in]  Event   The event signaled.
   @param[in]  Context The context.
@@ -158,7 +230,7 @@ HttpCommonNotify (
   );
 
 /**
-  Create events for the TCP4 connection token and TCP4 close token.
+  Create events for the TCP connection token and TCP close token.
 
   @param[in]  HttpInstance       Pointer to HTTP_PROTOCOL structure.
 
@@ -167,23 +239,23 @@ HttpCommonNotify (
 
 **/
 EFI_STATUS
-HttpCreateTcp4ConnCloseEvent (
+HttpCreateTcpConnCloseEvent (
   IN  HTTP_PROTOCOL        *HttpInstance
   );
 
 /**
-  Close events in the TCP4 connection token and TCP4 close token.
+  Close events in the TCP connection token and TCP close token.
 
   @param[in]  HttpInstance   Pointer to HTTP_PROTOCOL structure.
 
 **/
 VOID
-HttpCloseTcp4ConnCloseEvent (
+HttpCloseTcpConnCloseEvent (
   IN  HTTP_PROTOCOL        *HttpInstance
   );
 
 /**
-  Create event for the TCP4 transmit token.
+  Create event for the TCP transmit token.
 
   @param[in]  Wrap               Point to HTTP token's wrap data.
 
@@ -192,12 +264,12 @@ HttpCloseTcp4ConnCloseEvent (
 
 **/
 EFI_STATUS
-HttpCreateTcp4TxEvent (
+HttpCreateTcpTxEvent (
   IN  HTTP_TOKEN_WRAP      *Wrap
   );
 
 /**
-  Create event for the TCP4 receive token which is used to receive HTTP header.
+  Create event for the TCP receive token which is used to receive HTTP header.
 
   @param[in]  HttpInstance       Pointer to HTTP_PROTOCOL structure.
 
@@ -206,12 +278,12 @@ HttpCreateTcp4TxEvent (
 
 **/
 EFI_STATUS
-HttpCreateTcp4RxEventForHeader (
+HttpCreateTcpRxEventForHeader (
   IN  HTTP_PROTOCOL        *HttpInstance
   );
 
 /**
-  Create event for the TCP4 receive token which is used to receive HTTP body.
+  Create event for the TCP receive token which is used to receive HTTP body.
 
   @param[in]  Wrap               Point to HTTP token's wrap data.
 
@@ -220,24 +292,35 @@ HttpCreateTcp4RxEventForHeader (
 
 **/
 EFI_STATUS
-HttpCreateTcp4RxEvent (
-  IN  HTTP_TOKEN_WRAP      *Wrap 
+HttpCreateTcpRxEvent (
+  IN  HTTP_TOKEN_WRAP      *Wrap
   );
 
 /**
-  Intiialize the HTTP_PROTOCOL structure to the unconfigured state.
+  Close Events for Tcp Receive Tokens for HTTP body and HTTP header.
 
-  @param[in]       HttpSb               The HTTP service private instance.
+  @param[in]  Wrap               Pointer to HTTP token's wrap data.
+
+**/
+VOID
+HttpCloseTcpRxEvent (
+  IN  HTTP_TOKEN_WRAP      *Wrap
+  );
+
+/**
+  Initialize the HTTP_PROTOCOL structure to the unconfigured state.
+
   @param[in, out]  HttpInstance         Pointer to HTTP_PROTOCOL structure.
+  @param[in]       IpVersion            Indicate us TCP4 protocol or TCP6 protocol.
 
-  @retval EFI_SUCCESS       HTTP_PROTOCOL structure is initialized successfully.                                          
+  @retval EFI_SUCCESS       HTTP_PROTOCOL structure is initialized successfully.
   @retval Others            Other error as indicated.
 
 **/
 EFI_STATUS
 HttpInitProtocol (
-  IN     HTTP_SERVICE            *HttpSb,
-  IN OUT HTTP_PROTOCOL           *HttpInstance
+  IN OUT HTTP_PROTOCOL           *HttpInstance,
+  IN     BOOLEAN                 IpVersion
   );
 
 /**
@@ -296,7 +379,24 @@ HttpConfigureTcp4 (
   );
 
 /**
-  Check existing TCP connection, if in error state, receover TCP4 connection.
+  Configure TCP6 protocol child.
+
+  @param[in]  HttpInstance       The HTTP instance private data.
+  @param[in]  Wrap               The HTTP token's wrap data.
+
+  @retval EFI_SUCCESS            The TCP6 protocol child is configured.
+  @retval Others                 Other error as indicated.
+
+**/
+EFI_STATUS
+HttpConfigureTcp6 (
+  IN  HTTP_PROTOCOL        *HttpInstance,
+  IN  HTTP_TOKEN_WRAP      *Wrap
+  );
+
+/**
+  Check existing TCP connection, if in error state, recover TCP4 connection. Then,
+  connect one TLS session if required.
 
   @param[in]  HttpInstance       The HTTP instance private data.
 
@@ -311,7 +411,23 @@ HttpConnectTcp4 (
   );
 
 /**
-  Send the HTTP message through TCP4.
+  Check existing TCP connection, if in error state, recover TCP6 connection. Then,
+  connect one TLS session if required.
+
+  @param[in]  HttpInstance       The HTTP instance private data.
+
+  @retval EFI_SUCCESS            The TCP connection is established.
+  @retval EFI_NOT_READY          TCP6 protocol child is not created or configured.
+  @retval Others                 Other error as indicated.
+
+**/
+EFI_STATUS
+HttpConnectTcp6 (
+  IN  HTTP_PROTOCOL        *HttpInstance
+  );
+
+/**
+  Send the HTTP or HTTPS message through TCP4 or TCP6.
 
   @param[in]  HttpInstance       The HTTP instance private data.
   @param[in]  Wrap               The HTTP token's wrap data.
@@ -323,7 +439,7 @@ HttpConnectTcp4 (
 
 **/
 EFI_STATUS
-HttpTransmitTcp4 (
+HttpTransmitTcp (
   IN  HTTP_PROTOCOL    *HttpInstance,
   IN  HTTP_TOKEN_WRAP  *Wrap,
   IN  UINT8            *TxString,
@@ -331,27 +447,13 @@ HttpTransmitTcp4 (
   );
 
 /**
-  Translate the status code in HTTP message to EFI_HTTP_STATUS_CODE defined 
-  in UEFI 2.5 specification.
-
-  @param[in]  StatusCode         The status code value in HTTP message.
-
-  @return                        Value defined in EFI_HTTP_STATUS_CODE .
-
-**/
-EFI_HTTP_STATUS_CODE
-HttpMappingToStatusCode (
-  IN UINTN                  StatusCode
-  );
-
-/**
   Check whether the user's token or event has already
-  been enqueue on HTTP TxToken or RxToken list.
+  been enqueue on HTTP Tx or Rx Token list.
 
   @param[in]  Map                The container of either user's transmit or receive
                                  token.
   @param[in]  Item               Current item to check against.
-  @param[in]  Context            The Token to check againist.
+  @param[in]  Context            The Token to check against.
 
   @retval EFI_ACCESS_DENIED      The token or event has already been enqueued in IP
   @retval EFI_SUCCESS            The current item isn't the same token/event as the
@@ -367,11 +469,11 @@ HttpTokenExist (
   );
 
 /**
-  Check whether the HTTP message associated with TxToken is already sent out.
+  Check whether the HTTP message associated with TxToken or Tx6Token is already sent out.
 
   @param[in]  Map                The container of TxToken.
   @param[in]  Item               Current item to check against.
-  @param[in]  Context            The Token to check againist.
+  @param[in]  Context            The Token to check against.
 
   @retval EFI_NOT_READY          The HTTP message is still queued in the list.
   @retval EFI_SUCCESS            The HTTP message has been sent out.
@@ -386,11 +488,31 @@ HttpTcpNotReady (
   );
 
 /**
-  Transmit the HTTP mssage by processing the associated HTTP token.
+  Initialize Http session.
 
-  @param[in]  Map                The container of TxToken.
+  @param[in]  HttpInstance       The HTTP instance private data.
+  @param[in]  Wrap               The HTTP token's wrap data.
+  @param[in]  Configure          The Flag indicates whether need to initialize session.
+  @param[in]  TlsConfigure       The Flag indicates whether it's the new Tls session.
+
+  @retval EFI_SUCCESS            The initialization of session is done.
+  @retval Others                 Other error as indicated.
+
+**/
+EFI_STATUS
+HttpInitSession (
+  IN  HTTP_PROTOCOL    *HttpInstance,
+  IN  HTTP_TOKEN_WRAP  *Wrap,
+  IN  BOOLEAN          Configure,
+  IN  BOOLEAN          TlsConfigure
+  );
+
+/**
+  Transmit the HTTP or HTTPS message by processing the associated HTTP token.
+
+  @param[in]  Map                The container of TxToken or Tx6Token.
   @param[in]  Item               Current item to check against.
-  @param[in]  Context            The Token to check againist.
+  @param[in]  Context            The Token to check against.
 
   @retval EFI_OUT_OF_RESOURCES   Failed to allocate resources.
   @retval EFI_SUCCESS            The HTTP message is queued into TCP transmit
@@ -408,9 +530,9 @@ HttpTcpTransmit (
 /**
   Receive the HTTP response by processing the associated HTTP token.
 
-  @param[in]  Map                The container of RxToken.
+  @param[in]  Map                The container of Rx4Token or Rx6Token.
   @param[in]  Item               Current item to check against.
-  @param[in]  Context            The Token to check againist.
+  @param[in]  Context            The Token to check against.
 
   @retval EFI_SUCCESS            The HTTP response is queued into TCP receive
                                  queue.
@@ -426,21 +548,50 @@ HttpTcpReceive (
   );
 
 /**
-  Generate HTTP request string.
+  Receive the HTTP header by processing the associated HTTP token.
 
-  @param[in]  HttpInstance       Pointer to HTTP_PROTOCOL structure.
-  @param[in]  Message            Pointer to storage containing HTTP message data.
-  @param[in]  Url                The URL of a remote host.
+  @param[in]       HttpInstance    The HTTP instance private data.
+  @param[in, out]  SizeofHeaders   The HTTP header length.
+  @param[in, out]  BufferSize      The size of buffer to cache the header message.
+  @param[in]       Timeout         The time to wait for receiving the header packet.
 
-  @return     Pointer to the created HTTP request string.
-  @return     NULL if any error occured.
+  @retval EFI_SUCCESS              The HTTP header is received.
+  @retval Others                   Other errors as indicated.
 
 **/
-CHAR8 *
-HttpGenRequestString (
-  IN  HTTP_PROTOCOL        *HttpInstance,
-  IN  EFI_HTTP_MESSAGE     *Message,
-  IN  CHAR8                *Url
+EFI_STATUS
+HttpTcpReceiveHeader (
+  IN  HTTP_PROTOCOL         *HttpInstance,
+  IN  OUT UINTN             *SizeofHeaders,
+  IN  OUT UINTN             *BufferSize,
+  IN  EFI_EVENT             Timeout
+  );
+
+/**
+  Receive the HTTP body by processing the associated HTTP token.
+
+  @param[in]  Wrap               The HTTP token's wrap data.
+  @param[in]  HttpMsg            The HTTP message data.
+
+  @retval EFI_SUCCESS            The HTTP body is received.
+  @retval Others                 Other error as indicated.
+
+**/
+EFI_STATUS
+HttpTcpReceiveBody (
+  IN  HTTP_TOKEN_WRAP       *Wrap,
+  IN  EFI_HTTP_MESSAGE      *HttpMsg
+  );
+
+/**
+  Clean up Tcp Tokens while the Tcp transmission error occurs.
+
+  @param[in]  Wrap               Pointer to HTTP token's wrap data.
+
+**/
+VOID
+HttpTcpTokenCleanup (
+  IN  HTTP_TOKEN_WRAP      *Wrap
   );
 
 /**
@@ -449,7 +600,7 @@ HttpGenRequestString (
   @param[in]  Wrap                Pointer to HTTP token's wrap data.
 
   @retval EFI_SUCCESS             Allocation succeeded.
-  @retval EFI_OUT_OF_RESOURCES    Failed to complete the opration due to lack of resources.
+  @retval EFI_OUT_OF_RESOURCES    Failed to complete the operation due to lack of resources.
   @retval EFI_NOT_READY           Can't find a corresponding TxToken.
 
 **/

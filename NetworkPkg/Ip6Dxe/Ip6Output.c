@@ -3,13 +3,7 @@
 
   Copyright (c) 2009 - 2015, Intel Corporation. All rights reserved.<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php.
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -23,7 +17,7 @@ UINT32 mIp6Id;
 
   @param[in]       IpSb             Points to an IP6 service binding instance.
   @param[out]      SourceList       The list entry head of all source addresses.
-                                    It is the caller's responsiblity to free the
+                                    It is the caller's responsibility to free the
                                     resources.
   @param[out]      SourceCount      The number of source addresses.
 
@@ -364,7 +358,7 @@ Ip6SysPacketSent (
   @param[in]  LastHeader       The pointer of next header of last extension header.
   @param[in]  HeadLen          The length of the unfragmented part of the IP6 header.
 
-  @retval EFI_BAD_BUFFER_SIZE  There is no enought room in the head space of
+  @retval EFI_BAD_BUFFER_SIZE  There is no enough room in the head space of
                                Packet.
   @retval EFI_SUCCESS          The operation performed successfully.
 
@@ -726,7 +720,7 @@ Ip6Output (
       }
 
       //
-      // Send out multicast neighbor solicitation for address resolution immediatly.
+      // Send out multicast neighbor solicitation for address resolution immediately.
       //
       Ip6CreateSNMulticastAddr (&NeighborCache->Neighbor, &Destination);
       Status = Ip6SelectSourceAddress (IpSb, &NeighborCache->Neighbor, &Source);
@@ -809,7 +803,7 @@ Ip6Output (
   //
   // OK, selected the source and route, fragment the packet then send
   // them. Tag each fragment other than the first one as spawn from it.
-  // Each extension header is an integar multiple of 8 octets long, in
+  // Each extension header is an integer multiple of 8 octets long, in
   // order to retain 8-octet alignment for subsequent headers.
   //
   Mtu     = IpSb->MaxPacketSize + sizeof (EFI_IP6_HEADER);
@@ -876,7 +870,7 @@ Ip6Output (
 
     for (Index = 0, Offset = 0, PacketLen = Mtu; Index < Num; Index++) {
       //
-      // Get fragment from the Packet, append UnFragnmentLen spare buffer
+      // Get fragment from the Packet, append UnFragmentLen spare buffer
       // before the fragmented data, the corresponding data is filled in later.
       //
       Fragment = NetbufGetFragment (Packet, Offset, PacketLen, UnFragmentLen);

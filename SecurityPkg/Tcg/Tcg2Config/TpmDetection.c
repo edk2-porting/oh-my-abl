@@ -1,14 +1,8 @@
 /** @file
   TPM1.2/dTPM2.0 auto detection.
 
-Copyright (c) 2015, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials 
-are licensed and made available under the terms and conditions of the BSD License 
-which accompanies this distribution.  The full text of the license may be found at 
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS, 
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2015 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -18,7 +12,6 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
-#include <Library/IoLib.h>
 #include <Library/DebugLib.h>
 #include <Library/PeiServicesLib.h>
 #include <Library/PcdLib.h>
@@ -27,29 +20,7 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #include <IndustryStandard/Tpm12.h>
 
 #include "Tcg2ConfigNvData.h"
-
-/**
-  This routine return if dTPM (1.2 or 2.0) present.
-
-  @retval TRUE  dTPM present
-  @retval FALSE dTPM not present
-**/
-BOOLEAN
-IsDtpmPresent (
-  VOID
-  )
-{
-  UINT8                             RegRead;
-  
-  RegRead = MmioRead8 ((UINTN)PcdGet64 (PcdTpmBaseAddress));
-  if (RegRead == 0xFF) {
-    DEBUG ((EFI_D_ERROR, "DetectTpmDevice: Dtpm not present\n"));
-    return FALSE;
-  } else {
-    DEBUG ((EFI_D_INFO, "DetectTpmDevice: Dtpm present\n"));
-    return TRUE;
-  }
-}
+#include "Tcg2Internal.h"
 
 /**
   This routine check both SetupVariable and real TPM device, and return final TpmDevice configuration.
@@ -100,10 +71,6 @@ DetectTpmDevice (
   }
 
   DEBUG ((EFI_D_INFO, "DetectTpmDevice:\n"));
-  if (!IsDtpmPresent ()) {
-    // dTPM not available
-    return TPM_DEVICE_NULL;
-  }
 
   // dTPM available and not disabled by setup
   // We need check if it is TPM1.2 or TPM2.0
@@ -111,7 +78,10 @@ DetectTpmDevice (
 
   Status = Tpm12RequestUseTpm ();
   if (EFI_ERROR (Status)) {
-    return TPM_DEVICE_2_0_DTPM;
+    //
+    // dTPM not available
+    //
+    return TPM_DEVICE_NULL;
   }
 
   if (BootMode == BOOT_ON_S3_RESUME) {

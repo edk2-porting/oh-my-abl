@@ -12,7 +12,7 @@
 *  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
 *  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 *
-* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+* Copyright (c) 2017-2018, 2020, The Linux Foundation. All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -68,6 +68,7 @@
 #include <Protocol/LoadFile.h>
 #include <Protocol/PxeBaseCode.h>
 #include <Protocol/SimpleFileSystem.h>
+#include <Protocol/EFIKernelInterface.h>
 #include <Uefi.h>
 
 // Reboot modes
@@ -98,7 +99,12 @@ typedef struct {
 EFI_STATUS
 ShutdownUefiBootServices (VOID);
 
-EFI_STATUS PreparePlatformHardware (VOID);
+EFI_STATUS
+PreparePlatformHardware (EFI_KERNEL_PROTOCOL *KernIntf, VOID *KernelLoadAddr,
+    UINTN KernelSizeActual, VOID *RamdiskLoadAddr, UINTN RamdiskSizeActual,
+    VOID *DeviceTreeLoadAddr, UINTN DeviceTreeSizeActual,
+    VOID *CallerStackCurrent, UINTN CallerStackBase);
+
 VOID
 RebootDevice (UINT8 RebootReason);
 VOID ShutdownDevice (VOID);

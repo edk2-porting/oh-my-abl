@@ -22,7 +22,6 @@
 #include <Guid/FileInfo.h>
 #include <Guid/GlobalVariable.h>
 #include <Library/ArmLib.h>
-#include <Library/BdsLib.h>
 #include <Library/DxeServicesTableLib.h>
 #include <Library/HobLib.h>
 #include <Library/LinuxLoaderLib.h>
@@ -80,8 +79,19 @@ EFI_STATUS ShutdownUefiBootServices (VOID)
   return Status;
 }
 
-EFI_STATUS PreparePlatformHardware (VOID)
+EFI_STATUS PreparePlatformHardware (EFI_KERNEL_PROTOCOL *KernIntf,
+    VOID *KernelLoadAddr, UINTN KernelSizeActual, VOID *RamdiskLoadAddr,
+    UINTN RamdiskSizeActual, VOID *DeviceTreeLoadAddr,
+    UINTN DeviceTreeSizeActual, VOID *CallerStackCurrent, UINTN CallerStackBase)
 {
+  Thread *ThreadNum;
+  VOID *StackBase;
+  VOID **StackCurrent;
+
+  ThreadNum = KernIntf->Thread->GetCurrentThread ();
+  StackBase = KernIntf->Thread->ThreadGetUnsafeSPBase (ThreadNum);
+  StackCurrent = KernIntf->Thread->ThreadGetUnsafeSPCurrent (ThreadNum);
+
   ArmDisableBranchPrediction ();
 
   /* ArmDisableAllExceptions */
@@ -89,8 +99,16 @@ EFI_STATUS PreparePlatformHardware (VOID)
   ArmDisableAsynchronousAbort ();
 
   // Clean, invalidate, disable data cache
-  WriteBackInvalidateDataCache ();
-  InvalidateInstructionCache ();
+  WriteBackInvalidateDataCacheRange (KernelLoadAddr, KernelSizeActual);
+  WriteBackInvalidateDataCacheRange (RamdiskLoadAddr, RamdiskSizeActual);
+  WriteBackInvalidateDataCacheRange (DeviceTreeLoadAddr, DeviceTreeSizeActual);
+  WriteBackInvalidateDataCacheRange ((VOID *)StackCurrent,
+                  (UINTN)StackBase - (UINTN)StackCurrent);
+  WriteBackInvalidateDataCacheRange (CallerStackCurrent,
+                  CallerStackBase - (UINTN)CallerStackCurrent);
+
+  ArmCleanDataCache ();
+  ArmInvalidateInstructionCache ();
 
   ArmDisableDataCache ();
   ArmDisableInstructionCache ();

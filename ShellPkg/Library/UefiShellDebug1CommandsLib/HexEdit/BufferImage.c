@@ -1,15 +1,9 @@
 /** @file
   Defines HBufferImage - the view of the file that is visible at any point,
   as well as the event handlers for editing the file
-  
-  Copyright (c) 2005 - 2014, Intel Corporation. All rights reserved. <BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
 
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2005 - 2018, Intel Corporation. All rights reserved. <BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -138,7 +132,7 @@ HBufferImageInit (
 }
 
 /**
-  Backup function for HBufferImage. Only a few fields need to be backup. 
+  Backup function for HBufferImage. Only a few fields need to be backup.
   This is for making the file buffer refresh as few as possible.
 
   @retval EFI_SUCCESS  The operation was successful.
@@ -190,7 +184,7 @@ HBufferImageBackup (
     Lines
     CurrentLine
     NumLines
-    ListHead 
+    ListHead
 
   @retval EFI_SUCCESS  The operation was successful.
 **/
@@ -906,7 +900,6 @@ HBufferImageRefresh (
   @return EFI_SUCCESS     The operation was successful.
 **/
 EFI_STATUS
-EFIAPI
 HBufferImageRead (
   IN CONST CHAR16                   *FileName,
   IN CONST CHAR16                   *DiskName,
@@ -947,7 +940,7 @@ HBufferImageRead (
   case FileTypeMemBuffer:
     Status = HMemImageRead (MemOffset, MemSize, Recover);
     break;
-    
+
   default:
     Status = EFI_NOT_FOUND;
     break;
@@ -1014,7 +1007,7 @@ HBufferImageSave (
   case FileTypeMemBuffer:
     Status = HMemImageSave (MemOffset, MemSize);
     break;
-    
+
   default:
     Status = EFI_NOT_FOUND;
     break;
@@ -1031,7 +1024,7 @@ HBufferImageSave (
   Create a new line and append it to the line list.
     Fields affected:
     NumLines
-    Lines 
+    Lines
 
   @retval NULL    create line failed.
   @return         the line created.
@@ -1101,7 +1094,6 @@ HBufferImageFree (
   @retval -1  The operation failed.
 **/
 INTN
-EFIAPI
 HBufferImageCharToHex (
   IN CHAR16 Char
   )
@@ -1110,15 +1102,15 @@ HBufferImageCharToHex (
   // change the character to hex
   //
   if (Char >= L'0' && Char <= L'9') {
-    return (INTN) (Char - L'0');
+    return (Char - L'0');
   }
 
   if (Char >= L'a' && Char <= L'f') {
-    return (INTN) (Char - L'a' + 10);
+    return (Char - L'a' + 10);
   }
 
   if (Char >= L'A' && Char <= L'F') {
-    return (INTN) (Char - L'A' + 10);
+    return (Char - L'A' + 10);
   }
 
   return -1;
@@ -1133,7 +1125,6 @@ HBufferImageCharToHex (
   @retval EFI_OUT_OF_RESOURCES    A memory allocation failed.
 **/
 EFI_STATUS
-EFIAPI
 HBufferImageAddChar (
   IN  CHAR16  Char
   )
@@ -1264,7 +1255,6 @@ HBufferImageAddChar (
   @retval EFI_SUCCESS   The operationw as successful.
 **/
 EFI_STATUS
-EFIAPI
 HBufferImageDoBackspace (
   VOID
   )
@@ -1328,7 +1318,6 @@ HBufferImageDoBackspace (
   @retval EFI_OUT_OF_RESOURCES  A memory allocation failed.
 **/
 EFI_STATUS
-EFIAPI
 HBufferImageDoCharInput (
   IN  CHAR16  Char
   )
@@ -1373,7 +1362,7 @@ HBufferImageDoCharInput (
   Check user specified FileRow is above current screen.
 
   @param[in] FileRow  Row of file position ( start from 1 ).
-  
+
   @retval TRUE   It is above the current screen.
   @retval FALSE  It is not above the current screen.
 
@@ -1885,12 +1874,12 @@ HBufferImageGetTotalSize (
 
 /**
   Delete character from buffer.
-  
+
   @param[in] Pos      Position, Pos starting from 0.
   @param[in] Count    The Count of characters to delete.
   @param[out] DeleteBuffer    The DeleteBuffer.
 
-  @retval EFI_SUCCESS Success 
+  @retval EFI_SUCCESS Success
 **/
 EFI_STATUS
 HBufferImageDeleteCharacterFromBuffer (
@@ -2019,7 +2008,7 @@ HBufferImageDeleteCharacterFromBuffer (
   @param[in] Count      Count of characters to add.
   @param[in] AddBuffer  Add buffer.
 
-  @retval EFI_SUCCESS   Success.  
+  @retval EFI_SUCCESS   Success.
 **/
 EFI_STATUS
 HBufferImageAddCharacterToBuffer (
@@ -2119,7 +2108,6 @@ HBufferImageAddCharacterToBuffer (
   @retval EFI_SUCCESS   The operationw as successful.
 **/
 EFI_STATUS
-EFIAPI
 HBufferImageDoDelete (
   VOID
   )
@@ -2172,7 +2160,7 @@ HBufferImageDoDelete (
 
 /**
   Change the raw buffer to a list of lines for the UI.
-  
+
   @param[in] Buffer   The pointer to the buffer to fill.
   @param[in] Bytes    The size of the buffer in bytes.
 
@@ -2180,7 +2168,6 @@ HBufferImageDoDelete (
   @retval EFI_OUT_OF_RESOURCES  A memory allocation failed.
 **/
 EFI_STATUS
-EFIAPI
 HBufferImageBufferToList (
   IN VOID   *Buffer,
   IN UINTN  Bytes
@@ -2238,14 +2225,13 @@ HBufferImageBufferToList (
 
 /**
   Change the list of lines from the UI to a raw buffer.
-  
+
   @param[in] Buffer   The pointer to the buffer to fill.
   @param[in] Bytes    The size of the buffer in bytes.
 
   @retval EFI_SUCCESS   The operation was successful.
 **/
 EFI_STATUS
-EFIAPI
 HBufferImageListToBuffer (
   IN VOID   *Buffer,
   IN UINTN  Bytes
@@ -2300,7 +2286,6 @@ HBufferImageListToBuffer (
   @param[in] TextY    The y-coordinate.
 **/
 VOID
-EFIAPI
 HBufferImageAdjustMousePosition (
   IN INT32 TextX,
   IN INT32 TextY

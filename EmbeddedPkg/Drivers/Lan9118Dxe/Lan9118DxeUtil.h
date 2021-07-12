@@ -2,13 +2,7 @@
 *
 *  Copyright (c) 2012-2014, ARM Limited. All rights reserved.
 *
-*  This program and the accompanying materials
-*  are licensed and made available under the terms and conditions of the BSD License
-*  which accompanies this distribution.  The full text of the license may be found at
-*  http://opensource.org/licenses/bsd-license.php
-*
-*  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-*  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+*  SPDX-License-Identifier: BSD-2-Clause-Patent
 *
 **/
 
@@ -37,6 +31,23 @@ GenEtherCrc32 (
   IN    EFI_MAC_ADDRESS *Mac,
   IN    UINT32 AddrLen
   );
+
+UINT32
+Lan9118RawMmioRead32(
+  UINTN Address,
+  UINTN Delay
+  );
+#define Lan9118MmioRead32(a) \
+	Lan9118RawMmioRead32(a, a ## _RD_DELAY)
+
+UINT32
+Lan9118RawMmioWrite32(
+  UINTN Address,
+  UINT32 Value,
+  UINTN Delay
+  );
+#define Lan9118MmioWrite32(a, v) \
+	Lan9118RawMmioWrite32(a, v, a ## _WR_DELAY)
 
 /* ------------------ MAC CSR Access ------------------- */
 

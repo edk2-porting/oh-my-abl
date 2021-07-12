@@ -2,14 +2,8 @@
 
   The UHCI driver model and HC protocol routines.
 
-Copyright (c) 2004 - 2015, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2004 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -596,7 +590,7 @@ Uhci2ClearRootHubPortFeature (
 
 
 /**
-  Submits control transfer to a target USB device accroding to UEFI 2.0 spec.
+  Submits control transfer to a target USB device according to UEFI 2.0 spec.
 
   @param  This                   A pointer to the EFI_USB2_HC_PROTOCOL instance.
   @param  DeviceAddress          Target device address.
@@ -1519,7 +1513,7 @@ UhciFreeDev (
   if (Uhc->ExitBootServiceEvent != NULL) {
     gBS->CloseEvent (Uhc->ExitBootServiceEvent);
   }
-  
+
   if (Uhc->MemPool != NULL) {
     UsbHcFreeMemPool (Uhc->MemPool);
   }
@@ -1796,7 +1790,7 @@ UhciDriverBindingStart (
   UhciWriteReg (Uhc->PciIo, USBCMD_OFFSET, USBCMD_RS | USBCMD_MAXP);
 
   return EFI_SUCCESS;
-  
+
 UNINSTALL_USBHC:
   gBS->UninstallMultipleProtocolInterfaces (
          Controller,
@@ -1833,7 +1827,7 @@ CLOSE_PCIIO:
 
 
 /**
-  Stop this driver on ControllerHandle. Support stoping any child handles
+  Stop this driver on ControllerHandle. Support stopping any child handles
   created by this driver.
 
   @param  This                 Protocol instance pointer.

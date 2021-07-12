@@ -1,5 +1,5 @@
 /** @file
-  The library instance provides security service of TPM measure boot.  
+  The library instance provides security service of TPM measure boot.
 
   Caution: This file requires additional review when modified.
   This library will have external input - PE/COFF image and GPT partition.
@@ -15,14 +15,8 @@
   TcgMeasureGptTable() function will receive untrusted GPT partition table, and parse
   partition data carefully.
 
-Copyright (c) 2009 - 2015, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials 
-are licensed and made available under the terms and conditions of the BSD License 
-which accompanies this distribution.  The full text of the license may be found at 
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS, 
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2009 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -34,7 +28,6 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #include <Protocol/FirmwareVolumeBlock.h>
 
 #include <Guid/MeasuredFvHob.h>
-#include <Guid/ZeroGuid.h>
 
 #include <Library/BaseLib.h>
 #include <Library/DebugLib.h>
@@ -53,7 +46,7 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 BOOLEAN                           mMeasureGptTableFlag = FALSE;
 UINTN                             mMeasureGptCount = 0;
 VOID                              *mFileBuffer;
-UINTN                             mImageSize;
+UINTN                             mTpmImageSize;
 //
 // Measured FV handle cache
 //
@@ -69,11 +62,11 @@ MEASURED_HOB_DATA                 *mMeasuredHobData     = NULL;
 
   @param  FileHandle      Pointer to the file handle to read the PE/COFF image.
   @param  FileOffset      Offset into the PE/COFF image to begin the read operation.
-  @param  ReadSize        On input, the size in bytes of the requested read operation.  
+  @param  ReadSize        On input, the size in bytes of the requested read operation.
                           On output, the number of bytes actually read.
   @param  Buffer          Output buffer that contains the data read from the PE/COFF image.
-  
-  @retval EFI_SUCCESS     The specified portion of the PE/COFF image was read and the size 
+
+  @retval EFI_SUCCESS     The specified portion of the PE/COFF image was read and the size
 **/
 EFI_STATUS
 EFIAPI
@@ -95,11 +88,11 @@ DxeTpmMeasureBootLibImageRead (
   }
 
   EndPosition = FileOffset + *ReadSize;
-  if (EndPosition > mImageSize) {
-    *ReadSize = (UINT32)(mImageSize - FileOffset);
+  if (EndPosition > mTpmImageSize) {
+    *ReadSize = (UINT32)(mTpmImageSize - FileOffset);
   }
 
-  if (FileOffset >= mImageSize) {
+  if (FileOffset >= mTpmImageSize) {
     *ReadSize = 0;
   }
 
@@ -158,11 +151,11 @@ TcgMeasureGptTable (
   }
   //
   // Read the EFI Partition Table Header
-  //  
+  //
   PrimaryHeader = (EFI_PARTITION_TABLE_HEADER *) AllocatePool (BlockIo->Media->BlockSize);
   if (PrimaryHeader == NULL) {
     return EFI_OUT_OF_RESOURCES;
-  }  
+  }
   Status = DiskIo->ReadDisk (
                      DiskIo,
                      BlockIo->Media->MediaId,
@@ -174,7 +167,7 @@ TcgMeasureGptTable (
     DEBUG ((EFI_D_ERROR, "Failed to Read Partition Table Header!\n"));
     FreePool (PrimaryHeader);
     return EFI_DEVICE_ERROR;
-  }  
+  }
   //
   // Read the partition entry.
   //
@@ -195,23 +188,23 @@ TcgMeasureGptTable (
     FreePool (EntryPtr);
     return EFI_DEVICE_ERROR;
   }
-  
+
   //
   // Count the valid partition
   //
   PartitionEntry    = (EFI_PARTITION_ENTRY *)EntryPtr;
   NumberOfPartition = 0;
   for (Index = 0; Index < PrimaryHeader->NumberOfPartitionEntries; Index++) {
-    if (!CompareGuid (&PartitionEntry->PartitionTypeGUID, &gZeroGuid)) {
-      NumberOfPartition++;  
+    if (!IsZeroGuid (&PartitionEntry->PartitionTypeGUID)) {
+      NumberOfPartition++;
     }
     PartitionEntry = (EFI_PARTITION_ENTRY *)((UINT8 *)PartitionEntry + PrimaryHeader->SizeOfPartitionEntry);
   }
 
   //
   // Prepare Data for Measurement
-  // 
-  EventSize = (UINT32)(sizeof (EFI_GPT_DATA) - sizeof (GptData->Partitions) 
+  //
+  EventSize = (UINT32)(sizeof (EFI_GPT_DATA) - sizeof (GptData->Partitions)
                         + NumberOfPartition * PrimaryHeader->SizeOfPartitionEntry);
   TcgEvent = (TCG_PCR_EVENT *) AllocateZeroPool (EventSize + sizeof (TCG_PCR_EVENT_HDR));
   if (TcgEvent == NULL) {
@@ -223,11 +216,11 @@ TcgMeasureGptTable (
   TcgEvent->PCRIndex   = 5;
   TcgEvent->EventType  = EV_EFI_GPT_EVENT;
   TcgEvent->EventSize  = EventSize;
-  GptData = (EFI_GPT_DATA *) TcgEvent->Event;  
+  GptData = (EFI_GPT_DATA *) TcgEvent->Event;
 
   //
   // Copy the EFI_PARTITION_TABLE_HEADER and NumberOfPartition
-  //  
+  //
   CopyMem ((UINT8 *)GptData, (UINT8*)PrimaryHeader, sizeof (EFI_PARTITION_TABLE_HEADER));
   GptData->NumberOfPartitions = NumberOfPartition;
   //
@@ -236,7 +229,7 @@ TcgMeasureGptTable (
   PartitionEntry    = (EFI_PARTITION_ENTRY*)EntryPtr;
   NumberOfPartition = 0;
   for (Index = 0; Index < PrimaryHeader->NumberOfPartitionEntries; Index++) {
-    if (!CompareGuid (&PartitionEntry->PartitionTypeGUID, &gZeroGuid)) {
+    if (!IsZeroGuid (&PartitionEntry->PartitionTypeGUID)) {
       CopyMem (
         (UINT8 *)&GptData->Partitions + NumberOfPartition * PrimaryHeader->SizeOfPartitionEntry,
         (UINT8 *)PartitionEntry,
@@ -279,6 +272,9 @@ TcgMeasureGptTable (
   PE/COFF image is external input, so this function will validate its data structure
   within this image buffer before use.
 
+  Notes: PE/COFF image has been checked by BasePeCoffLib PeCoffLoaderGetImageInfo() in
+  its caller function DxeTpmMeasureBootHandler().
+
   @param[in] TcgProtocol    Pointer to the located TCG protocol instance.
   @param[in] ImageAddress   Start address of image buffer.
   @param[in] ImageSize      Image size
@@ -288,7 +284,7 @@ TcgMeasureGptTable (
 
   @retval EFI_SUCCESS            Successfully measure image.
   @retval EFI_OUT_OF_RESOURCES   No enough resource to measure image.
-  @retval EFI_UNSUPPORTED        ImageType is unsupported or PE image is mal-format.  
+  @retval EFI_UNSUPPORTED        ImageType is unsupported or PE image is mal-format.
   @retval other error value
 
 **/
@@ -318,7 +314,6 @@ TcgMeasurePeImage (
   EFI_IMAGE_SECTION_HEADER             *SectionHeader;
   UINTN                                Index;
   UINTN                                Pos;
-  UINT16                               Magic;
   UINT32                               EventSize;
   UINT32                               EventNumber;
   EFI_PHYSICAL_ADDRESS                 EventLogLastEntry;
@@ -416,44 +411,30 @@ TcgMeasurePeImage (
   // Measuring PE/COFF Image Header;
   // But CheckSum field and SECURITY data directory (certificate) are excluded
   //
-  if (Hdr.Pe32->FileHeader.Machine == IMAGE_FILE_MACHINE_IA64 && Hdr.Pe32->OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
-    //
-    // NOTE: Some versions of Linux ELILO for Itanium have an incorrect magic value 
-    //       in the PE/COFF Header. If the MachineType is Itanium(IA64) and the 
-    //       Magic value in the OptionalHeader is EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC
-    //       then override the magic value to EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC
-    //
-    Magic = EFI_IMAGE_NT_OPTIONAL_HDR64_MAGIC;
-  } else {
-    //
-    // Get the magic value from the PE/COFF Optional Header
-    //
-    Magic = Hdr.Pe32->OptionalHeader.Magic;
-  }
-  
+
   //
   // 3.  Calculate the distance from the base of the image header to the image checksum address.
   // 4.  Hash the image header from its base to beginning of the image checksum.
   //
   HashBase = (UINT8 *) (UINTN) ImageAddress;
-  if (Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
+  if (Hdr.Pe32->OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
     //
     // Use PE32 offset
     //
     NumberOfRvaAndSizes = Hdr.Pe32->OptionalHeader.NumberOfRvaAndSizes;
-    HashSize = (UINTN) ((UINT8 *)(&Hdr.Pe32->OptionalHeader.CheckSum) - HashBase);
+    HashSize = (UINTN) (&Hdr.Pe32->OptionalHeader.CheckSum) - (UINTN) HashBase;
   } else {
     //
     // Use PE32+ offset
     //
     NumberOfRvaAndSizes = Hdr.Pe32Plus->OptionalHeader.NumberOfRvaAndSizes;
-    HashSize = (UINTN) ((UINT8 *)(&Hdr.Pe32Plus->OptionalHeader.CheckSum) - HashBase);
+    HashSize = (UINTN) (&Hdr.Pe32Plus->OptionalHeader.CheckSum) - (UINTN) HashBase;
   }
 
   HashStatus = Sha1Update (Sha1Ctx, HashBase, HashSize);
   if (!HashStatus) {
     goto Finish;
-  }  
+  }
 
   //
   // 5.  Skip over the image checksum (it occupies a single ULONG).
@@ -463,7 +444,7 @@ TcgMeasurePeImage (
     // 6.  Since there is no Cert Directory in optional header, hash everything
     //     from the end of the checksum to the end of image header.
     //
-    if (Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
+    if (Hdr.Pe32->OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
       //
       // Use PE32 offset.
       //
@@ -482,23 +463,23 @@ TcgMeasurePeImage (
       if (!HashStatus) {
         goto Finish;
       }
-    }    
+    }
   } else {
     //
     // 7.  Hash everything from the end of the checksum to the start of the Cert Directory.
     //
-    if (Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
+    if (Hdr.Pe32->OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
       //
       // Use PE32 offset
       //
       HashBase = (UINT8 *) &Hdr.Pe32->OptionalHeader.CheckSum + sizeof (UINT32);
-      HashSize = (UINTN) ((UINT8 *)(&Hdr.Pe32->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY]) - HashBase);
+      HashSize = (UINTN) (&Hdr.Pe32->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY]) - (UINTN) HashBase;
     } else {
       //
       // Use PE32+ offset
-      //    
+      //
       HashBase = (UINT8 *) &Hdr.Pe32Plus->OptionalHeader.CheckSum + sizeof (UINT32);
-      HashSize = (UINTN) ((UINT8 *)(&Hdr.Pe32Plus->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY]) - HashBase);
+      HashSize = (UINTN) (&Hdr.Pe32Plus->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY]) - (UINTN) HashBase;
     }
 
     if (HashSize != 0) {
@@ -512,7 +493,7 @@ TcgMeasurePeImage (
     // 8.  Skip over the Cert Directory. (It is sizeof(IMAGE_DATA_DIRECTORY) bytes.)
     // 9.  Hash everything from the end of the Cert Directory to the end of image header.
     //
-    if (Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
+    if (Hdr.Pe32->OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
       //
       // Use PE32 offset
       //
@@ -525,7 +506,7 @@ TcgMeasurePeImage (
       HashBase = (UINT8 *) &Hdr.Pe32Plus->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_SECURITY + 1];
       HashSize = Hdr.Pe32Plus->OptionalHeader.SizeOfHeaders - (UINTN) (HashBase - ImageAddress);
     }
-    
+
     if (HashSize != 0) {
       HashStatus  = Sha1Update (Sha1Ctx, HashBase, HashSize);
       if (!HashStatus) {
@@ -537,7 +518,7 @@ TcgMeasurePeImage (
   //
   // 10. Set the SUM_OF_BYTES_HASHED to the size of the header
   //
-  if (Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
+  if (Hdr.Pe32->OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
     //
     // Use PE32 offset
     //
@@ -619,7 +600,7 @@ TcgMeasurePeImage (
     if (NumberOfRvaAndSizes <= EFI_IMAGE_DIRECTORY_ENTRY_SECURITY) {
       CertSize = 0;
     } else {
-      if (Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
+      if (Hdr.Pe32->OptionalHeader.Magic == EFI_IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
         //
         // Use PE32 offset.
         //
@@ -668,7 +649,7 @@ TcgMeasurePeImage (
   if (Status == EFI_OUT_OF_RESOURCES) {
     //
     // Out of resource here means the image is hashed and its result is extended to PCR.
-    // But the event log cann't be saved since log area is full.
+    // But the event log can't be saved since log area is full.
     // Just return EFI_SUCCESS in order not to block the image load.
     //
     Status = EFI_SUCCESS;
@@ -688,27 +669,27 @@ Finish:
 }
 
 /**
-  The security handler is used to abstract platform-specific policy 
-  from the DXE core response to an attempt to use a file that returns a 
-  given status for the authentication check from the section extraction protocol.  
+  The security handler is used to abstract platform-specific policy
+  from the DXE core response to an attempt to use a file that returns a
+  given status for the authentication check from the section extraction protocol.
 
-  The possible responses in a given SAP implementation may include locking 
-  flash upon failure to authenticate, attestation logging for all signed drivers, 
-  and other exception operations.  The File parameter allows for possible logging 
+  The possible responses in a given SAP implementation may include locking
+  flash upon failure to authenticate, attestation logging for all signed drivers,
+  and other exception operations.  The File parameter allows for possible logging
   within the SAP of the driver.
 
-  If File is NULL, then EFI_INVALID_PARAMETER is returned.
+  If File is NULL, then EFI_ACCESS_DENIED is returned.
 
-  If the file specified by File with an authentication status specified by 
+  If the file specified by File with an authentication status specified by
   AuthenticationStatus is safe for the DXE Core to use, then EFI_SUCCESS is returned.
 
-  If the file specified by File with an authentication status specified by 
-  AuthenticationStatus is not safe for the DXE Core to use under any circumstances, 
+  If the file specified by File with an authentication status specified by
+  AuthenticationStatus is not safe for the DXE Core to use under any circumstances,
   then EFI_ACCESS_DENIED is returned.
 
-  If the file specified by File with an authentication status specified by 
-  AuthenticationStatus is not safe for the DXE Core to use right now, but it 
-  might be possible to use it at a future time, then EFI_SECURITY_VIOLATION is 
+  If the file specified by File with an authentication status specified by
+  AuthenticationStatus is not safe for the DXE Core to use right now, but it
+  might be possible to use it at a future time, then EFI_SECURITY_VIOLATION is
   returned.
 
   @param[in]      AuthenticationStatus  This is the authentication status returned
@@ -751,6 +732,13 @@ DxeTpmMeasureBootHandler (
   EFI_PHYSICAL_ADDRESS                FvAddress;
   UINT32                              Index;
 
+  //
+  // Check for invalid parameters.
+  //
+  if (File == NULL) {
+    return EFI_ACCESS_DENIED;
+  }
+
   Status = gBS->LocateProtocol (&gEfiTcgProtocolGuid, NULL, (VOID **) &TcgProtocol);
   if (EFI_ERROR (Status)) {
     //
@@ -762,7 +750,7 @@ DxeTpmMeasureBootHandler (
 
   ProtocolCapability.Size = (UINT8) sizeof (ProtocolCapability);
   Status = TcgProtocol->StatusCheck (
-             TcgProtocol, 
+             TcgProtocol,
              &ProtocolCapability,
              &TCGFeatureFlags,
              &EventLogLocation,
@@ -779,7 +767,7 @@ DxeTpmMeasureBootHandler (
   // Copy File Device Path
   //
   OrigDevicePathNode = DuplicateDevicePath (File);
-  
+
   //
   // 1. Check whether this device path support BlockIo protocol.
   // Is so, this device path may be a GPT device path.
@@ -788,7 +776,7 @@ DxeTpmMeasureBootHandler (
   Status = gBS->LocateDevicePath (&gEfiBlockIoProtocolGuid, &DevicePathNode, &Handle);
   if (!EFI_ERROR (Status) && !mMeasureGptTableFlag) {
     //
-    // Find the gpt partion on the given devicepath
+    // Find the gpt partition on the given devicepath
     //
     DevicePathNode = OrigDevicePathNode;
     ASSERT (DevicePathNode != NULL);
@@ -800,8 +788,8 @@ DxeTpmMeasureBootHandler (
             DevicePathSubType (DevicePathNode) == MEDIA_HARDDRIVE_DP) {
         //
         // Check whether it is a gpt partition or not
-        //                           
-        if (((HARDDRIVE_DEVICE_PATH *) DevicePathNode)->MBRType == MBR_TYPE_EFI_PARTITION_TABLE_HEADER && 
+        //
+        if (((HARDDRIVE_DEVICE_PATH *) DevicePathNode)->MBRType == MBR_TYPE_EFI_PARTITION_TABLE_HEADER &&
             ((HARDDRIVE_DEVICE_PATH *) DevicePathNode)->SignatureType == SIGNATURE_TYPE_GUID) {
 
           //
@@ -836,7 +824,7 @@ DxeTpmMeasureBootHandler (
       DevicePathNode    = NextDevicePathNode (DevicePathNode);
     }
   }
-  
+
   //
   // 2. Measure PE image.
   //
@@ -857,7 +845,7 @@ DxeTpmMeasureBootHandler (
     }
     //
     // The PE image from unmeasured Firmware volume need be measured
-    // The PE image from measured Firmware volume will be mearsured according to policy below.
+    // The PE image from measured Firmware volume will be measured according to policy below.
     //   If it is driver, do not measure
     //   If it is application, still measure.
     //
@@ -870,7 +858,7 @@ DxeTpmMeasureBootHandler (
       TempHandle = Handle;
       do {
         Status = gBS->HandleProtocol(
-                        TempHandle, 
+                        TempHandle,
                         &gEfiFirmwareVolumeBlockProtocolGuid,
                         (VOID**)&FvbProtocol
                         );
@@ -908,7 +896,7 @@ DxeTpmMeasureBootHandler (
     goto Finish;
   }
 
-  mImageSize  = FileSize;
+  mTpmImageSize  = FileSize;
   mFileBuffer = FileBuffer;
 
   //
@@ -929,16 +917,16 @@ DxeTpmMeasureBootHandler (
     //
     goto Finish;
   }
-  
+
   //
   // Measure only application if Application flag is set
   // Measure drivers and applications if Application flag is not set
   //
-  if ((!ApplicationRequired) || 
-        (ApplicationRequired && ImageContext.ImageType == EFI_IMAGE_SUBSYSTEM_EFI_APPLICATION)) {  
+  if ((!ApplicationRequired) ||
+        (ApplicationRequired && ImageContext.ImageType == EFI_IMAGE_SUBSYSTEM_EFI_APPLICATION)) {
     //
     // Print the image path to be measured.
-    //    
+    //
     DEBUG_CODE_BEGIN ();
       CHAR16                            *ToText;
       ToText = ConvertDevicePathToText (
@@ -957,10 +945,10 @@ DxeTpmMeasureBootHandler (
     //
     Status = TcgMeasurePeImage (
                TcgProtocol,
-               (EFI_PHYSICAL_ADDRESS) (UINTN) FileBuffer, 
-               FileSize, 
-               (UINTN) ImageContext.ImageAddress, 
-               ImageContext.ImageType, 
+               (EFI_PHYSICAL_ADDRESS) (UINTN) FileBuffer,
+               FileSize,
+               (UINTN) ImageContext.ImageAddress,
+               ImageContext.ImageType,
                DevicePathNode
                );
   }

@@ -1,14 +1,8 @@
 /** @file
 EFI Firmware Volume routines which work on a Fv image in buffers.
 
-Copyright (c) 1999 - 2015, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 1999 - 2018, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -186,6 +180,7 @@ Returns:
 
   Status = FvBufClearAllFiles (TempFv);
   if (EFI_ERROR (Status)) {
+    CommonLibBinderFree (TempFv);
     return Status;
   }
 
@@ -353,6 +348,9 @@ Returns:
 
   if (*DestinationFv == NULL) {
     *DestinationFv = CommonLibBinderAllocate (size);
+    if (*DestinationFv == NULL) {
+      return EFI_OUT_OF_RESOURCES;
+    }
   }
 
   CommonLibBinderCopyMem (*DestinationFv, SourceFv, size);
@@ -939,7 +937,7 @@ Arguments:
 
   Fv - Address of the Fv in memory
   Key - Should be 0 to get the first file.  After that, it should be
-        passed back in without modifying it's contents to retrieve
+        passed back in without modifying its contents to retrieve
         subsequent files.
   File - Output file pointer
     File == NULL - invalid parameter
@@ -1325,7 +1323,7 @@ Arguments:
   SectionsStart - Address of the start of the FFS sections array
   TotalSectionsSize - Total size of all the sections
   Key - Should be 0 to get the first section.  After that, it should be
-        passed back in without modifying it's contents to retrieve
+        passed back in without modifying its contents to retrieve
         subsequent files.
   Section - Output section pointer
     (Section == NULL) -> invalid parameter
@@ -1650,7 +1648,7 @@ FvBufCalculateSum16 (
   IN UINTN        Size
   )
 /*++
-  
+
 Routine Description:
 
   This function calculates the UINT16 sum for the requested region.
@@ -1689,7 +1687,7 @@ FvBufCalculateChecksum16 (
   IN UINTN        Size
   )
 /*++
-  
+
 Routine Description::
 
   This function calculates the value needed for a valid UINT16 checksum

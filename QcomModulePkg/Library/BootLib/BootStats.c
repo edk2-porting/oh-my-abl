@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017, 2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -101,8 +101,6 @@ BootStatsSetTimeStamp (BS_ENTRY BootStatId)
       if (BootStatClockCount) {
         WRITEL (BootStatImemAddress, BootStatClockCount);
       }
-      DEBUG ((EFI_D_VERBOSE, "BootStats: ID-%d: BootStatClockCount:%u\n",
-              BootStatId, BootStatClockCount));
     }
   }
 }

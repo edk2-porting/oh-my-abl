@@ -2,13 +2,7 @@
   String support
 
 Copyright (c) 2004 - 2015, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -66,14 +60,11 @@ UninitializeStringSupport (
   );
 
 /**
-  Call the browser and display the front page
-
-  @return   Status code that will be returned by
-            EFI_FORM_BROWSER2_PROTOCOL.SendForm ().
+  Routine to export glyphs to the HII database.  This is in addition to whatever is defined in the Graphics Console driver.
 
 **/
-EFI_STATUS
-CallFrontPage (
+EFI_HII_HANDLE
+ExportFonts (
   VOID
   );
 

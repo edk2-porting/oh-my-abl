@@ -1,14 +1,8 @@
 /** @file
 Provides services to access SMRAM Save State Map
 
-Copyright (c) 2010 - 2015, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2010 - 2019, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -20,8 +14,34 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 #include <Library/BaseMemoryLib.h>
 #include <Library/SmmServicesTableLib.h>
 #include <Library/DebugLib.h>
-#include <Register/Cpuid.h>
-#include <Register/SmramSaveStateMap.h>
+
+#include "PiSmmCpuDxeSmm.h"
+
+typedef struct {
+  UINT64                            Signature;              // Offset 0x00
+  UINT16                            Reserved1;              // Offset 0x08
+  UINT16                            Reserved2;              // Offset 0x0A
+  UINT16                            Reserved3;              // Offset 0x0C
+  UINT16                            SmmCs;                  // Offset 0x0E
+  UINT16                            SmmDs;                  // Offset 0x10
+  UINT16                            SmmSs;                  // Offset 0x12
+  UINT16                            SmmOtherSegment;        // Offset 0x14
+  UINT16                            Reserved4;              // Offset 0x16
+  UINT64                            Reserved5;              // Offset 0x18
+  UINT64                            Reserved6;              // Offset 0x20
+  UINT64                            Reserved7;              // Offset 0x28
+  UINT64                            SmmGdtPtr;              // Offset 0x30
+  UINT32                            SmmGdtSize;             // Offset 0x38
+  UINT32                            Reserved8;              // Offset 0x3C
+  UINT64                            Reserved9;              // Offset 0x40
+  UINT64                            Reserved10;             // Offset 0x48
+  UINT16                            Reserved11;             // Offset 0x50
+  UINT16                            Reserved12;             // Offset 0x52
+  UINT32                            Reserved13;             // Offset 0x54
+  UINT64                            Reserved14;             // Offset 0x58
+} PROCESSOR_SMM_DESCRIPTOR;
+
+extern CONST PROCESSOR_SMM_DESCRIPTOR      gcPsd;
 
 //
 // EFER register LMA bit
@@ -77,11 +97,11 @@ typedef struct {
 ///
 /// Variables from SMI Handler
 ///
-extern UINT32           gSmbase;
-extern volatile UINT32  gSmiStack;
-extern UINT32           gSmiCr3;
-extern volatile UINT8   gcSmiHandlerTemplate[];
-extern CONST UINT16     gcSmiHandlerSize;
+X86_ASSEMBLY_PATCH_LABEL gPatchSmbase;
+X86_ASSEMBLY_PATCH_LABEL gPatchSmiStack;
+X86_ASSEMBLY_PATCH_LABEL gPatchSmiCr3;
+extern volatile UINT8    gcSmiHandlerTemplate[];
+extern CONST UINT16      gcSmiHandlerSize;
 
 //
 // Variables used by SMI Handler
@@ -240,7 +260,7 @@ GetRegisterIndex (
 
   @retval EFI_SUCCESS           The register was read from Save State.
   @retval EFI_NOT_FOUND         The register is not defined for the Save State of Processor.
-  @retval EFI_INVALID_PARAMTER  This or Buffer is NULL.
+  @retval EFI_INVALID_PARAMETER  This or Buffer is NULL.
 
 **/
 EFI_STATUS
@@ -323,7 +343,7 @@ ReadSaveStateRegisterByIndex (
 
   @retval EFI_SUCCESS           The register was read from Save State.
   @retval EFI_NOT_FOUND         The register is not defined for the Save State of Processor.
-  @retval EFI_INVALID_PARAMTER  This or Buffer is NULL.
+  @retval EFI_INVALID_PARAMETER  This or Buffer is NULL.
 
 **/
 EFI_STATUS
@@ -338,7 +358,6 @@ ReadSaveStateRegister (
   UINT32                      SmmRevId;
   SMRAM_SAVE_STATE_IOMISC     IoMisc;
   EFI_SMM_SAVE_STATE_IO_INFO  *IoInfo;
-  VOID                        *IoMemAddr;
 
   //
   // Check for special EFI_SMM_SAVE_STATE_REGISTER_LMA
@@ -385,6 +404,14 @@ ReadSaveStateRegister (
     }
 
     //
+    // Only support IN/OUT, but not INS/OUTS/REP INS/REP OUTS.
+    //
+    if ((mSmmCpuIoType[IoMisc.Bits.Type] != EFI_SMM_SAVE_STATE_IO_TYPE_INPUT) &&
+        (mSmmCpuIoType[IoMisc.Bits.Type] != EFI_SMM_SAVE_STATE_IO_TYPE_OUTPUT)) {
+      return EFI_NOT_FOUND;
+    }
+
+    //
     // Compute index for the I/O Length and I/O Type lookup tables
     //
     if (mSmmCpuIoWidth[IoMisc.Bits.Length].Width == 0 || mSmmCpuIoType[IoMisc.Bits.Type] == 0) {
@@ -403,13 +430,7 @@ ReadSaveStateRegister (
     IoInfo->IoPort = (UINT16)IoMisc.Bits.Port;
     IoInfo->IoWidth = mSmmCpuIoWidth[IoMisc.Bits.Length].IoWidth;
     IoInfo->IoType = mSmmCpuIoType[IoMisc.Bits.Type];
-    if (IoInfo->IoType == EFI_SMM_SAVE_STATE_IO_TYPE_INPUT || IoInfo->IoType == EFI_SMM_SAVE_STATE_IO_TYPE_OUTPUT) {
-      ReadSaveStateRegister (CpuIndex, EFI_SMM_SAVE_STATE_REGISTER_RAX, mSmmCpuIoWidth[IoMisc.Bits.Length].Width, &IoInfo->IoData);
-    }
-    else {
-      ReadSaveStateRegisterByIndex(CpuIndex, SMM_SAVE_STATE_REGISTER_IOMEMADDR_INDEX, sizeof(IoMemAddr), &IoMemAddr);
-      CopyMem(&IoInfo->IoData, IoMemAddr, mSmmCpuIoWidth[IoMisc.Bits.Length].Width);
-    }
+    ReadSaveStateRegister (CpuIndex, EFI_SMM_SAVE_STATE_REGISTER_RAX, mSmmCpuIoWidth[IoMisc.Bits.Length].Width, &IoInfo->IoData);
     return EFI_SUCCESS;
   }
 
@@ -434,7 +455,7 @@ ReadSaveStateRegister (
 
   @retval EFI_SUCCESS           The register was written to Save State.
   @retval EFI_NOT_FOUND         The register is not defined for the Save State of Processor.
-  @retval EFI_INVALID_PARAMTER  ProcessorIndex or Width is not correct.
+  @retval EFI_INVALID_PARAMETER  ProcessorIndex or Width is not correct.
 
 **/
 EFI_STATUS
@@ -657,6 +678,17 @@ InstallSmiHandler (
   IN UINT32  Cr3
   )
 {
+  PROCESSOR_SMM_DESCRIPTOR  *Psd;
+  UINT32                    CpuSmiStack;
+
+  //
+  // Initialize PROCESSOR_SMM_DESCRIPTOR
+  //
+  Psd = (PROCESSOR_SMM_DESCRIPTOR *)(VOID *)((UINTN)SmBase + SMM_PSD_OFFSET);
+  CopyMem (Psd, &gcPsd, sizeof (gcPsd));
+  Psd->SmmGdtPtr = (UINT64)GdtBase;
+  Psd->SmmGdtSize = (UINT32)GdtSize;
+
   if (SmmCpuFeaturesGetSmiHandlerSize () != 0) {
     //
     // Install SMI handler provided by library
@@ -675,25 +707,28 @@ InstallSmiHandler (
     return;
   }
 
+  InitShadowStack (CpuIndex, (VOID *)((UINTN)SmiStack + StackSize));
+
   //
   // Initialize values in template before copy
   //
-  gSmiStack             = (UINT32)((UINTN)SmiStack + StackSize - sizeof (UINTN));
-  gSmiCr3               = Cr3;
-  gSmbase               = SmBase;
+  CpuSmiStack = (UINT32)((UINTN)SmiStack + StackSize - sizeof (UINTN));
+  PatchInstructionX86 (gPatchSmiStack, CpuSmiStack, 4);
+  PatchInstructionX86 (gPatchSmiCr3, Cr3, 4);
+  PatchInstructionX86 (gPatchSmbase, SmBase, 4);
   gSmiHandlerIdtr.Base  = IdtBase;
   gSmiHandlerIdtr.Limit = (UINT16)(IdtSize - 1);
 
   //
   // Set the value at the top of the CPU stack to the CPU Index
   //
-  *(UINTN*)(UINTN)gSmiStack = CpuIndex;
+  *(UINTN*)(UINTN)CpuSmiStack = CpuIndex;
 
   //
   // Copy template to CPU specific SMI handler location
   //
   CopyMem (
-    (VOID*)(UINTN)(SmBase + SMM_HANDLER_OFFSET),
+    (VOID*)((UINTN)SmBase + SMM_HANDLER_OFFSET),
     (VOID*)gcSmiHandlerTemplate,
     gcSmiHandlerSize
     );

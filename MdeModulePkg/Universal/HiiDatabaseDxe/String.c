@@ -2,14 +2,9 @@
 Implementation for EFI_HII_STRING_PROTOCOL.
 
 
-Copyright (c) 2007 - 2015, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2007 - 2020, Intel Corporation. All rights reserved.<BR>
+(C) Copyright 2016 Hewlett Packard Enterprise Development LP<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -105,7 +100,7 @@ ReferFontInfoLocally (
   @param  StringSrc              Points to current null-terminated string.
   @param  BufferSize             Length of the buffer.
 
-  @retval EFI_SUCCESS            The string text was outputed successfully.
+  @retval EFI_SUCCESS            The string text was outputted successfully.
   @retval EFI_BUFFER_TOO_SMALL   Buffer is insufficient to store the found string
                                  text. BufferSize is updated to the required buffer
                                  size.
@@ -149,7 +144,7 @@ ConvertToUnicodeText (
   @param  StringSrc              Points to current null-terminated string.
   @param  BufferSize             Length of the buffer.
 
-  @retval EFI_SUCCESS            The string text was outputed successfully.
+  @retval EFI_SUCCESS            The string text was outputted successfully.
   @retval EFI_BUFFER_TOO_SMALL   Buffer is insufficient to store the found string
                                  text. BufferSize is updated to the required buffer
                                  size.
@@ -198,7 +193,7 @@ GetUnicodeStringTextOrSize (
   @param  StringFontInfo         Buffer to record the output font info. It's
                                  caller's responsibility to free this buffer.
 
-  @retval EFI_SUCCESS            The string font is outputed successfully.
+  @retval EFI_SUCCESS            The string font is outputted successfully.
   @retval EFI_NOT_FOUND          The specified font id does not exist.
 
 **/
@@ -235,7 +230,7 @@ GetStringFontInfo (
 /**
   Parse all string blocks to find a String block specified by StringId.
   If StringId = (EFI_STRING_ID) (-1), find out all EFI_HII_SIBT_FONT blocks
-  within this string package and backup its information. If LastStringId is 
+  within this string package and backup its information. If LastStringId is
   specified, the string id of last string block will also be output.
   If StringId = 0, output the string id of last string block (EFI_HII_SIBT_STRING).
 
@@ -295,6 +290,7 @@ FindStringBlock (
   ASSERT (StringPackage->Signature == HII_STRING_PACKAGE_SIGNATURE);
 
   CurrentStringId = 1;
+  StringSize = 0;
 
   if (StringId != (EFI_STRING_ID) (-1) && StringId != 0) {
     ASSERT (BlockType != NULL && StringBlockAddr != NULL && StringTextOffset != NULL);
@@ -522,7 +518,7 @@ FindStringBlock (
         // Since string package tool set FontId initially to 0 and increases it
         // progressively by one, StringPackage->FondId always represents an unique
         // and available FontId.
-        //        
+        //
         StringPackage->FontId++;
 
         FreePool (FontInfo);
@@ -572,7 +568,7 @@ FindStringBlock (
         *StartStringId  = CurrentStringId;
     }
   }
-  
+
   //
   // Get last string ID
   //
@@ -679,7 +675,7 @@ GetStringWorker (
   }
 
   //
-  // Get the string font. The FontId 0 is the default font for those string blocks which 
+  // Get the string font. The FontId 0 is the default font for those string blocks which
   // do not specify a font identifier. If default font is not specified, return NULL.
   //
   if (StringFontInfo != NULL) {
@@ -704,20 +700,20 @@ GetStringWorker (
 
 /**
   If GetStringBlock find the StringId's string is not saved in the exist string block,
-  this function will create the UCS2 string block to save the string; also split the 
+  this function will create the UCS2 string block to save the string; also split the
   skip block into two or one skip block.
 
   This is a internal function.
-  
+
   @param  StringPackage           Hii string package instance.
   @param  StartStringId           The first id in the skip block which StringId in the block.
   @param  StringId                The string's id, which is unique within
-                                  PackageList.  
-  @param  BlockType               Output the block type of found string block.  
-  @param  StringBlockAddr         Output the block address of found string block.  
+                                  PackageList.
+  @param  BlockType               Output the block type of found string block.
+  @param  StringBlockAddr         Output the block address of found string block.
   @param  FontBlock               whether this string block has font info.
 
-  @retval EFI_SUCCESS            The string font is outputed successfully.
+  @retval EFI_SUCCESS            The string font is outputted successfully.
   @retval EFI_OUT_OF_RESOURCES   NO resource for the memory to save the new string block.
 
 **/
@@ -733,7 +729,7 @@ InsertLackStringBlock (
 {
   UINT8                                *BlockPtr;
   UINT8                                *StringBlock;
-  UINT32                               SkipLen;    
+  UINT32                               SkipLen;
   UINT32                               OldBlockSize;
   UINT32                               NewBlockSize;
   UINT32                               FrontSkipNum;
@@ -744,7 +740,7 @@ InsertLackStringBlock (
   FrontSkipNum  = 0;
   SkipLen       = 0;
   OldStringAddr = *StringBlockAddr;
-  
+
   ASSERT (*BlockType == EFI_HII_SIBT_SKIP1 || *BlockType == EFI_HII_SIBT_SKIP2);
   //
   // Old skip block size.
@@ -755,7 +751,7 @@ InsertLackStringBlock (
   } else {
     SkipLen = sizeof (EFI_HII_SIBT_SKIP2_BLOCK);
     IdCount = *(UINT16*)(OldStringAddr + sizeof (EFI_HII_STRING_BLOCK));
-  } 
+  }
 
   //
   // New create UCS or UCS2 block size.
@@ -799,7 +795,7 @@ InsertLackStringBlock (
   //
   // Copy old block in front of skip block.
   //
-  CopyMem (StringBlock, StringPackage->StringBlock, OldStringAddr - StringPackage->StringBlock);  
+  CopyMem (StringBlock, StringPackage->StringBlock, OldStringAddr - StringPackage->StringBlock);
   BlockPtr = StringBlock + (OldStringAddr - StringPackage->StringBlock);
 
   if (FrontSkipNum > 0) {
@@ -836,7 +832,7 @@ InsertLackStringBlock (
   //
   // Append a EFI_HII_SIBT_END block to the end.
   //
-  CopyMem (BlockPtr, OldStringAddr + SkipLen, OldBlockSize - (OldStringAddr - StringPackage->StringBlock) - SkipLen);  
+  CopyMem (BlockPtr, OldStringAddr + SkipLen, OldBlockSize - (OldStringAddr - StringPackage->StringBlock) - SkipLen);
 
   if (FontBlock) {
     *BlockType = EFI_HII_SIBT_STRING_UCS2_FONT;
@@ -916,9 +912,9 @@ SetStringWorker (
              &StartStringId
              );
   if (EFI_ERROR (Status) && (BlockType == EFI_HII_SIBT_SKIP1 || BlockType == EFI_HII_SIBT_SKIP2)) {
-    Status = InsertLackStringBlock(StringPackage, 
-                          StartStringId, 
-                          StringId, 
+    Status = InsertLackStringBlock(StringPackage,
+                          StartStringId,
+                          StringId,
                           &BlockType,
                           &StringBlockAddr,
                           (BOOLEAN)(StringFontInfo != NULL)
@@ -945,11 +941,11 @@ SetStringWorker (
       return EFI_INVALID_PARAMETER;
     } else {
       Referred = ReferFontInfoLocally (
-                   Private, 
-                   StringPackage, 
-                   StringPackage->FontId, 
-                   FALSE, 
-                   GlobalFont, 
+                   Private,
+                   StringPackage,
+                   StringPackage->FontId,
+                   FALSE,
+                   GlobalFont,
                    &LocalFont
                    );
       if (!Referred) {
@@ -960,7 +956,7 @@ SetStringWorker (
     // Update the FontId of the specified string block to input font info.
     //
     switch (BlockType) {
-    case EFI_HII_SIBT_STRING_SCSU_FONT:  
+    case EFI_HII_SIBT_STRING_SCSU_FONT:
     case EFI_HII_SIBT_STRINGS_SCSU_FONT:
     case EFI_HII_SIBT_STRING_UCS2_FONT:
     case EFI_HII_SIBT_STRINGS_UCS2_FONT:
@@ -971,7 +967,7 @@ SetStringWorker (
       // When modify the font info of these blocks, the block type should be updated
       // to contain font info thus the whole structure should be revised.
       // It is recommended to use tool to modify the block type not in the code.
-      //      
+      //
       return EFI_UNSUPPORTED;
     }
   }
@@ -1002,7 +998,7 @@ SetStringWorker (
     }
     *BlockPtr++ = 0;
 
-    
+
     TmpSize = OldBlockSize - (StringTextPtr - StringPackage->StringBlock) - AsciiStrSize ((CHAR8 *) StringTextPtr);
     CopyMem (
       BlockPtr,
@@ -1010,6 +1006,7 @@ SetStringWorker (
       TmpSize
       );
 
+    ZeroMem (StringPackage->StringBlock, OldBlockSize);
     FreePool (StringPackage->StringBlock);
     StringPackage->StringBlock = Block;
     StringPackage->StringPkgHdr->Header.Length += (UINT32) (BlockSize - OldBlockSize);
@@ -1043,6 +1040,7 @@ SetStringWorker (
       OldBlockSize - (StringTextPtr - StringPackage->StringBlock) - StringSize
       );
 
+    ZeroMem (StringPackage->StringBlock, OldBlockSize);
     FreePool (StringPackage->StringBlock);
     StringPackage->StringBlock = Block;
     StringPackage->StringPkgHdr->Header.Length += (UINT32) (BlockSize - OldBlockSize);
@@ -1094,6 +1092,7 @@ SetStringWorker (
 
   CopyMem (BlockPtr, StringPackage->StringBlock, OldBlockSize);
 
+  ZeroMem (StringPackage->StringBlock, OldBlockSize);
   FreePool (StringPackage->StringBlock);
   StringPackage->StringBlock = Block;
   StringPackage->StringPkgHdr->Header.Length += Ext2.Length;
@@ -1105,9 +1104,9 @@ SetStringWorker (
 
 /**
   This function adds the string String to the group of strings owned by PackageList, with the
-  specified font information StringFontInfo and returns a new string id. 
-  The new string identifier is guaranteed to be unique within the package list. 
-  That new string identifier is reserved for all languages in the package list. 
+  specified font information StringFontInfo and returns a new string id.
+  The new string identifier is guaranteed to be unique within the package list.
+  That new string identifier is reserved for all languages in the package list.
 
 
   @param  This                   A pointer to the EFI_HII_STRING_PROTOCOL instance.
@@ -1208,6 +1207,8 @@ HiiNewString (
     return EFI_NOT_FOUND;
   }
 
+  EfiAcquireLock (&mHiiDatabaseLock);
+
   Status = EFI_SUCCESS;
   NewStringPackageCreated = FALSE;
   NewStringId   = 0;
@@ -1277,6 +1278,7 @@ HiiNewString (
       // Append a EFI_HII_SIBT_END block to the end.
       //
       *BlockPtr = EFI_HII_SIBT_END;
+      ZeroMem (StringPackage->StringBlock, OldBlockSize);
       FreePool (StringPackage->StringBlock);
       StringPackage->StringBlock = StringBlock;
       StringPackage->StringPkgHdr->Header.Length += Ucs2BlockSize;
@@ -1339,7 +1341,7 @@ HiiNewString (
     // Calculate the length of the string blocks, including string block to record
     // printable language full name and EFI_HII_SIBT_END_BLOCK.
     //
-    Ucs2BlockSize = (UINT32) (StrSize ((CHAR16 *) LanguageName) + 
+    Ucs2BlockSize = (UINT32) (StrSize ((CHAR16 *) LanguageName) +
                               (*StringId - 1) * sizeof (EFI_HII_SIBT_STRING_UCS2_BLOCK) - sizeof (CHAR16));
 
     BlockSize     = Ucs2BlockSize + sizeof (EFI_HII_SIBT_END_BLOCK);
@@ -1408,6 +1410,7 @@ HiiNewString (
     // Append a EFI_HII_SIBT_END block to the end.
     //
     *BlockPtr = EFI_HII_SIBT_END;
+    ZeroMem (StringPackage->StringBlock, OldBlockSize);
     FreePool (StringPackage->StringBlock);
     StringPackage->StringBlock = StringBlock;
     StringPackage->StringPkgHdr->Header.Length += Ucs2BlockSize;
@@ -1450,6 +1453,7 @@ HiiNewString (
       // Append a EFI_HII_SIBT_END block to the end.
       //
       *BlockPtr = EFI_HII_SIBT_END;
+      ZeroMem (StringPackage->StringBlock, OldBlockSize);
       FreePool (StringPackage->StringBlock);
       StringPackage->StringBlock = StringBlock;
       StringPackage->StringPkgHdr->Header.Length += Ucs2FontBlockSize;
@@ -1511,13 +1515,14 @@ HiiNewString (
       // Append a EFI_HII_SIBT_END block to the end.
       //
       *BlockPtr = EFI_HII_SIBT_END;
+      ZeroMem (StringPackage->StringBlock, OldBlockSize);
       FreePool (StringPackage->StringBlock);
       StringPackage->StringBlock = StringBlock;
       StringPackage->StringPkgHdr->Header.Length += FontBlockSize + Ucs2FontBlockSize;
       PackageListNode->PackageListHdr.PackageLength += FontBlockSize + Ucs2FontBlockSize;
 
       //
-      // Increase the FontId to make it unique since we already add 
+      // Increase the FontId to make it unique since we already add
       // a EFI_HII_SIBT_FONT block to this string package.
       //
       StringPackage->FontId++;
@@ -1558,6 +1563,20 @@ Done:
     FreePool (StringPackage->StringPkgHdr);
     FreePool (StringPackage);
   }
+  //
+  // The contents of HiiDataBase may updated,need to check.
+  //
+  //
+  // Check whether need to get the contents of HiiDataBase.
+  // Only after ReadyToBoot to do the export.
+  //
+  if (gExportAfterReadyToBoot) {
+    if (!EFI_ERROR (Status)) {
+      HiiGetDatabaseInfo(&Private->HiiDatabase);
+    }
+  }
+
+  EfiReleaseLock (&mHiiDatabaseLock);
 
   return Status;
 }
@@ -1657,16 +1676,16 @@ HiiGetString (
       //
       // Second search: to match the StringId in other available languages if exist.
       //
-      for (Link =  PackageListNode->StringPkgHdr.ForwardLink; 
+      for (Link =  PackageListNode->StringPkgHdr.ForwardLink;
            Link != &PackageListNode->StringPkgHdr;
            Link =  Link->ForwardLink
           ) {
-      StringPackage = CR (Link, HII_STRING_PACKAGE_INSTANCE, StringEntry, HII_STRING_PACKAGE_SIGNATURE);      
+      StringPackage = CR (Link, HII_STRING_PACKAGE_INSTANCE, StringEntry, HII_STRING_PACKAGE_SIGNATURE);
       Status = GetStringWorker (Private, StringPackage, StringId, NULL, NULL, NULL);
       if (!EFI_ERROR (Status)) {
         return EFI_INVALID_LANGUAGE;
       }
-    }    
+    }
   }
 
   return EFI_NOT_FOUND;
@@ -1724,6 +1743,8 @@ HiiSetString (
     return EFI_NOT_FOUND;
   }
 
+  EfiAcquireLock (&mHiiDatabaseLock);
+
   Private = HII_STRING_DATABASE_PRIVATE_DATA_FROM_THIS (This);
   PackageListNode = NULL;
 
@@ -1750,14 +1771,24 @@ HiiSetString (
                    (EFI_FONT_INFO *) StringFontInfo
                    );
         if (EFI_ERROR (Status)) {
+          EfiReleaseLock (&mHiiDatabaseLock);
           return Status;
         }
         PackageListNode->PackageListHdr.PackageLength += StringPackage->StringPkgHdr->Header.Length - OldPackageLen;
+        //
+        // Check whether need to get the contents of HiiDataBase.
+        // Only after ReadyToBoot to do the export.
+        //
+        if (gExportAfterReadyToBoot) {
+          HiiGetDatabaseInfo(&Private->HiiDatabase);
+        }
+        EfiReleaseLock (&mHiiDatabaseLock);
         return EFI_SUCCESS;
       }
     }
   }
 
+  EfiReleaseLock (&mHiiDatabaseLock);
   return EFI_NOT_FOUND;
 }
 
@@ -1919,7 +1950,7 @@ HiiGetSecondaryLanguages (
 
   Private    = HII_STRING_DATABASE_PRIVATE_DATA_FROM_THIS (This);
 
-  PackageListNode = NULL;     
+  PackageListNode = NULL;
   for (Link = Private->DatabaseList.ForwardLink; Link != &Private->DatabaseList; Link = Link->ForwardLink) {
     DatabaseRecord  = CR (Link, HII_DATABASE_RECORD, DatabaseEntry, HII_DATABASE_RECORD_SIGNATURE);
     if (DatabaseRecord->Handle == PackageList) {
@@ -1930,7 +1961,7 @@ HiiGetSecondaryLanguages (
     if (PackageListNode == NULL) {
       return EFI_NOT_FOUND;
     }
-      
+
     Languages  = NULL;
     ResultSize = 0;
     for (Link1 = PackageListNode->StringPkgHdr.ForwardLink;

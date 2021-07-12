@@ -1,22 +1,16 @@
 ## @file
 #  Check a patch for various format issues
 #
-#  Copyright (c) 2015, Intel Corporation. All rights reserved.<BR>
+#  Copyright (c) 2015 - 2020, Intel Corporation. All rights reserved.<BR>
+#  Copyright (C) 2020, Red Hat, Inc.<BR>
 #
-#  This program and the accompanying materials are licensed and made
-#  available under the terms and conditions of the BSD License which
-#  accompanies this distribution. The full text of the license may be
-#  found at http://opensource.org/licenses/bsd-license.php
-#
-#  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS"
-#  BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER
-#  EXPRESS OR IMPLIED.
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
 #
 
 from __future__ import print_function
 
 VersionNumber = '0.1'
-__copyright__ = "Copyright (c) 2015, Intel Corporation  All rights reserved."
+__copyright__ = "Copyright (c) 2015 - 2016, Intel Corporation  All rights reserved."
 
 import email
 import argparse
@@ -28,6 +22,66 @@ import sys
 class Verbose:
     SILENT, ONELINE, NORMAL = range(3)
     level = NORMAL
+
+class EmailAddressCheck:
+    """Checks an email address."""
+
+    def __init__(self, email, description):
+        self.ok = True
+
+        if email is None:
+            self.error('Email address is missing!')
+            return
+        if description is None:
+            self.error('Email description is missing!')
+            return
+
+        self.description = "'" + description + "'"
+        self.check_email_address(email)
+
+    def error(self, *err):
+        if self.ok and Verbose.level > Verbose.ONELINE:
+            print('The ' + self.description + ' email address is not valid:')
+        self.ok = False
+        if Verbose.level < Verbose.NORMAL:
+            return
+        count = 0
+        for line in err:
+            prefix = (' *', '  ')[count > 0]
+            print(prefix, line)
+            count += 1
+
+    email_re1 = re.compile(r'(?:\s*)(.*?)(\s*)<(.+)>\s*$',
+                           re.MULTILINE|re.IGNORECASE)
+
+    def check_email_address(self, email):
+        email = email.strip()
+        mo = self.email_re1.match(email)
+        if mo is None:
+            self.error("Email format is invalid: " + email.strip())
+            return
+
+        name = mo.group(1).strip()
+        if name == '':
+            self.error("Name is not provided with email address: " +
+                       email)
+        else:
+            quoted = len(name) > 2 and name[0] == '"' and name[-1] == '"'
+            if name.find(',') >= 0 and not quoted:
+                self.error('Add quotes (") around name with a comma: ' +
+                           name)
+
+        if mo.group(2) == '':
+            self.error("There should be a space between the name and " +
+                       "email address: " + email)
+
+        if mo.group(3).find(' ') >= 0:
+            self.error("The email address cannot contain a space: " +
+                       mo.group(3))
+
+        if ' via Groups.Io' in name and mo.group(3).endswith('@groups.io'):
+            self.error("Email rewritten by lists DMARC / DKIM / SPF: " +
+                       email)
 
 class CommitMessageCheck:
     """Checks the contents of a git commit message."""
@@ -41,6 +95,8 @@ class CommitMessageCheck:
 
         self.subject = subject
         self.msg = message
+
+        print (subject)
 
         self.check_contributed_under()
         self.check_signed_off_by()
@@ -74,11 +130,17 @@ class CommitMessageCheck:
             print(prefix, line)
             count += 1
 
+    # Find 'contributed-under:' at the start of a line ignoring case and
+    # requires ':' to be present.  Matches if there is white space before
+    # the tag or between the tag and the ':'.
+    contributed_under_re = \
+        re.compile(r'^\s*contributed-under\s*:', re.MULTILINE|re.IGNORECASE)
+
     def check_contributed_under(self):
-        cu_msg='Contributed-under: TianoCore Contribution Agreement 1.0'
-        if self.msg.find(cu_msg) < 0:
-            self.error('Missing Contributed-under! (Note: this must be ' +
-                       'added by the code contributor!)')
+        match = self.contributed_under_re.search(self.msg)
+        if match is not None:
+            self.error('Contributed-under! (Note: this must be ' +
+                       'removed by the code contributor!)')
 
     @staticmethod
     def make_signature_re(sig, re_input=False):
@@ -122,37 +184,9 @@ class CommitMessageCheck:
             if s[2] != ' ':
                 self.error("There should be a space after '" + sig + ":'")
 
-            self.check_email_address(s[3])
+            EmailAddressCheck(s[3], sig)
 
         return sigs
-
-    email_re1 = re.compile(r'(?:\s*)(.*?)(\s*)<(.+)>\s*$',
-                           re.MULTILINE|re.IGNORECASE)
-
-    def check_email_address(self, email):
-        email = email.strip()
-        mo = self.email_re1.match(email)
-        if mo is None:
-            self.error("Email format is invalid: " + email.strip())
-            return
-
-        name = mo.group(1).strip()
-        if name == '':
-            self.error("Name is not provided with email address: " +
-                       email)
-        else:
-            quoted = len(name) > 2 and name[0] == '"' and name[-1] == '"'
-            if name.find(',') >= 0 and not quoted:
-                self.error('Add quotes (") around name with a comma: ' +
-                           name)
-
-        if mo.group(2) == '':
-            self.error("There should be a space between the name and " +
-                       "email address: " + email)
-
-        if mo.group(3).find(' ') >= 0:
-            self.error("The email address cannot contain a space: " +
-                       mo.group(3))
 
     def check_signed_off_by(self):
         sob='Signed-off-by'
@@ -180,6 +214,8 @@ class CommitMessageCheck:
         for sig in self.sig_types:
             self.find_signatures(sig)
 
+    cve_re = re.compile('CVE-[0-9]{4}-[0-9]{5}[^0-9]')
+
     def check_overall_format(self):
         lines = self.msg.splitlines()
 
@@ -197,9 +233,26 @@ class CommitMessageCheck:
             self.error('Empty commit message!')
             return
 
-        if count >= 1 and len(lines[0]) > 76:
-            self.error('First line of commit message (subject line) ' +
-                       'is too long.')
+        if count >= 1 and re.search(self.cve_re, lines[0]):
+            #
+            # If CVE-xxxx-xxxxx is present in subject line, then limit length of
+            # subject line to 92 characters
+            #
+            if len(lines[0].rstrip()) >= 93:
+                self.error(
+                    'First line of commit message (subject line) is too long (%d >= 93).' %
+                    (len(lines[0].rstrip()))
+                    )
+        else:
+            #
+            # If CVE-xxxx-xxxxx is not present in subject line, then limit
+            # length of subject line to 75 characters
+            #
+            if len(lines[0].rstrip()) >= 76:
+                self.error(
+                    'First line of commit message (subject line) is too long (%d >= 76).' %
+                    (len(lines[0].rstrip()))
+                    )
 
         if count >= 1 and len(lines[0].strip()) == 0:
             self.error('First line of commit message (subject line) ' +
@@ -210,10 +263,17 @@ class CommitMessageCheck:
                        'empty.')
 
         for i in range(2, count):
-            if (len(lines[i]) > 76 and
+            if (len(lines[i]) >= 76 and
                 len(lines[i].split()) > 1 and
                 not lines[i].startswith('git-svn-id:')):
-                self.error('Line %d of commit message is too long.' % (i + 1))
+                #
+                # Print a warning if body line is longer than 75 characters
+                #
+                print(
+                    'WARNING - Line %d of commit message is too long (%d >= 76).' %
+                    (i + 1, len(lines[i]))
+                    )
+                print(lines[i])
 
         last_sig_line = None
         for i in range(count - 1, 0, -1):
@@ -243,6 +303,7 @@ class GitDiffCheck:
         self.count = len(self.lines)
         self.line_num = 0
         self.state = START
+        self.new_bin = []
         while self.line_num < self.count and self.format_ok:
             line_num = self.line_num
             self.run()
@@ -254,6 +315,11 @@ class GitDiffCheck:
             return
         if self.ok:
             print('The code passed all checks.')
+        if self.new_bin:
+            print('\nWARNING - The following binary files will be added ' +
+                  'into the repository:')
+            for binary in self.new_bin:
+                print('  ' + binary)
 
     def run(self):
         line = self.lines[self.line_num]
@@ -265,7 +331,8 @@ class GitDiffCheck:
             if line.startswith('@@ '):
                 self.state = PRE_PATCH
             elif len(line) >= 1 and line[0] not in ' -+' and \
-                 not line.startswith(r'\ No newline '):
+                 not line.startswith('\r\n') and  \
+                 not line.startswith(r'\ No newline ') and not self.binary:
                 for line in self.lines[self.line_num + 1:]:
                     if line.startswith('diff --git'):
                         self.format_error('diff found after end of patch')
@@ -276,17 +343,44 @@ class GitDiffCheck:
         if self.state == START:
             if line.startswith('diff --git'):
                 self.state = PRE_PATCH
-                self.set_filename(None)
+                self.filename = line[13:].split(' ', 1)[0]
+                self.is_newfile = False
+                self.force_crlf = True
+                self.force_notabs = True
+                if self.filename.endswith('.sh'):
+                    #
+                    # Do not enforce CR/LF line endings for linux shell scripts.
+                    #
+                    self.force_crlf = False
+                if self.filename == '.gitmodules':
+                    #
+                    # .gitmodules is updated by git and uses tabs and LF line
+                    # endings.  Do not enforce no tabs and do not enforce
+                    # CR/LF line endings.
+                    #
+                    self.force_crlf = False
+                    self.force_notabs = False
             elif len(line.rstrip()) != 0:
                 self.format_error("didn't find diff command")
             self.line_num += 1
         elif self.state == PRE_PATCH:
-            if line.startswith('+++ b/'):
-                self.set_filename(line[6:].rstrip())
             if line.startswith('@@ '):
                 self.state = PATCH
+                self.binary = False
+            elif line.startswith('GIT binary patch') or \
+                 line.startswith('Binary files'):
+                self.state = PATCH
+                self.binary = True
+                if self.is_newfile:
+                    self.new_bin.append(self.filename)
+            elif line.startswith('new file mode 160000'):
+                #
+                # New submodule.  Do not enforce CR/LF line endings
+                #
+                self.force_crlf = False
             else:
                 ok = False
+                self.is_newfile = self.newfile_prefix_re.match(line)
                 for pfx in self.pre_patch_prefixes:
                     if line.startswith(pfx):
                         ok = True
@@ -294,10 +388,14 @@ class GitDiffCheck:
                     self.format_error("didn't find diff hunk marker (@@)")
             self.line_num += 1
         elif self.state == PATCH:
-            if line.startswith('-'):
+            if self.binary:
+                pass
+            elif line.startswith('-'):
                 pass
             elif line.startswith('+'):
                 self.check_added_line(line[1:])
+            elif line.startswith('\r\n'):
+                pass
             elif line.startswith(r'\ No newline '):
                 pass
             elif not line.startswith(' '):
@@ -313,26 +411,34 @@ class GitDiffCheck:
         'old mode ',
         'new mode ',
         'similarity index ',
+        'copy from ',
+        'copy to ',
         'rename ',
-        'Binary files ',
         )
 
     line_endings = ('\r\n', '\n\r', '\n', '\r')
 
-    def set_filename(self, filename):
-        self.hunk_filename = filename
-        if filename:
-            self.force_crlf = not filename.endswith('.sh')
-        else:
-            self.force_crlf = True
+    newfile_prefix_re = \
+        re.compile(r'''^
+                       index\ 0+\.\.
+                   ''',
+                   re.VERBOSE)
 
     def added_line_error(self, msg, line):
         lines = [ msg ]
-        if self.hunk_filename is not None:
-            lines.append('File: ' + self.hunk_filename)
+        if self.filename is not None:
+            lines.append('File: ' + self.filename)
         lines.append('Line: ' + line)
 
         self.error(*lines)
+
+    old_debug_re = \
+        re.compile(r'''
+                        DEBUG \s* \( \s* \( \s*
+                        (?: DEBUG_[A-Z_]+ \s* \| \s*)*
+                        EFI_D_ ([A-Z_]+)
+                   ''',
+                   re.VERBOSE)
 
     def check_added_line(self, line):
         eol = ''
@@ -346,10 +452,16 @@ class GitDiffCheck:
         if self.force_crlf and eol != '\r\n':
             self.added_line_error('Line ending (%s) is not CRLF' % repr(eol),
                                   line)
-        if '\t' in line:
+        if self.force_notabs and '\t' in line:
             self.added_line_error('Tab character used', line)
         if len(stripped) < len(line):
             self.added_line_error('Trailing whitespace found', line)
+
+        mo = self.old_debug_re.search(line)
+        if mo is not None:
+            self.added_line_error('EFI_D_' + mo.group(1) + ' was used, '
+                                  'but DEBUG_' + mo.group(1) +
+                                  ' is now recommended', line)
 
     split_diff_re = re.compile(r'''
                                    (?P<cmd>
@@ -390,6 +502,9 @@ class CheckOnePatch:
         self.patch = patch
         self.find_patch_pieces()
 
+        email_check = EmailAddressCheck(self.author_email, 'Author')
+        email_ok = email_check.ok
+
         msg_check = CommitMessageCheck(self.commit_subject, self.commit_msg)
         msg_ok = msg_check.ok
 
@@ -398,7 +513,7 @@ class CheckOnePatch:
             diff_check = GitDiffCheck(self.diff)
             diff_ok = diff_check.ok
 
-        self.ok = msg_ok and diff_ok
+        self.ok = email_ok and msg_ok and diff_ok
 
         if Verbose.level == Verbose.ONELINE:
             if self.ok:
@@ -429,6 +544,14 @@ class CheckOnePatch:
                        )
                    ''',
                    re.IGNORECASE | re.VERBOSE | re.MULTILINE)
+
+    subject_prefix_re = \
+        re.compile(r'''^
+                       \s* (\[
+                        [^\[\]]* # Allow all non-brackets
+                       \])* \s*
+                   ''',
+                   re.VERBOSE)
 
     def find_patch_pieces(self):
         if sys.version_info < (3, 0):
@@ -463,17 +586,29 @@ class CheckOnePatch:
         else:
             self.stat = mo.group('stat')
             self.commit_msg = mo.group('commit_message')
+        #
+        # Parse subject line from email header.  The subject line may be
+        # composed of multiple parts with different encodings.  Decode and
+        # combine all the parts to produce a single string with the contents of
+        # the decoded subject line.
+        #
+        parts = email.header.decode_header(pmail.get('subject'))
+        subject = ''
+        for (part, encoding) in parts:
+            if encoding:
+                part = part.decode(encoding)
+            else:
+                try:
+                    part = part.decode()
+                except:
+                    pass
+            subject = subject + part
 
-        self.commit_subject = pmail['subject'].replace('\r\n', '')
+        self.commit_subject = subject.replace('\r\n', '')
         self.commit_subject = self.commit_subject.replace('\n', '')
+        self.commit_subject = self.subject_prefix_re.sub('', self.commit_subject, 1)
 
-        pfx_start = self.commit_subject.find('[')
-        if pfx_start >= 0:
-            pfx_end = self.commit_subject.find(']')
-            if pfx_end > pfx_start:
-                self.commit_prefix = self.commit_subject[pfx_start + 1 : pfx_end]
-                self.commit_subject = self.commit_subject[pfx_end + 1 :].lstrip()
-
+        self.author_email = pmail['from']
 
 class CheckGitCommits:
     """Reads patches from git based on the specified git revision range.
@@ -494,8 +629,12 @@ class CheckGitCommits:
                 else:
                     blank_line = True
                 print('Checking git commit:', commit)
+            email = self.read_committer_email_address_from_git(commit)
+            self.ok &= EmailAddressCheck(email, 'Committer').ok
             patch = self.read_patch_from_git(commit)
             self.ok &= CheckOnePatch(commit, patch).ok
+        if not commits:
+            print("Couldn't find commit matching: '{}'".format(rev_spec))
 
     def read_commit_list_from_git(self, rev_spec, max_count):
         # Run git to get the commit patch
@@ -504,11 +643,17 @@ class CheckGitCommits:
             cmd.append('--max-count=' + str(max_count))
         cmd.append(rev_spec)
         out = self.run_git(*cmd)
-        return out.split()
+        return out.split() if out else []
 
     def read_patch_from_git(self, commit):
         # Run git to get the commit patch
-        return self.run_git('show', '--pretty=email', commit)
+        return self.run_git('show', '--pretty=email', '--no-textconv',
+                            '--no-use-mailmap', commit)
+
+    def read_committer_email_address_from_git(self, commit):
+        # Run git to get the committer email
+        return self.run_git('show', '--pretty=%cn <%ce>', '--no-patch',
+                            '--no-use-mailmap', commit)
 
     def run_git(self, *args):
         cmd = [ 'git' ]
@@ -516,7 +661,8 @@ class CheckGitCommits:
         p = subprocess.Popen(cmd,
                      stdout=subprocess.PIPE,
                      stderr=subprocess.STDOUT)
-        return p.communicate()[0].decode('utf-8', 'ignore')
+        Result = p.communicate()
+        return Result[0].decode('utf-8', 'ignore') if Result[0] and Result[0].find(b"fatal")!=0 else None
 
 class CheckOnePatchFile:
     """Performs a patch check for a single file.

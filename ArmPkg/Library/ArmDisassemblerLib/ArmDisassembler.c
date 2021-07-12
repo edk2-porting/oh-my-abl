@@ -3,13 +3,7 @@
 
   Copyright (c) 2008 - 2010, Apple Inc. All rights reserved.<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -88,12 +82,10 @@ MRegList (
   )
 {
   UINTN     Index, Start, End;
-  CHAR8     *Str;
   BOOLEAN   First;
 
-  Str = mMregListStr;
-  *Str = '\0';
-  AsciiStrCat  (Str, "{");
+  mMregListStr[0] = '\0';
+  AsciiStrCatS (mMregListStr, sizeof mMregListStr, "{");
   for (Index = 0, First = TRUE; Index <= 15; Index++) {
     if ((OpCode & (1 << Index)) != 0) {
       Start = End = Index;
@@ -102,25 +94,25 @@ MRegList (
       }
 
       if (!First) {
-        AsciiStrCat  (Str, ",");
+        AsciiStrCatS (mMregListStr, sizeof mMregListStr, ",");
       } else {
         First = FALSE;
       }
 
       if (Start == End) {
-        AsciiStrCat  (Str, gReg[Start]);
-        AsciiStrCat  (Str, ", ");
+        AsciiStrCatS (mMregListStr, sizeof mMregListStr, gReg[Start]);
+        AsciiStrCatS (mMregListStr, sizeof mMregListStr, ", ");
       } else {
-        AsciiStrCat  (Str, gReg[Start]);
-        AsciiStrCat  (Str, "-");
-        AsciiStrCat  (Str, gReg[End]);
+        AsciiStrCatS (mMregListStr, sizeof mMregListStr, gReg[Start]);
+        AsciiStrCatS (mMregListStr, sizeof mMregListStr, "-");
+        AsciiStrCatS (mMregListStr, sizeof mMregListStr, gReg[End]);
       }
     }
   }
   if (First) {
-    AsciiStrCat  (Str, "ERROR");
+    AsciiStrCatS (mMregListStr, sizeof mMregListStr, "ERROR");
   }
-  AsciiStrCat  (Str, "}");
+  AsciiStrCatS (mMregListStr, sizeof mMregListStr, "}");
 
   // BugBug: Make caller pass in buffer it is cleaner
   return mMregListStr;
@@ -145,8 +137,8 @@ RotateRight (
 
 
 /**
-  Place a dissasembly of of **OpCodePtr into buffer, and update OpCodePtr to
-  point to next instructin.
+  Place a disassembly of **OpCodePtr into buffer, and update OpCodePtr to
+  point to next instruction.
 
   We cheat and only decode instructions that access
   memory. If the instruction is not found we dump the instruction in hex.
@@ -396,7 +388,7 @@ DisassembleArmInstruction (
   }
 
 
-  if ((OpCode  & 0x0db00000) == 0x03200000) {
+  if ((OpCode  & 0x0db00000) == 0x01200000) {
     // A4.1.38 MSR{<cond>} CPSR_<fields>, #<immediate> MSR{<cond>} CPSR_<fields>, <Rm>
     if (I) {
       // MSR{<cond>} CPSR_<fields>, #<immediate>

@@ -1,14 +1,8 @@
 /** @file
   Implementation of synchronization functions.
 
-  Copyright (c) 2006 - 2012, Intel Corporation. All rights reserved.<BR>
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php.
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -30,7 +24,7 @@ void    _ReadWriteBarrier (void);
   optimal spin lock performance.
 
   This function retrieves the spin lock alignment requirements for optimal
-  performance on a given CPU architecture. The spin lock alignment is byte alignment. 
+  performance on a given CPU architecture. The spin lock alignment is byte alignment.
   It must be a power of two and is returned by this function. If there are no alignment
   requirements, then 1 must be returned. The spin lock synchronization
   functions must function correctly if the spin lock size and alignment values
@@ -47,7 +41,7 @@ GetSpinLockProperties (
   VOID
   )
 {
-  return 32;
+  return InternalGetSpinLockProperties ();
 }
 
 /**
@@ -116,7 +110,11 @@ AcquireSpinLock (
   INT64   Cycle;
   INT64   Delta;
 
-  if (PcdGet32 (PcdSpinLockTimeout) > 0) {
+  if (PcdGet32 (PcdSpinLockTimeout) == 0) {
+    while (!AcquireSpinLockOrFail (SpinLock)) {
+      CpuPause ();
+    }
+  } else if (!AcquireSpinLockOrFail (SpinLock)) {
     //
     // Get the current timer value
     //
@@ -160,10 +158,6 @@ AcquireSpinLock (
       Total += Delta;
       ASSERT (Total < Timeout);
     }
-  } else {
-    while (!AcquireSpinLockOrFail (SpinLock)) {
-      CpuPause ();
-    }
   }
   return SpinLock;
 }
@@ -193,7 +187,7 @@ AcquireSpinLockOrFail (
 {
   SPIN_LOCK   LockValue;
   VOID        *Result;
-  
+
   ASSERT (SpinLock != NULL);
 
   LockValue = *SpinLock;
@@ -249,8 +243,7 @@ ReleaseSpinLock (
 
   Performs an atomic increment of the 32-bit unsigned integer specified by
   Value and returns the incremented value. The increment operation must be
-  performed using MP safe mechanisms. The state of the return value is not
-  guaranteed to be MP safe.
+  performed using MP safe mechanisms.
 
   If Value is NULL, then ASSERT().
 
@@ -262,7 +255,7 @@ ReleaseSpinLock (
 UINT32
 EFIAPI
 InterlockedIncrement (
-  IN      UINT32                    *Value
+  IN      volatile UINT32           *Value
   )
 {
   ASSERT (Value != NULL);
@@ -274,8 +267,7 @@ InterlockedIncrement (
 
   Performs an atomic decrement of the 32-bit unsigned integer specified by
   Value and returns the decremented value. The decrement operation must be
-  performed using MP safe mechanisms. The state of the return value is not
-  guaranteed to be MP safe.
+  performed using MP safe mechanisms.
 
   If Value is NULL, then ASSERT().
 
@@ -287,7 +279,7 @@ InterlockedIncrement (
 UINT32
 EFIAPI
 InterlockedDecrement (
-  IN      UINT32                    *Value
+  IN      volatile UINT32           *Value
   )
 {
   ASSERT (Value != NULL);
@@ -316,7 +308,7 @@ InterlockedDecrement (
 UINT16
 EFIAPI
 InterlockedCompareExchange16 (
-  IN OUT  UINT16                    *Value,
+  IN OUT  volatile UINT16           *Value,
   IN      UINT16                    CompareValue,
   IN      UINT16                    ExchangeValue
   )
@@ -347,7 +339,7 @@ InterlockedCompareExchange16 (
 UINT32
 EFIAPI
 InterlockedCompareExchange32 (
-  IN OUT  UINT32                    *Value,
+  IN OUT  volatile UINT32           *Value,
   IN      UINT32                    CompareValue,
   IN      UINT32                    ExchangeValue
   )
@@ -377,7 +369,7 @@ InterlockedCompareExchange32 (
 UINT64
 EFIAPI
 InterlockedCompareExchange64 (
-  IN OUT  UINT64                    *Value,
+  IN OUT  volatile UINT64           *Value,
   IN      UINT64                    CompareValue,
   IN      UINT64                    ExchangeValue
   )
@@ -407,7 +399,7 @@ InterlockedCompareExchange64 (
 VOID *
 EFIAPI
 InterlockedCompareExchangePointer (
-  IN OUT  VOID                      **Value,
+  IN OUT  VOID                      * volatile *Value,
   IN      VOID                      *CompareValue,
   IN      VOID                      *ExchangeValue
   )
@@ -419,13 +411,13 @@ InterlockedCompareExchangePointer (
   switch (SizeOfValue) {
     case sizeof (UINT32):
       return (VOID*)(UINTN)InterlockedCompareExchange32 (
-                             (UINT32*)Value,
+                             (volatile UINT32*)Value,
                              (UINT32)(UINTN)CompareValue,
                              (UINT32)(UINTN)ExchangeValue
                              );
     case sizeof (UINT64):
       return (VOID*)(UINTN)InterlockedCompareExchange64 (
-                             (UINT64*)Value,
+                             (volatile UINT64*)Value,
                              (UINT64)(UINTN)CompareValue,
                              (UINT64)(UINTN)ExchangeValue
                              );

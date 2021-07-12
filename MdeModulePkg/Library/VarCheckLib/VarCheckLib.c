@@ -1,14 +1,8 @@
 /** @file
   Implementation functions and structures for var check services.
 
-Copyright (c) 2015, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
-
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+Copyright (c) 2015 - 2016, Intel Corporation. All rights reserved.<BR>
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -80,6 +74,13 @@ VARIABLE_ENTRY_PROPERTY mVarCheckVariableWithWildcardName[] = {
     },
   },
   {
+    &gEfiGlobalVariableGuid,
+    L"PlatformRecovery####",
+    {
+      0
+    },
+  },
+  {
     &gEfiHardwareErrorVariableGuid,
     L"HwErrRec####",
     {
@@ -89,17 +90,17 @@ VARIABLE_ENTRY_PROPERTY mVarCheckVariableWithWildcardName[] = {
 };
 
 /**
-  Check if a Unicode character is a hexadecimal character.
+  Check if a Unicode character is an upper case hexadecimal character.
 
-  This function checks if a Unicode character is a
-  hexadecimal character.  The valid hexadecimal character is
-  L'0' to L'9', L'a' to L'f', or L'A' to L'F'.
+  This function checks if a Unicode character is an upper case
+  hexadecimal character.  The valid upper case hexadecimal character is
+  L'0' to L'9', or L'A' to L'F'.
 
 
   @param[in] Char       The character to check against.
 
-  @retval TRUE          If the Char is a hexadecmial character.
-  @retval FALSE         If the Char is not a hexadecmial character.
+  @retval TRUE          If the Char is an upper case hexadecmial character.
+  @retval FALSE         If the Char is not an upper case hexadecmial character.
 
 **/
 BOOLEAN
@@ -108,7 +109,7 @@ VarCheckInternalIsHexaDecimalDigitCharacter (
   IN CHAR16             Char
   )
 {
-  return (BOOLEAN) ((Char >= L'0' && Char <= L'9') || (Char >= L'A' && Char <= L'F') || (Char >= L'a' && Char <= L'f'));
+  return (BOOLEAN) ((Char >= L'0' && Char <= L'9') || (Char >= L'A' && Char <= L'F'));
 }
 
 /**

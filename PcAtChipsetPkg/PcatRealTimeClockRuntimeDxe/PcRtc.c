@@ -1,22 +1,28 @@
 /** @file
   RTC Architectural Protocol GUID as defined in DxeCis 0.96.
 
-Copyright (c) 2006 - 2015, Intel Corporation. All rights reserved.<BR>
-This program and the accompanying materials
-are licensed and made available under the terms and conditions of the BSD License
-which accompanies this distribution.  The full text of the license may be found at
-http://opensource.org/licenses/bsd-license.php
+Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
+Copyright (c) 2017, AMD Inc. All rights reserved.<BR>
 
-THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
 #include "PcRtc.h"
 
+//
+// Days of month.
+//
+UINTN mDayOfMonth[] = { 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
+//
+// The name of NV variable to store the timezone and daylight saving information.
+//
+CHAR16 mTimeZoneVariableName[] = L"RTC";
+
 /**
   Compare the Hour, Minute and Second of the From time and the To time.
-  
+
   Only compare H/M/S in EFI_TIME and ignore other fields here.
 
   @param From   the first time
@@ -60,8 +66,8 @@ RtcRead (
   IN  UINT8 Address
   )
 {
-  IoWrite8 (PCAT_RTC_ADDRESS_REGISTER, (UINT8) (Address | (UINT8) (IoRead8 (PCAT_RTC_ADDRESS_REGISTER) & 0x80)));
-  return IoRead8 (PCAT_RTC_DATA_REGISTER);
+  IoWrite8 (PcdGet8 (PcdRtcIndexRegister), (UINT8) (Address | (UINT8) (IoRead8 (PcdGet8 (PcdRtcIndexRegister)) & 0x80)));
+  return IoRead8 (PcdGet8 (PcdRtcTargetRegister));
 }
 
 /**
@@ -78,8 +84,8 @@ RtcWrite (
   IN  UINT8   Data
   )
 {
-  IoWrite8 (PCAT_RTC_ADDRESS_REGISTER, (UINT8) (Address | (UINT8) (IoRead8 (PCAT_RTC_ADDRESS_REGISTER) & 0x80)));
-  IoWrite8 (PCAT_RTC_DATA_REGISTER, Data);
+  IoWrite8 (PcdGet8 (PcdRtcIndexRegister), (UINT8) (Address | (UINT8) (IoRead8 (PcdGet8 (PcdRtcIndexRegister)) & 0x80)));
+  IoWrite8 (PcdGet8 (PcdRtcTargetRegister), Data);
 }
 
 /**
@@ -118,7 +124,7 @@ PcRtcInit (
   // Make sure Division Chain is properly configured,
   // or RTC clock won't "tick" -- time won't increment
   //
-  RegisterA.Data = RTC_INIT_REGISTER_A;
+  RegisterA.Data = FixedPcdGet8 (PcdInitialValueRtcRegisterA);
   RtcWrite (RTC_ADDRESS_REGISTER_A, RegisterA.Data);
 
   //
@@ -134,7 +140,7 @@ PcRtcInit (
   //
   // Clear RTC register D
   //
-  RegisterD.Data = RTC_INIT_REGISTER_D;
+  RegisterD.Data = FixedPcdGet8 (PcdInitialValueRtcRegisterD);
   RtcWrite (RTC_ADDRESS_REGISTER_D, RegisterD.Data);
 
   //
@@ -166,7 +172,7 @@ PcRtcInit (
   // Set RTC configuration after get original time
   // The value of bit AIE should be reserved.
   //
-  RegisterB.Data = RTC_INIT_REGISTER_B | (RegisterB.Data & BIT5);
+  RegisterB.Data = FixedPcdGet8 (PcdInitialValueRtcRegisterB) | (RegisterB.Data & BIT5);
   RtcWrite (RTC_ADDRESS_REGISTER_B, RegisterB.Data);
 
   //
@@ -175,25 +181,25 @@ PcRtcInit (
   if (!EfiAtRuntime ()) {
     EfiReleaseLock (&Global->RtcLock);
   }
- 
+
   //
   // Get the data of Daylight saving and time zone, if they have been
   // stored in NV variable during previous boot.
   //
   DataSize = sizeof (UINT32);
   Status = EfiGetVariable (
-             L"RTC",
+             mTimeZoneVariableName,
              &gEfiCallerIdGuid,
              NULL,
              &DataSize,
-             (VOID *) &TimerVar
+             &TimerVar
              );
   if (!EFI_ERROR (Status)) {
     Time.TimeZone = (INT16) TimerVar;
     Time.Daylight = (UINT8) (TimerVar >> 16);
   } else {
     Time.TimeZone = EFI_UNSPECIFIED_TIMEZONE;
-    Time.Daylight = 0;  
+    Time.Daylight = 0;
   }
 
   //
@@ -229,7 +235,7 @@ PcRtcInit (
   if (EFI_ERROR (Status)) {
     return EFI_DEVICE_ERROR;
   }
-  
+
   //
   // Reset wakeup time value to valid state when wakeup alarm is disabled and wakeup time is invalid.
   // Global variable has already had valid SavedTimeZone and Daylight,
@@ -239,9 +245,9 @@ PcRtcInit (
   if ((Enabled) || (!EFI_ERROR (Status))) {
     return EFI_SUCCESS;
   }
-  
+
   //
-  // When wakeup time is disabled and invalid, reset wakeup time register to valid state 
+  // When wakeup time is disabled and invalid, reset wakeup time register to valid state
   // but keep wakeup alarm disabled.
   //
   Time.Second = RTC_INIT_SECOND;
@@ -289,13 +295,13 @@ PcRtcInit (
     }
     return EFI_DEVICE_ERROR;
   }
-  
+
   //
   // Inhibit updates of the RTC
   //
   RegisterB.Bits.Set  = 1;
   RtcWrite (RTC_ADDRESS_REGISTER_B, RegisterB.Data);
- 
+
   //
   // Set RTC alarm time registers
   //
@@ -308,7 +314,7 @@ PcRtcInit (
   //
   RegisterB.Bits.Set = 0;
   RtcWrite (RTC_ADDRESS_REGISTER_B, RegisterB.Data);
- 
+
   //
   // Release RTC Lock.
   //
@@ -473,19 +479,33 @@ PcRtcSetTime (
      }
     return Status;
   }
-  
+
   //
   // Write timezone and daylight to RTC variable
   //
-  TimerVar = Time->Daylight;
-  TimerVar = (UINT32) ((TimerVar << 16) | (UINT16)(Time->TimeZone));
-  Status =  EfiSetVariable (
-              L"RTC",
-              &gEfiCallerIdGuid,
-              EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS | EFI_VARIABLE_NON_VOLATILE,
-              sizeof (TimerVar),
-              &TimerVar
-              );
+  if ((Time->TimeZone == EFI_UNSPECIFIED_TIMEZONE) && (Time->Daylight == 0)) {
+    Status = EfiSetVariable (
+               mTimeZoneVariableName,
+               &gEfiCallerIdGuid,
+               0,
+               0,
+               NULL
+               );
+    if (Status == EFI_NOT_FOUND) {
+      Status = EFI_SUCCESS;
+    }
+  } else {
+    TimerVar = Time->Daylight;
+    TimerVar = (UINT32) ((TimerVar << 16) | (UINT16)(Time->TimeZone));
+    Status = EfiSetVariable (
+               mTimeZoneVariableName,
+               &gEfiCallerIdGuid,
+               EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS | EFI_VARIABLE_NON_VOLATILE,
+               sizeof (TimerVar),
+               &TimerVar
+               );
+  }
+
   if (EFI_ERROR (Status)) {
     if (!EfiAtRuntime ()) {
       EfiReleaseLock (&Global->RtcLock);
@@ -499,6 +519,13 @@ PcRtcSetTime (
   RegisterB.Data      = RtcRead (RTC_ADDRESS_REGISTER_B);
   RegisterB.Bits.Set  = 1;
   RtcWrite (RTC_ADDRESS_REGISTER_B, RegisterB.Data);
+
+  //
+  // Store the century value to RTC before converting to BCD format.
+  //
+  if (Global->CenturyRtcAddress != 0) {
+    RtcWrite (Global->CenturyRtcAddress, DecimalToBcd8 ((UINT8) (RtcTime.Year / 100)));
+  }
 
   ConvertEfiTimeToRtcTime (&RtcTime, RegisterB);
 
@@ -756,7 +783,7 @@ PcRtcSetWakeupTime (
     }
     return EFI_DEVICE_ERROR;
   }
-  
+
   //
   // Inhibit updates of the RTC
   //
@@ -899,7 +926,7 @@ ConvertRtcTimeToEfiTime (
   @param    Timeout  Tell how long it should take to wait.
 
   @retval   EFI_DEVICE_ERROR   RTC device error.
-  @retval   EFI_SUCCESS        RTC is updated and ready.  
+  @retval   EFI_SUCCESS        RTC is updated and ready.
 **/
 EFI_STATUS
 RtcWaitToUpdate (
@@ -980,28 +1007,13 @@ DayValid (
   IN  EFI_TIME  *Time
   )
 {
-  INTN  DayOfMonth[12];
-
-  DayOfMonth[0] = 31;
-  DayOfMonth[1] = 29;
-  DayOfMonth[2] = 31;
-  DayOfMonth[3] = 30;
-  DayOfMonth[4] = 31;
-  DayOfMonth[5] = 30;
-  DayOfMonth[6] = 31;
-  DayOfMonth[7] = 31;
-  DayOfMonth[8] = 30;
-  DayOfMonth[9] = 31;
-  DayOfMonth[10] = 30;
-  DayOfMonth[11] = 31;
-
   //
   // The validity of Time->Month field should be checked before
   //
   ASSERT (Time->Month >=1);
   ASSERT (Time->Month <=12);
   if (Time->Day < 1 ||
-      Time->Day > DayOfMonth[Time->Month - 1] ||
+      Time->Day > mDayOfMonth[Time->Month - 1] ||
       (Time->Month == 2 && (!IsLeapYear (Time) && Time->Day > 28))
       ) {
     return FALSE;
@@ -1039,9 +1051,9 @@ IsLeapYear (
 }
 
 /**
-  Converts time from EFI_TIME format defined by UEFI spec to RTC's.
+  Converts time from EFI_TIME format defined by UEFI spec to RTC format.
 
-  This function converts time from EFI_TIME format defined by UEFI spec to RTC's.
+  This function converts time from EFI_TIME format defined by UEFI spec to RTC format.
   If data mode of RTC is BCD, then converts EFI_TIME to it.
   If RTC is in 12-hour format, then converts EFI_TIME to it.
 
@@ -1095,7 +1107,7 @@ ConvertEfiTimeToRtcTime (
 
 /**
   Compare the Hour, Minute and Second of the From time and the To time.
-  
+
   Only compare H/M/S in EFI_TIME and ignore other fields here.
 
   @param From   the first time
@@ -1137,21 +1149,7 @@ IsWithinOneDay (
   IN EFI_TIME  *To
   )
 {
-  UINT8   DayOfMonth[12];
   BOOLEAN Adjacent;
-
-  DayOfMonth[0] = 31;
-  DayOfMonth[1] = 29;
-  DayOfMonth[2] = 31;
-  DayOfMonth[3] = 30;
-  DayOfMonth[4] = 31;
-  DayOfMonth[5] = 30;
-  DayOfMonth[6] = 31;
-  DayOfMonth[7] = 31;
-  DayOfMonth[8] = 30;
-  DayOfMonth[9] = 31;
-  DayOfMonth[10] = 30;
-  DayOfMonth[11] = 31;
 
   Adjacent = FALSE;
 
@@ -1160,7 +1158,7 @@ IsWithinOneDay (
   //
   ASSERT (From->Month >=1);
   ASSERT (From->Month <=12);
-  
+
   if (From->Year == To->Year) {
     if (From->Month == To->Month) {
       if ((From->Day + 1) == To->Day) {
@@ -1179,7 +1177,7 @@ IsWithinOneDay (
             Adjacent = TRUE;
           }
         }
-      } else if (From->Day == DayOfMonth[From->Month - 1]) {
+      } else if (From->Day == mDayOfMonth[From->Month - 1]) {
         if ((CompareHMS(From, To) >= 0)) {
            Adjacent = TRUE;
         }
@@ -1198,3 +1196,62 @@ IsWithinOneDay (
   return Adjacent;
 }
 
+/**
+  Get the century RTC address from the ACPI FADT table.
+
+  @return  The century RTC address or 0 if not found.
+**/
+UINT8
+GetCenturyRtcAddress (
+  VOID
+  )
+{
+  EFI_ACPI_2_0_FIXED_ACPI_DESCRIPTION_TABLE     *Fadt;
+
+  Fadt = (EFI_ACPI_2_0_FIXED_ACPI_DESCRIPTION_TABLE *) EfiLocateFirstAcpiTable (
+                                                         EFI_ACPI_2_0_FIXED_ACPI_DESCRIPTION_TABLE_SIGNATURE
+                                                         );
+
+  if ((Fadt != NULL) &&
+      (Fadt->Century > RTC_ADDRESS_REGISTER_D) && (Fadt->Century < 0x80)
+      ) {
+    return Fadt->Century;
+  } else {
+    return 0;
+  }
+}
+
+/**
+  Notification function of ACPI Table change.
+
+  This is a notification function registered on ACPI Table change event.
+  It saves the Century address stored in ACPI FADT table.
+
+  @param  Event        Event whose notification function is being invoked.
+  @param  Context      Pointer to the notification function's context.
+
+**/
+VOID
+EFIAPI
+PcRtcAcpiTableChangeCallback (
+  IN EFI_EVENT        Event,
+  IN VOID             *Context
+  )
+{
+  EFI_STATUS          Status;
+  EFI_TIME            Time;
+  UINT8               CenturyRtcAddress;
+  UINT8               Century;
+
+  CenturyRtcAddress = GetCenturyRtcAddress ();
+  if ((CenturyRtcAddress != 0) && (mModuleGlobal.CenturyRtcAddress != CenturyRtcAddress)) {
+    mModuleGlobal.CenturyRtcAddress = CenturyRtcAddress;
+    Status = PcRtcGetTime (&Time, NULL, &mModuleGlobal);
+    if (!EFI_ERROR (Status)) {
+      Century = (UINT8) (Time.Year / 100);
+      Century = DecimalToBcd8 (Century);
+      DEBUG ((EFI_D_INFO, "PcRtc: Write 0x%x to CMOS location 0x%x\n", Century, mModuleGlobal.CenturyRtcAddress));
+      RtcWrite (mModuleGlobal.CenturyRtcAddress, Century);
+    }
+  }
+}

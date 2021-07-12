@@ -2,13 +2,7 @@
 *
 *  Copyright (c) 2012-2014, ARM Limited. All rights reserved.
 *
-*  This program and the accompanying materials
-*  are licensed and made available under the terms and conditions of the BSD License
-*  which accompanies this distribution.  The full text of the license may be found at
-*  http://opensource.org/licenses/bsd-license.php
-*
-*  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-*  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+*  SPDX-License-Identifier: BSD-2-Clause-Patent
 *
 **/
 
@@ -57,12 +51,83 @@
 #define LAN9118_E2P_CMD                       (0x000000B0 + LAN9118_BA)    // EEPROM Command
 #define LAN9118_E2P_DATA                      (0x000000B4 + LAN9118_BA)    // EEPROM Data
 
+/*
+ * Required delays following write cycles (number of BYTE_TEST reads)
+ * Taken from Table 6.1 in Revision 1.5 (07-11-08) of the LAN9118 datasheet.
+ * Where no delay listed, 0 has been assumed.
+ */
+#define LAN9118_RX_DATA_WR_DELAY              0
+#define LAN9118_RX_STATUS_WR_DELAY            0
+#define LAN9118_RX_STATUS_PEEK_WR_DELAY       0
+#define LAN9118_TX_DATA_WR_DELAY              0
+#define LAN9118_TX_STATUS_WR_DELAY            0
+#define LAN9118_TX_STATUS_PEEK_WR_DELAY       0
+#define LAN9118_ID_REV_WR_DELAY               0
+#define LAN9118_IRQ_CFG_WR_DELAY              3
+#define LAN9118_INT_STS_WR_DELAY              2
+#define LAN9118_INT_EN_WR_DELAY               1
+#define LAN9118_BYTE_TEST_WR_DELAY            0
+#define LAN9118_FIFO_INT_WR_DELAY             1
+#define LAN9118_RX_CFG_WR_DELAY               1
+#define LAN9118_TX_CFG_WR_DELAY               1
+#define LAN9118_HW_CFG_WR_DELAY               1
+#define LAN9118_RX_DP_CTL_WR_DELAY            1
+#define LAN9118_RX_FIFO_INF_WR_DELAY          0
+#define LAN9118_TX_FIFO_INF_WR_DELAY          3
+#define LAN9118_PMT_CTRL_WR_DELAY             7
+#define LAN9118_GPIO_CFG_WR_DELAY             1
+#define LAN9118_GPT_CFG_WR_DELAY              1
+#define LAN9118_GPT_CNT_WR_DELAY              3
+#define LAN9118_WORD_SWAP_WR_DELAY            1
+#define LAN9118_FREE_RUN_WR_DELAY             4
+#define LAN9118_RX_DROP_WR_DELAY              0
+#define LAN9118_MAC_CSR_CMD_WR_DELAY          1
+#define LAN9118_MAC_CSR_DATA_WR_DELAY         1
+#define LAN9118_AFC_CFG_WR_DELAY              1
+#define LAN9118_E2P_CMD_WR_DELAY              1
+#define LAN9118_E2P_DATA_WR_DELAY             1
+
+/*
+ * Required delays following read cycles (number of BYTE_TEST reads)
+ * Taken from Table 6.2 in Revision 1.5 (07-11-08) of the LAN9118 datasheet.
+ * Where no delay listed, 0 has been assumed.
+ */
+#define LAN9118_RX_DATA_RD_DELAY              3
+#define LAN9118_RX_STATUS_RD_DELAY            3
+#define LAN9118_RX_STATUS_PEEK_RD_DELAY       0
+#define LAN9118_TX_DATA_RD_DELAY              0
+#define LAN9118_TX_STATUS_RD_DELAY            3
+#define LAN9118_TX_STATUS_PEEK_RD_DELAY       0
+#define LAN9118_ID_REV_RD_DELAY               0
+#define LAN9118_IRQ_CFG_RD_DELAY              0
+#define LAN9118_INT_STS_RD_DELAY              0
+#define LAN9118_INT_EN_RD_DELAY               0
+#define LAN9118_BYTE_TEST_RD_DELAY            0
+#define LAN9118_FIFO_INT_RD_DELAY             0
+#define LAN9118_RX_CFG_RD_DELAY               0
+#define LAN9118_TX_CFG_RD_DELAY               0
+#define LAN9118_HW_CFG_RD_DELAY               0
+#define LAN9118_RX_DP_CTL_RD_DELAY            0
+#define LAN9118_RX_FIFO_INF_RD_DELAY          0
+#define LAN9118_TX_FIFO_INF_RD_DELAY          0
+#define LAN9118_PMT_CTRL_RD_DELAY             0
+#define LAN9118_GPIO_CFG_RD_DELAY             0
+#define LAN9118_GPT_CFG_RD_DELAY              0
+#define LAN9118_GPT_CNT_RD_DELAY              0
+#define LAN9118_WORD_SWAP_RD_DELAY            0
+#define LAN9118_FREE_RUN_RD_DELAY             0
+#define LAN9118_RX_DROP_RD_DELAY              4
+#define LAN9118_MAC_CSR_CMD_RD_DELAY          0
+#define LAN9118_MAC_CSR_DATA_RD_DELAY         0
+#define LAN9118_AFC_CFG_RD_DELAY              0
+#define LAN9118_E2P_CMD_RD_DELAY              0
+#define LAN9118_E2P_DATA_RD_DELAY             0
 
 // Receiver Status bits
 #define RXSTATUS_CRC_ERROR                    BIT1                      // Cyclic Redundancy Check Error
 #define RXSTATUS_DB                           BIT2                      // Dribbling bit: Frame had non-integer multiple of 8bits
 #define RXSTATUS_MII_ERROR                    BIT3                      // Receive error during interception
-#define RXSTATUS_RXW_TO                       BIT4                      // Incomming frame larger than 2kb
+#define RXSTATUS_RXW_TO                       BIT4                      // Incoming frame larger than 2kb
 #define RXSTATUS_FT                           BIT5                      // 1: Ether type / 0: 802.3 type frame
 #define RXSTATUS_LCOLL                        BIT6                      // Late collision detected
 #define RXSTATUS_FTL                          BIT7                      // Frame longer than Ether type
@@ -87,8 +152,8 @@
 #define TXSTATUS_PTAG_MASK                    (0xFFFF0000)              // Mask for Unique ID of packets (So we know who the packets are for)
 
 // ID_REV register bits
-#define IDREV_ID                              ((MmioRead32(LAN9118_ID_REV) & 0xFFFF0000) >> 16)
-#define IDREV_REV                             (MmioRead32(LAN9118_ID_REV) & 0x0000FFFF)
+#define IDREV_ID                              ((Lan9118MmioRead32(LAN9118_ID_REV) & 0xFFFF0000) >> 16)
+#define IDREV_REV                             (Lan9118MmioRead32(LAN9118_ID_REV) & 0x0000FFFF)
 
 // Interrupt Config Register bits
 #define IRQCFG_IRQ_TYPE                       BIT0                    // IRQ Buffer type

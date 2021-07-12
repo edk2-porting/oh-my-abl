@@ -4,15 +4,10 @@
 # This SMM driver performs SMM initialization, deploy SMM Entry Vector,
 # provides CPU specific services in SMM.
 #
-# Copyright (c) 2009 - 2015, Intel Corporation. All rights reserved.<BR>
+# Copyright (c) 2009 - 2019, Intel Corporation. All rights reserved.<BR>
+# Copyright (c) 2017, AMD Incorporated. All rights reserved.<BR>
 #
-# This program and the accompanying materials
-# are licensed and made available under the terms and conditions of the BSD License
-# which accompanies this distribution.  The full text of the license may be found at
-# http://opensource.org/licenses/bsd-license.php
-#
-# THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-# WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+# SPDX-License-Identifier: BSD-2-Clause-Patent
 #
 ##
 
@@ -44,57 +39,42 @@
   SmmProfile.h
   SmmProfileInternal.h
   SmramSaveState.c
+  SmmCpuMemoryManagement.c
+  SmmMp.h
+  SmmMp.c
 
 [Sources.Ia32]
   Ia32/Semaphore.c
   Ia32/PageTbl.c
+  Ia32/SmmFuncsArch.c
   Ia32/SmmProfileArch.c
   Ia32/SmmProfileArch.h
-  Ia32/SmmInit.asm      | MSFT
-  Ia32/SmiEntry.asm     | MSFT
-  Ia32/SmiException.asm | MSFT
-  Ia32/MpFuncs.asm      | MSFT
-
-  Ia32/SmmInit.asm      | INTEL
-  Ia32/SmiEntry.asm     | INTEL
-  Ia32/SmiException.asm | INTEL
-  Ia32/MpFuncs.asm      | INTEL
-
-  Ia32/SmmInit.S        | GCC
-  Ia32/SmiEntry.S       | GCC
-  Ia32/SmiException.S   | GCC
-  Ia32/MpFuncs.S        | GCC
+  Ia32/SmmInit.nasm
+  Ia32/SmiEntry.nasm
+  Ia32/SmiException.nasm
+  Ia32/MpFuncs.nasm
+  Ia32/Cet.nasm
 
 [Sources.X64]
   X64/Semaphore.c
   X64/PageTbl.c
+  X64/SmmFuncsArch.c
   X64/SmmProfileArch.c
   X64/SmmProfileArch.h
-  X64/SmmInit.asm      | MSFT
-  X64/SmiEntry.asm     | MSFT
-  X64/SmiException.asm | MSFT
-  X64/MpFuncs.asm      | MSFT
-
-  X64/SmmInit.asm      | INTEL
-  X64/SmiEntry.asm     | INTEL
-  X64/SmiException.asm | INTEL
-  X64/MpFuncs.asm      | INTEL
-
-  X64/SmmInit.S        | GCC
-  X64/SmiEntry.S       | GCC
-  X64/SmiException.S   | GCC
-  X64/MpFuncs.S        | GCC
+  X64/SmmInit.nasm
+  X64/SmiEntry.nasm
+  X64/SmiException.nasm
+  X64/MpFuncs.nasm
+  X64/Cet.nasm
 
 [Packages]
   MdePkg/MdePkg.dec
   MdeModulePkg/MdeModulePkg.dec
   UefiCpuPkg/UefiCpuPkg.dec
-  IntelFrameworkPkg/IntelFrameworkPkg.dec
 
 [LibraryClasses]
   UefiDriverEntryPoint
   UefiRuntimeServicesTableLib
-  CacheMaintenanceLib
   PcdLib
   DebugLib
   BaseLib
@@ -126,16 +106,15 @@
   gEfiSmmCpuProtocolGuid                   ## PRODUCES
   gEfiSmmReadyToLockProtocolGuid           ## NOTIFY
   gEfiSmmCpuServiceProtocolGuid            ## PRODUCES
-  gEfiSmmCpuSaveStateProtocolGuid          ## SOMETIMES_PRODUCES
+  gEdkiiSmmMemoryAttributeProtocolGuid     ## PRODUCES
+  gEfiMmMpProtocolGuid                    ## PRODUCES
 
 [Guids]
   gEfiAcpiVariableGuid                     ## SOMETIMES_CONSUMES ## HOB # it is used for S3 boot.
-  gEfiGlobalVariableGuid                   ## SOMETIMES_PRODUCES ## Variable:L"SmmProfileData"
-  gEfiAcpi20TableGuid                      ## SOMETIMES_CONSUMES ## SystemTable
-  gEfiAcpi10TableGuid                      ## SOMETIMES_CONSUMES ## SystemTable
+  gEdkiiPiSmmMemoryAttributesTableGuid     ## CONSUMES ## SystemTable
+  gEfiMemoryAttributesTableGuid            ## CONSUMES ## SystemTable
 
 [FeaturePcd]
-  gEfiMdeModulePkgTokenSpaceGuid.PcdFrameworkCompatibilitySupport  ## CONSUMES
   gUefiCpuPkgTokenSpaceGuid.PcdCpuSmmDebug                         ## CONSUMES
   gUefiCpuPkgTokenSpaceGuid.PcdCpuSmmBlockStartupThisAp            ## CONSUMES
   gUefiCpuPkgTokenSpaceGuid.PcdCpuSmmEnableBspElection             ## CONSUMES
@@ -154,6 +133,18 @@
   gUefiCpuPkgTokenSpaceGuid.PcdCpuHotPlugDataAddress               ## SOMETIMES_PRODUCES
   gUefiCpuPkgTokenSpaceGuid.PcdCpuSmmCodeAccessCheckEnable         ## CONSUMES
   gUefiCpuPkgTokenSpaceGuid.PcdCpuSmmSyncMode                      ## CONSUMES
+  gUefiCpuPkgTokenSpaceGuid.PcdCpuSmmShadowStackSize               ## SOMETIMES_CONSUMES
+  gEfiMdeModulePkgTokenSpaceGuid.PcdAcpiS3Enable                   ## CONSUMES
+  gEfiMdeModulePkgTokenSpaceGuid.PcdPteMemoryEncryptionAddressOrMask    ## CONSUMES
+  gEfiMdeModulePkgTokenSpaceGuid.PcdNullPointerDetectionPropertyMask    ## CONSUMES
+  gEfiMdeModulePkgTokenSpaceGuid.PcdHeapGuardPropertyMask               ## CONSUMES
+  gEfiMdePkgTokenSpaceGuid.PcdControlFlowEnforcementPropertyMask        ## CONSUMES
+
+[FixedPcd]
+  gUefiCpuPkgTokenSpaceGuid.PcdCpuSmmMpTokenCountPerChunk               ## CONSUMES
+
+[Pcd.X64]
+  gUefiCpuPkgTokenSpaceGuid.PcdCpuSmmRestrictedMemoryAccess        ## CONSUMES
 
 [Depex]
   gEfiMpServiceProtocolGuid

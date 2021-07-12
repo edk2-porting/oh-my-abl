@@ -1,15 +1,9 @@
 /** @file
 
   Copyright (c) 2008 - 2009, Apple Inc. All rights reserved.<BR>
-  Copyright (c) 2011 - 2015, ARM Ltd. All rights reserved.<BR>
+  Copyright (c) 2011 - 2016, ARM Ltd. All rights reserved.<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -26,29 +20,9 @@
  #error "Unknown chipset."
 #endif
 
-typedef enum {
-  ARM_CACHE_TYPE_WRITE_BACK,
-  ARM_CACHE_TYPE_UNKNOWN
-} ARM_CACHE_TYPE;
-
-typedef enum {
-  ARM_CACHE_ARCHITECTURE_UNIFIED,
-  ARM_CACHE_ARCHITECTURE_SEPARATE,
-  ARM_CACHE_ARCHITECTURE_UNKNOWN
-} ARM_CACHE_ARCHITECTURE;
-
-typedef struct {
-  ARM_CACHE_TYPE          Type;
-  ARM_CACHE_ARCHITECTURE  Architecture;
-  BOOLEAN                 DataCachePresent;
-  UINTN                   DataCacheSize;
-  UINTN                   DataCacheAssociativity;
-  UINTN                   DataCacheLineLength;
-  BOOLEAN                 InstructionCachePresent;
-  UINTN                   InstructionCacheSize;
-  UINTN                   InstructionCacheAssociativity;
-  UINTN                   InstructionCacheLineLength;
-} ARM_CACHE_INFO;
+#define EFI_MEMORY_CACHETYPE_MASK   (EFI_MEMORY_UC | EFI_MEMORY_WC | \
+                                     EFI_MEMORY_WT | EFI_MEMORY_WB | \
+                                     EFI_MEMORY_UCE)
 
 /**
  * The UEFI firmware must not use the ARM_MEMORY_REGION_ATTRIBUTE_NONSECURE_* attributes.
@@ -61,6 +35,14 @@ typedef enum {
   ARM_MEMORY_REGION_ATTRIBUTE_NONSECURE_UNCACHED_UNBUFFERED,
   ARM_MEMORY_REGION_ATTRIBUTE_WRITE_BACK,
   ARM_MEMORY_REGION_ATTRIBUTE_NONSECURE_WRITE_BACK,
+
+  // On some platforms, memory mapped flash region is designed as not supporting
+  // shareable attribute, so WRITE_BACK_NONSHAREABLE is added for such special
+  // need.
+  // Do NOT use below two attributes if you are not sure.
+  ARM_MEMORY_REGION_ATTRIBUTE_WRITE_BACK_NONSHAREABLE,
+  ARM_MEMORY_REGION_ATTRIBUTE_NONSECURE_WRITE_BACK_NONSHAREABLE,
+
   ARM_MEMORY_REGION_ATTRIBUTE_WRITE_THROUGH,
   ARM_MEMORY_REGION_ATTRIBUTE_NONSECURE_WRITE_THROUGH,
   ARM_MEMORY_REGION_ATTRIBUTE_DEVICE,
@@ -126,69 +108,21 @@ typedef enum {
 #define GET_MPID(ClusterId, CoreId)   (((ClusterId) << 8) | (CoreId))
 #define PRIMARY_CORE_ID       (PcdGet32(PcdArmPrimaryCore) & ARM_CORE_MASK)
 
-ARM_CACHE_TYPE
-EFIAPI
-ArmCacheType (
-  VOID
-  );
-
-ARM_CACHE_ARCHITECTURE
-EFIAPI
-ArmCacheArchitecture (
-  VOID
-  );
-
-VOID
-EFIAPI
-ArmCacheInformation (
-  OUT ARM_CACHE_INFO  *CacheInfo
-  );
-
-BOOLEAN
-EFIAPI
-ArmDataCachePresent (
-  VOID
-  );
-
-UINTN
-EFIAPI
-ArmDataCacheSize (
-  VOID
-  );
-
-UINTN
-EFIAPI
-ArmDataCacheAssociativity (
-  VOID
-  );
-
 UINTN
 EFIAPI
 ArmDataCacheLineLength (
   VOID
   );
 
-BOOLEAN
-EFIAPI
-ArmInstructionCachePresent (
-  VOID
-  );
-
-UINTN
-EFIAPI
-ArmInstructionCacheSize (
-  VOID
-  );
-
-UINTN
-EFIAPI
-ArmInstructionCacheAssociativity (
-  VOID
-  );
-
 UINTN
 EFIAPI
 ArmInstructionCacheLineLength (
+  VOID
+  );
+
+UINTN
+EFIAPI
+ArmCacheWritebackGranule (
   VOID
   );
 
@@ -243,12 +177,6 @@ ArmCleanDataCache (
 
 VOID
 EFIAPI
-ArmCleanDataCacheToPoU (
-  VOID
-  );
-
-VOID
-EFIAPI
 ArmInvalidateInstructionCache (
   VOID
   );
@@ -261,9 +189,21 @@ ArmInvalidateDataCacheEntryByMVA (
 
 VOID
 EFIAPI
-ArmCleanDataCacheEntryByMVA (
+ArmCleanDataCacheEntryToPoUByMVA (
   IN  UINTN   Address
   );
+
+VOID
+EFIAPI
+ArmInvalidateInstructionCacheEntryToPoUByMVA (
+  IN  UINTN   Address
+  );
+
+VOID
+EFIAPI
+ArmCleanDataCacheEntryByMVA (
+IN  UINTN   Address
+);
 
 VOID
 EFIAPI
@@ -425,18 +365,16 @@ ArmSetTTBR0 (
   IN  VOID  *TranslationTableBase
   );
 
+VOID
+EFIAPI
+ArmSetTTBCR (
+  IN  UINT32 Bits
+  );
+
 VOID *
 EFIAPI
 ArmGetTTBR0BaseAddress (
   VOID
-  );
-
-RETURN_STATUS
-EFIAPI
-ArmConfigureMmu (
-  IN  ARM_MEMORY_REGION_DESCRIPTOR  *MemoryTable,
-  OUT VOID                         **TranslationTableBase OPTIONAL,
-  OUT UINTN                         *TranslationTableSize  OPTIONAL
   );
 
 BOOLEAN
@@ -471,19 +409,13 @@ ArmSetHighVectors (
 
 VOID
 EFIAPI
-ArmDrainWriteBuffer (
-  VOID
-  );
-
-VOID
-EFIAPI
 ArmDataMemoryBarrier (
   VOID
   );
 
 VOID
 EFIAPI
-ArmDataSyncronizationBarrier (
+ArmDataSynchronizationBarrier (
   VOID
   );
 
@@ -620,6 +552,12 @@ ArmReadSctlr (
   VOID
   );
 
+VOID
+EFIAPI
+ArmWriteSctlr (
+  IN  UINT32   Value
+  );
+
 UINTN
 EFIAPI
 ArmReadHVBar (
@@ -661,28 +599,138 @@ ArmUnsetCpuActlrBit (
   IN  UINTN    Bits
   );
 
-RETURN_STATUS
-ArmSetMemoryRegionNoExec (
-  IN  EFI_PHYSICAL_ADDRESS      BaseAddress,
-  IN  UINT64                    Length
+//
+// Accessors for the architected generic timer registers
+//
+
+#define ARM_ARCH_TIMER_ENABLE           (1 << 0)
+#define ARM_ARCH_TIMER_IMASK            (1 << 1)
+#define ARM_ARCH_TIMER_ISTATUS          (1 << 2)
+
+UINTN
+EFIAPI
+ArmReadCntFrq (
+  VOID
   );
 
-RETURN_STATUS
-ArmClearMemoryRegionNoExec (
-  IN  EFI_PHYSICAL_ADDRESS      BaseAddress,
-  IN  UINT64                    Length
+VOID
+EFIAPI
+ArmWriteCntFrq (
+  UINTN   FreqInHz
   );
 
-RETURN_STATUS
-ArmSetMemoryRegionReadOnly (
-  IN  EFI_PHYSICAL_ADDRESS      BaseAddress,
-  IN  UINT64                    Length
+UINT64
+EFIAPI
+ArmReadCntPct (
+  VOID
   );
 
-RETURN_STATUS
-ArmClearMemoryRegionReadOnly (
-  IN  EFI_PHYSICAL_ADDRESS      BaseAddress,
-  IN  UINT64                    Length
+UINTN
+EFIAPI
+ArmReadCntkCtl (
+  VOID
+  );
+
+VOID
+EFIAPI
+ArmWriteCntkCtl (
+  UINTN   Val
+  );
+
+UINTN
+EFIAPI
+ArmReadCntpTval (
+  VOID
+  );
+
+VOID
+EFIAPI
+ArmWriteCntpTval (
+  UINTN   Val
+  );
+
+UINTN
+EFIAPI
+ArmReadCntpCtl (
+  VOID
+  );
+
+VOID
+EFIAPI
+ArmWriteCntpCtl (
+  UINTN   Val
+  );
+
+UINTN
+EFIAPI
+ArmReadCntvTval (
+  VOID
+  );
+
+VOID
+EFIAPI
+ArmWriteCntvTval (
+  UINTN   Val
+  );
+
+UINTN
+EFIAPI
+ArmReadCntvCtl (
+  VOID
+  );
+
+VOID
+EFIAPI
+ArmWriteCntvCtl (
+  UINTN   Val
+  );
+
+UINT64
+EFIAPI
+ArmReadCntvCt (
+  VOID
+  );
+
+UINT64
+EFIAPI
+ArmReadCntpCval (
+  VOID
+  );
+
+VOID
+EFIAPI
+ArmWriteCntpCval (
+  UINT64   Val
+  );
+
+UINT64
+EFIAPI
+ArmReadCntvCval (
+  VOID
+  );
+
+VOID
+EFIAPI
+ArmWriteCntvCval (
+  UINT64   Val
+  );
+
+UINT64
+EFIAPI
+ArmReadCntvOff (
+  VOID
+  );
+
+VOID
+EFIAPI
+ArmWriteCntvOff (
+  UINT64   Val
+  );
+
+UINTN
+EFIAPI
+ArmGetPhysicalAddressBits (
+  VOID
   );
 
 #endif // __ARM_LIB__

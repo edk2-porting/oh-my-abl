@@ -1,15 +1,10 @@
 /** @file
   The header files of implementation of EFI_HTTP_PROTOCOL protocol interfaces.
 
-  Copyright (c) 2015, Intel Corporation. All rights reserved.<BR>
+  Copyright (c) 2015 - 2018, Intel Corporation. All rights reserved.<BR>
+  (C) Copyright 2016 Hewlett Packard Enterprise Development LP<BR>
 
-  This program and the accompanying materials
-  are licensed and made available under the terms and conditions of the BSD License
-  which accompanies this distribution.  The full text of the license may be found at
-  http://opensource.org/licenses/bsd-license.php.
-
-  THE PROGRAM IS DISTRIBUTED UNDER THE BSD LICENSE ON AN "AS IS" BASIS,
-  WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
+  SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
 
@@ -19,15 +14,10 @@
 #define HTTP_DEFAULT_PORT        80
 #define HTTP_END_OF_HDR_STR      "\r\n\r\n"
 #define HTTP_CRLF_STR            "\r\n"
-#define HTTP_VERSION_STR         "HTTP/1.1"
+#define HTTP_VERSION_STR         HTTP_VERSION
 #define HTTP_VERSION_CRLF_STR    " HTTP/1.1\r\n"
-#define HTTP_GET_STR             "GET "
-#define HTTP_HEAD_STR            "HEAD "
-//
-// Connect method has maximum length according to EFI_HTTP_METHOD defined in
-// UEFI2.5 spec so use this.
-//
-#define HTTP_MAXIMUM_METHOD_LEN  sizeof ("CONNECT")
+#define HTTP_ERROR_OR_NOT_SUPPORT_STATUS_CODE         300
+
 
 /**
   Returns the operational parameters for the current HTTP child instance.
@@ -37,14 +27,19 @@
 
   @param[in]  This                Pointer to EFI_HTTP_PROTOCOL instance.
   @param[out] HttpConfigData      Point to buffer for operational parameters of this
-                                  HTTP instance.
+                                  HTTP instance. It is the responsibility of the caller
+                                  to allocate the memory for HttpConfigData and
+                                  HttpConfigData->AccessPoint.IPv6Node/IPv4Node. In fact,
+                                  it is recommended to allocate sufficient memory to record
+                                  IPv6Node since it is big enough for all possibilities.
 
   @retval EFI_SUCCESS             Operation succeeded.
   @retval EFI_INVALID_PARAMETER   One or more of the following conditions is TRUE:
                                   This is NULL.
                                   HttpConfigData is NULL.
-                                  HttpConfigData->AccessPoint is NULL.
-  @retval EFI_NOT_STARTED         The HTTP instance is not configured.
+                                  HttpConfigData->AccessPoint.IPv4Node or
+                                  HttpConfigData->AccessPoint.IPv6Node is NULL.
+  @retval EFI_NOT_STARTED         This EFI HTTP Protocol instance has not been started.
 
 **/
 EFI_STATUS
@@ -64,8 +59,8 @@ EfiHttpGetModeData (
   connections with remote hosts, canceling all asynchronous tokens, and flush request
   and response buffers without informing the appropriate hosts.
 
-  Except for GetModeData() and Configure(), No other EFI HTTP function can be executed
-  by this instance until the Configure() function is executed and returns successfully.
+  No other EFI HTTP function can be executed by this instance until the Configure()
+  function is executed and returns successfully.
 
   @param[in]  This                Pointer to EFI_HTTP_PROTOCOL instance.
   @param[in]  HttpConfigData      Pointer to the configure data to configure the instance.
@@ -74,9 +69,9 @@ EfiHttpGetModeData (
   @retval EFI_INVALID_PARAMETER   One or more of the following conditions is TRUE:
                                   This is NULL.
                                   HttpConfigData->LocalAddressIsIPv6 is FALSE and
-                                  HttpConfigData->IPv4Node is NULL.
+                                  HttpConfigData->AccessPoint.IPv4Node is NULL.
                                   HttpConfigData->LocalAddressIsIPv6 is TRUE and
-                                  HttpConfigData->IPv6Node is NULL.
+                                  HttpConfigData->AccessPoint.IPv6Node is NULL.
   @retval EFI_ALREADY_STARTED     Reinitialize this HTTP instance without calling
                                   Configure() with NULL to reset it.
   @retval EFI_DEVICE_ERROR        An unexpected system or network error occurred.
@@ -111,6 +106,7 @@ EfiHttpConfigure (
                                   implementation.
   @retval EFI_INVALID_PARAMETER   One or more of the following conditions is TRUE:
                                   This is NULL.
+                                  Token is NULL.
                                   Token->Message is NULL.
                                   Token->Message->Body is not NULL,
                                   Token->Message->BodyLength is non-zero, and
@@ -141,8 +137,6 @@ EfiHttpRequest (
   @retval EFI_SUCCESS             Request and Response queues are successfully flushed.
   @retval EFI_INVALID_PARAMETER   This is NULL.
   @retval EFI_NOT_STARTED         This instance hasn't been configured.
-  @retval EFI_NO_MAPPING          When using the default address, configuration (DHCP,
-                                  BOOTP, RARP, etc.) hasn't finished yet.
   @retval EFI_NOT_FOUND           The asynchronous request or response token is not
                                   found.
   @retval EFI_UNSUPPORTED         The implementation does not support this function.
@@ -156,7 +150,7 @@ EfiHttpCancel (
 
 /**
   The Response() function queues an HTTP response to this HTTP instance, similar to
-  Receive() function in the EFI TCP driver. When the HTTP request is sent successfully,
+  Receive() function in the EFI TCP driver. When the HTTP response is received successfully,
   or if there is an error, Status in token will be updated and Event will be signaled.
 
   The HTTP driver will queue a receive token to the underlying TCP instance. When data
