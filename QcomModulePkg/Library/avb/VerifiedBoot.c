@@ -81,18 +81,39 @@ typedef struct {
   AvbSlotVerifyData *SlotData;
 } VB2Data;
 
+BOOLEAN Is_VERIFIED_BOOT_2 (VOID)
+{
+  UINT32 PtnCount;
+  INT32 PtnIdx;
+  INT32 PtnIdx_a;
+  GetPartitionCount (&PtnCount);
+  PtnIdx_a = GetPartitionIndex ((CHAR16 *)L"vbmeta_a");
+
+  if (PtnIdx_a < PtnCount &&
+      PtnIdx_a != INVALID_PTN) {
+      return TRUE;
+  } else {
+      PtnIdx = GetPartitionIndex ((CHAR16 *)L"vbmeta");
+      if (PtnIdx < PtnCount &&
+      PtnIdx != INVALID_PTN) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
 UINT32
 GetAVBVersion ()
 {
+  if (Is_VERIFIED_BOOT_2 ()) {
+    return AVB_2;
+  } else {
 #if VERIFIED_BOOT_LE
   return AVB_LE;
-#elif VERIFIED_BOOT_2
-  return AVB_2;
-#elif VERIFIED_BOOT
-  return AVB_1;
 #else
   return NO_AVB;
 #endif
+  }
 }
 
 BOOLEAN

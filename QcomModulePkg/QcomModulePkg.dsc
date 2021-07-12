@@ -93,12 +93,6 @@
   GCC:*_*_*_DLINK_FLAGS = -Ttext=0x0
   GCC:*_*_*_CC_FLAGS = -DZ_SOLO
 
-  !if $(VERIFIED_BOOT)
-      GCC:*_*_*_CC_FLAGS = -DVERIFIED_BOOT
-  !endif
-  !if $(VERIFIED_BOOT_2)
-      GCC:*_*_*_CC_FLAGS = -DVERIFIED_BOOT_2
-  !endif
   !if $(VERIFIED_BOOT_LE)
       GCC:*_*_*_CC_FLAGS = -DVERIFIED_BOOT_LE
   !endif
