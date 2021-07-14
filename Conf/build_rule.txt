@@ -380,7 +380,7 @@
 	$(STATIC_LIBRARY_FILES_LIST) $(DLINK2_FLAGS)
 
     <Command.GCC>
-        "$(DLINK)" -o ${dst} $(DLINK_FLAGS) --start-group $(DLINK_SPATH) @$(STATIC_LIBRARY_FILES_LIST) --end-group $(DLINK2_FLAGS)
+        "$(DLINK)" -o ${dst} $(DLINK_FLAGS) -Wl,--start-group,$(DLINK_SPATH),@$(STATIC_LIBRARY_FILES_LIST),--end-group $(DLINK2_FLAGS)
         "$(OBJCOPY)" $(OBJCOPY_FLAGS) ${dst}
 
     <Command.RVCT>
@@ -392,11 +392,11 @@
 
  #QTI_EDK2_PATCH Start
     <Command.CLANG80WIN, Command.CLANG100WIN>
-        "$(DLINK)" -o ${dst} $(DLINK_FLAGS) --start-group $(DLINK_SPATH) @$(STATIC_LIBRARY_FILES_LIST) --end-group $(DLINK2_FLAGS)
+        "$(DLINK)" -o ${dst} $(DLINK_FLAGS) -Wl,--start-group,$(DLINK_SPATH),@$(STATIC_LIBRARY_FILES_LIST),--end-group $(DLINK2_FLAGS)
         python $(BOOTTOOLS)(+)mapparser(+)Mapit.py -c CLANG $(DEBUG_DIR)(+)$(MODULE_NAME).map > $(DEBUG_DIR)(+)$(MODULE_NAME).map.txt
 
     <Command.CLANG80LINUX, Command.CLANG100LINUX>
-        "$(DLINK)" -o ${dst} $(DLINK_FLAGS) --start-group $(DLINK_SPATH) @$(STATIC_LIBRARY_FILES_LIST) --end-group $(DLINK2_FLAGS)
+        "$(DLINK)" -o ${dst} $(DLINK_FLAGS) -Wl,--start-group,$(DLINK_SPATH),@$(STATIC_LIBRARY_FILES_LIST),--end-group $(DLINK2_FLAGS)
         python $(BOOTTOOLS)(+)mapparser(+)Mapit.py -c CLANG $(DEBUG_DIR)(+)$(MODULE_NAME).map > $(DEBUG_DIR)(+)$(MODULE_NAME).map.txt
 #QTI_EDK2_PATCH End
 
@@ -438,7 +438,7 @@
     <Command.CLANG80WIN, Command.CLANG80LINUX, Command.CLANG100WIN, Command.CLANG100LINUX>
         "$(PP)" -I $(WORKSPACE)(+)$(TARGETROOT)/Include -I $(WORKSPACE)(+)$(TARGETROOT)(+)..(+)Include  -E -x assembler-with-cpp $(WORKSPACE)(+)$(TARGETROOT)(+)..(+)Library(+)$(MODULE_NAME)Lib(+)sbl1.ld > $(BUILD_DIR)(+)$(ARCH)(+)$(MODULE_NAME)_temp.ld
         Trim --source-code -o $(BUILD_DIR)(+)$(ARCH)(+)$(MODULE_NAME).ld $(BUILD_DIR)(+)$(ARCH)(+)$(MODULE_NAME)_temp.ld
-        "$(DLINK)" -o ${dst}.dll $(DLINK_FLAGS) --start-group $(DLINK_SPATH) @$(STATIC_LIBRARY_FILES_LIST) --end-group --script=$(BUILD_DIR)(+)$(ARCH)(+)$(MODULE_NAME).ld --entry _QCModuleEntry
+        "$(DLINK)" -o ${dst}.dll $(DLINK_FLAGS) -Wl,--start-group,$(DLINK_SPATH),@$(STATIC_LIBRARY_FILES_LIST),--end-group --script=$(BUILD_DIR)(+)$(ARCH)(+)$(MODULE_NAME).ld --entry _QCModuleEntry
         python $(BOOTTOOLS)(+)mapparser(+)Mapit.py -c CLANG -r 0x0:0x100000000 ${dst}.map > ${dst}_mapit.txt
         python $(BOOTTOOLS)(+)mapparser(+)UefiMapit.py $(BUILDROOT)(+)Build
         python $(BOOTTOOLS)(+)mapparser(+)Mapit.py -c CLANG -r 0x0:0x20000000 ${dst}.map > ${dst}_mapit_bootimem_ocimem.txt
