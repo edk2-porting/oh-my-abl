@@ -35,7 +35,7 @@
 [LibraryClasses]
   PcdLib
   ReportStatusCodeLib
-  BaseMemoryLib
+  BaseMemoryLibOptDxe
   BaseLib
   DebugPrintErrorLevelLib
 
