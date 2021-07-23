@@ -326,7 +326,10 @@ flashless_boot:
     DEBUG ((EFI_D_ERROR, "VM Hyp calls not present\n"));
   }
 
-  if (!BootIntoFastboot) {
+  if (BootIntoFastboot) {
+      goto fastboot;
+  }
+  else {
     BootInfo Info = {0};
     Info.MultiSlotBoot = MultiSlotBoot;
     Info.BootIntoRecovery = BootIntoRecovery;
@@ -335,7 +338,7 @@ flashless_boot:
   #if HIBERNATION_SUPPORT
     BootIntoHibernationImage (&Info, &SetRotAndBootState);
   #endif
-    Status = LoadImageAndAuth (&Info);
+    Status = LoadImageAndAuth (&Info, FALSE);
     if (Status != EFI_SUCCESS) {
       DEBUG ((EFI_D_ERROR, "LoadImageAndAuth failed: %r\n", Status));
       goto fastboot;

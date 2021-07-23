@@ -93,10 +93,14 @@ GetAVBVersion ();
  * Also provides Verified Boot command
  * arguments (if any) in Info->VBCmdLine
  *
+ * @param[in] HibernationResume FALSE
+ * for cold boot sequence and TRUE
+ * for Hibernation Resume
+ *
  * @return EFI_STATUS
  */
 EFI_STATUS
-LoadImageAndAuth (BootInfo *Info);
+LoadImageAndAuth (BootInfo *Info, BOOLEAN HibernationResume);
 
 /**
  *  Free resources/memory allocated by
