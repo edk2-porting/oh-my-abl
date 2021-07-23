@@ -3297,7 +3297,7 @@ CmdFlashingGetUnlockAbility (CONST CHAR8 *arg, VOID *data, UINT32 sz)
 }
 #endif
 
-#if HIBERNATION_SUPPORT
+#if HIBERNATION_SUPPORT_NO_AES
 STATIC VOID
 CmdGoldenSnapshot (CONST CHAR8 *Arg, VOID *Data, UINT32 Size)
 {
@@ -3820,7 +3820,7 @@ FastbootCommandSetup (IN VOID *Base, IN UINT64 Size)
       {"oem select-display-panel", CmdOemSelectDisplayPanel},
       {"oem set-hw-fence-value", CmdOemSetHwFenceValue},
       {"oem device-info", CmdOemDevinfo},
-#if HIBERNATION_SUPPORT
+#if HIBERNATION_SUPPORT_NO_AES
       {"oem golden-snapshot", CmdGoldenSnapshot},
 #endif
       {"continue", CmdContinue},

@@ -2007,7 +2007,7 @@ BOOLEAN IsTargetAuto (VOID)
 }
 #endif
 
-#if HIBERNATION_SUPPORT
+#if HIBERNATION_SUPPORT_NO_AES
 BOOLEAN IsHibernationEnabled (VOID)
 {
   return TRUE;

@@ -60,7 +60,7 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if HIBERNATION_SUPPORT
+#if HIBERNATION_SUPPORT_NO_AES
 
 #define ___aligned(x) __attribute__((aligned(x)))
 #define ___packed __attribute__((packed))

@@ -60,7 +60,7 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
 */
-#if HIBERNATION_SUPPORT
+#if HIBERNATION_SUPPORT_NO_AES
 
 #include <Library/DeviceInfo.h>
 #include <Library/DrawUI.h>
@@ -850,6 +850,7 @@ static INT32 ReadDataPages (UINT64 *KernelPfnIndexes,
                         Offset++;
                 }
         }
+
         BootStatsSetTimeStamp (BS_KERNEL_LOAD_DONE);
 
         MBs = (NrCopyPages * PAGE_SIZE) / (1024 * 1024);
@@ -1213,7 +1214,6 @@ static VOID CopyBounceAndBootKernel ()
         printf ("Disable UEFI Boot services\n");
         printf ("Kernel entry point = 0x%lx\n", CpuResume);
         printf ("Relocation code at = 0x%lx\n", RelocateAddress);
-
         BootStatsSetTimeStamp (BS_BL_END);
 
         /* Shut down UEFI boot services */

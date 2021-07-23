@@ -87,7 +87,7 @@
 #define MAX_NUM_FS 10
 #define DEFAULT_STACK_CHK_GUARD 0xc0c0c0c0
 
-#if HIBERNATION_SUPPORT
+#if HIBERNATION_SUPPORT_NO_AES
 VOID BootIntoHibernationImage (BootInfo *Info, BOOLEAN *SetRotAndBootState);
 #endif
 
@@ -333,7 +333,7 @@ flashless_boot:
     Info.BootIntoRecovery = BootIntoRecovery;
     Info.BootReasonAlarm = BootReasonAlarm;
     Info.FlashlessBoot = FlashlessBoot;
-  #if HIBERNATION_SUPPORT
+  #if HIBERNATION_SUPPORT_NO_AES
     BootIntoHibernationImage (&Info, &SetRotAndBootState);
   #endif
     Status = LoadImageAndAuth (&Info, FALSE, SetRotAndBootState);
