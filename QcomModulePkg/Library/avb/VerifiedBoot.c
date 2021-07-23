@@ -710,7 +710,12 @@ LoadImageNoAuthWrapper (BootInfo *Info)
 
    if (!IsDynamicPartitionSupport () &&
         !IsRootCmdLineUpdated (Info)) {
-    SystemPathLen = GetSystemPath (&SystemPath, Info);
+    SystemPathLen = GetSystemPath (&SystemPath,
+                                   Info->MultiSlotBoot,
+                                   Info->BootIntoRecovery,
+                                   (CHAR16 *)L"system",
+                                   (CHAR8 *)"root",
+                                   Info->FlashlessBoot);
     if (SystemPathLen == 0 || SystemPath == NULL) {
       DEBUG ((EFI_D_ERROR, "GetSystemPath failed!\n"));
       return EFI_LOAD_ERROR;
@@ -773,7 +778,12 @@ LoadImageAndAuthVB1 (BootInfo *Info)
   }
 
   if (!IsRootCmdLineUpdated (Info)) {
-    SystemPathLen = GetSystemPath (&SystemPath, Info);
+    SystemPathLen = GetSystemPath (&SystemPath,
+                                   Info->MultiSlotBoot,
+                                   Info->BootIntoRecovery,
+                                   (CHAR16 *)L"system",
+                                   (CHAR8 *)"root",
+                                   Info->FlashlessBoot);
     if (SystemPathLen == 0 || SystemPath == NULL) {
       DEBUG ((EFI_D_ERROR, "GetSystemPath failed!\n"));
       return EFI_LOAD_ERROR;
@@ -1874,12 +1884,17 @@ set_rot:
 
 skip_verification:
     if (!IsRootCmdLineUpdated (Info)) {
-      SystemPathLen = GetSystemPath (&SystemPath, Info);
-      if (SystemPathLen == 0 ||
-          SystemPath == NULL) {
-          return EFI_LOAD_ERROR;
-      }
-      GUARD (AppendVBCmdLine (Info, SystemPath));
+        SystemPathLen = GetSystemPath (&SystemPath,
+                                       Info->MultiSlotBoot,
+                                       Info->BootIntoRecovery,
+                                       (CHAR16 *)L"system",
+                                       (CHAR8 *)"root",
+                                       Info->FlashlessBoot);
+        if (SystemPathLen == 0 ||
+            SystemPath == NULL) {
+            return EFI_LOAD_ERROR;
+        }
+        GUARD (AppendVBCmdLine (Info, SystemPath));
     }
     return Status;
 }
