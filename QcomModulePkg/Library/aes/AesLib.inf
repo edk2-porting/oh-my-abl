@@ -1,0 +1,62 @@
+[Defines]
+	INF_VERSION                    = 0x00010005
+	BASE_NAME                      = AesLib
+	FILE_GUID                      = 4290415d-a219-41c2-8c00-31382eeb1d86
+	MODULE_TYPE                    = BASE
+	VERSION_STRING                 = 1.0
+	LIBRARY_CLASS                  = AesLib
+
+[BuildOptions]
+	GCC:*_*_*_CC_FLAGS = -DOPENSSL_CPUID_OBJ -DOPENSSL_SMALL_FOOTPRINT -DARM_COMPILE
+	GCC:*_*_*_CC_FLAGS = $(LLVM_ENABLE_SAFESTACK) $(LLVM_SAFESTACK_USE_PTR) $(LLVM_SAFESTACK_COLORING)
+
+[BuildOptions.AARCH64]
+	GCC:*_*_*_CC_FLAGS = $(SDLLVM_COMPILE_ANALYZE) $(SDLLVM_ANALYZE_REPORT)
+
+[Sources]
+  aes_gcm_armv8.c
+  gcm128.c
+  utils.c
+  ghashv8-armx.S | GCC
+  aes-64.S       | GCC
+
+[Packages]
+	ArmPkg/ArmPkg.dec
+	MdePkg/MdePkg.dec
+	EmbeddedPkg/EmbeddedPkg.dec
+	ArmPlatformPkg/ArmPlatformPkg.dec
+	MdeModulePkg/MdeModulePkg.dec
+	QcomModulePkg/QcomModulePkg.dec
+
+[LibraryClasses]
+	DxeServicesTableLib
+	UefiLib
+	ArmLib
+	BaseLib
+	DebugLib
+	DevicePathLib
+	DebugPrintErrorLevelLib
+	FdtLib
+
+
+[Guids]
+	gEfiVbmetaPartitionGuid
+	gEfiBootImgPartitionGuid
+	gEfiDtboPartitionGuid
+	gEfiRecoveryImgPartitionGuid
+
+[Protocols]
+	gQcomQseecomProtocolGuid
+	gEfiPartitionRecordGuid
+	gEfiHash2ProtocolGuid
+	gEfiHashAlgorithmSha256Guid
+	gEfiQcomASN1X509ProtocolGuid
+	gEfiQcomSecRSAProtocolGuid
+
+[FixedPcd]
+	gQcomTokenSpaceGuid.EnableMdtpSupport
+	gQcomTokenSpaceGuid.AllowEio
+
+[Depex]
+	TRUE
+
