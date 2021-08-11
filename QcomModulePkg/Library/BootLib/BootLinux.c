@@ -123,7 +123,8 @@ UpdateBootParams (BootParamlist *BootParamlistPtr)
     } else {
       Kptr = (Kernel64Hdr *) (BootParamlistPtr->ImageBuffer +
                                 BootParamlistPtr->PageSize);
-      if (Kptr->ImageSize) {
+      if (!BootParamlistPtr->BootingWithGzipPkgKernel &&
+          Kptr->ImageSize) {
           BootParamlistPtr->KernelLoadAddr += Kptr->TextOffset;
       } else {
         BootParamlistPtr->KernelLoadAddr += KERNEL_64BIT_LOAD_OFFSET;
