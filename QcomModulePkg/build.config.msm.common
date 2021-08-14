@@ -1,0 +1,10 @@
+################################################################################
+## Inheriting configs from ACK
+. ${ROOT_DIR}/common/build.config.common
+
+PREBUILT_PYTHON_PATH=prebuilts/build-tools/path/linux-x86/python3
+
+USER_BUILD_VARIANT=0
+if [ "${TARGET_BUILD_VARIANT}" = "user" ]; then
+  USER_BUILD_VARIANT=1
+fi
