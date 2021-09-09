@@ -880,6 +880,44 @@ AddDDrRegion (VOID *Fdt)
   return EFI_SUCCESS;
 }
 
+UINT8 GetDDRNumRank ()
+{
+  struct ddr_regions_data_info *DdrRegionsDataInfo = NULL;
+  UINT8 NumRank = 0;
+  EFI_STATUS Status;
+
+  /* Get DDR regions info and NumRank*/
+  DdrRegionsDataInfo = AllocateZeroPool (sizeof (struct ddr_regions_data_info));
+  if (DdrRegionsDataInfo == NULL) {
+    DEBUG ((EFI_D_ERROR, "DDR regions Buffer: Out of resources\n"));
+    return DDR_MAX_RANKS;
+  }
+
+  Status = GetDDrRegionsInfo (DdrRegionsDataInfo);
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_INFO,
+            "Failed to update DDR regions info\n"));
+    NumRank = DDR_MAX_RANKS;
+    goto Out;
+  } else {
+    if (DdrRegionsDataInfo->ddr_rank0_size > 0) {
+      NumRank ++;
+    }
+
+    if (DdrRegionsDataInfo->ddr_rank1_size > 0) {
+      NumRank ++;
+    }
+  }
+
+Out:
+  if (DdrRegionsDataInfo) {
+    FreePool (DdrRegionsDataInfo);
+  }
+  DdrRegionsDataInfo = NULL;
+
+  return NumRank;
+}
+
 /* Top level function that updates the device tree. */
 EFI_STATUS
 UpdateDeviceTree (VOID *fdt,
@@ -900,6 +938,7 @@ UpdateDeviceTree (VOID *fdt,
   struct ddr_details_entry_info *DdrInfo;
   EFI_STATUS Status;
   EFI_RAMPARTITION_PROTOCOL *EfiRamPartProt;
+  UINT8 NumRank = 0;
   UINT32 Hbb;
   UINT64 UpdateDTStartTime = GetTimerCountms ();
   UINT32 Index;
@@ -976,15 +1015,14 @@ UpdateDeviceTree (VOID *fdt,
       goto OutofUpdateRankChannel;
     }
 
-    DEBUG ((EFI_D_VERBOSE, "DdrInfo->num_channels:%d\n",
-            DdrInfo->num_channels));
+    NumRank = GetDDRNumRank ();
+    DEBUG ((EFI_D_VERBOSE, "DdrInfo->num_channels:%d, NumRank:%d\n",
+            DdrInfo->num_channels, NumRank));
     for (UINT8 Chan = 0; Chan < DdrInfo->num_channels; Chan++) {
-      DEBUG ((EFI_D_VERBOSE, "ddr_device_rank_ch%d:%d\n",
-              Chan, DDR_MAX_RANKS));
       AsciiSPrint (FdtRankProp, sizeof (FdtRankProp),
                    "ddr_device_rank_ch%d", Chan);
       FdtPropUpdateFunc (fdt, offset, (CONST char *)FdtRankProp,
-                         DDR_MAX_RANKS, fdt_appendprop_u32, ret);
+                         NumRank, fdt_appendprop_u32, ret);
       if (ret) {
         DEBUG ((EFI_D_ERROR,
                 "ERROR: Cannot update memory node ddr_device_rank_ch%d:0x%x\n",
@@ -993,7 +1031,7 @@ UpdateDeviceTree (VOID *fdt,
         DEBUG ((EFI_D_VERBOSE, "ddr_device_rank_ch%d added to memory node\n",
                 Chan));
       }
-      for (UINT8 Rank = 0; Rank < DDR_MAX_RANKS; Rank++) {
+      for (UINT8 Rank = 0; Rank < NumRank; Rank++) {
         DEBUG ((EFI_D_VERBOSE, "ddr_device_hbb_ch%d_rank%d:%d\n",
                 Chan, Rank, Hbb));
         AsciiSPrint (FdtHbbProp, sizeof (FdtHbbProp),
