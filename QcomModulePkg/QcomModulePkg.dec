@@ -163,3 +163,4 @@
   gQcomTokenSpaceGuid.EnableNewNodeSearchFuc|TRUE|BOOLEAN|0x0001500B
   gQcomTokenSpaceGuid.EnableMultiThreadFlash|TRUE|BOOLEAN|0x0001500C
   gQcomTokenSpaceGuid.EnableDdrRegion|TRUE|BOOLEAN|0x0001500D
+  gQcomTokenSpaceGuid.EnableUpdateRankChannel|FALSE|BOOLEAN|0x0001500E

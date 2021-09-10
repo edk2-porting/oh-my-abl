@@ -999,6 +999,11 @@ UpdateDeviceTree (VOID *fdt,
       DEBUG ((EFI_D_VERBOSE, "ddr_device_type is added to memory node\n"));
     }
 
+    if (!FixedPcdGetBool (EnableUpdateRankChannel)) {
+      DEBUG ((EFI_D_VERBOSE, "DDR rank is not enabled\n"));
+      goto OutofUpdateRankChannel;
+    }
+
     Status = gBS->LocateProtocol (&gEfiRamPartitionProtocolGuid, NULL,
                     (VOID **)&EfiRamPartProt);
 
