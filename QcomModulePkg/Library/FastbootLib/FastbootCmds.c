@@ -979,11 +979,11 @@ HandleSparseImgFlash (IN CHAR16 *PartitionName,
   DEBUG ((EFI_D_INFO, "Wrote %d blocks, expected to write %d blocks\n",
             SparseImgData.TotalBlocks, sparse_header->total_blks));
 
-  if (SparseImgData.TotalBlocks != sparse_header->total_blks) {
+  if (SparseImgData.TotalBlocks != sparse_header->total_blks ||
+          ((SparseImgData.BlockIo)->FlushBlocks (SparseImgData.BlockIo))) {
     DEBUG ((EFI_D_ERROR, "Sparse Image Write Failure\n"));
     Status = EFI_VOLUME_CORRUPTED;
   }
-
   return Status;
 }
 
@@ -1076,7 +1076,8 @@ HandleRawImgFlash (IN CHAR16 *PartitionName,
   }
 
   Status = WriteBlockToPartition (BlockIo, Handle, 0, Size, Image);
-  if (EFI_ERROR (Status)) {
+  if (EFI_ERROR (Status) ||
+      (BlockIo->FlushBlocks (BlockIo))) {
     DEBUG ((EFI_D_ERROR, "Writing Block to partition Failure\n"));
   }
 
