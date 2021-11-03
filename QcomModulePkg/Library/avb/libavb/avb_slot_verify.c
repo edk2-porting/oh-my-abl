@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-/* Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -59,6 +59,7 @@
 #include "avb_util.h"
 #include "avb_vbmeta_image.h"
 #include "avb_version.h"
+#include <Library/BaseLib.h>
 
 /* Maximum allow length (in bytes) of a partition name, including
  * ab_suffix.
@@ -169,7 +170,14 @@ static AvbSlotVerifyResult load_and_verify_hash_partition(
    */
   image_size = hash_desc.image_size;
   if (allow_verification_error) {
-    io_ret = ops->get_size_of_partition (ops, part_name, &image_size);
+    if (!AsciiStrnCmp (part_name, "boot", AsciiStrLen ("boot")) ||
+      !AsciiStrnCmp (part_name, "recovery", AsciiStrLen ("recovery")) ||
+      !AsciiStrnCmp (part_name, "vendor_boot", AsciiStrLen ("vendor_boot"))) {
+      io_ret = ops->get_actual_size_of_boot_image (ops, part_name, &image_size);
+    } else {
+      io_ret = ops->get_size_of_partition (ops, part_name, &image_size);
+    }
+
     if (io_ret == AVB_IO_RESULT_ERROR_OOM) {
       ret = AVB_SLOT_VERIFY_RESULT_ERROR_OOM;
       goto out;
