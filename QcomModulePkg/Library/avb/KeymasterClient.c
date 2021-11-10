@@ -125,6 +125,7 @@ typedef enum {
   KEYMASTER_PROVISION_ATTEST_KEY = (KEYMASTER_UTILS_CMD_ID + 9UL),
   KEYMASTER_SET_VBH = (KEYMASTER_UTILS_CMD_ID + 17UL),
   KEYMASTER_GET_DATE_SUPPORT = (KEYMASTER_UTILS_CMD_ID + 21UL),
+  KEYMASTER_FBE_SET_SEED = (KEYMASTER_UTILS_CMD_ID + 24UL),
 
   KEYMASTER_LAST_CMD_ENTRY = (int)0xFFFFFFFFULL
 } KeyMasterCmd;
@@ -194,6 +195,14 @@ typedef struct {
 typedef struct {
   INT32 Status;
 } __attribute__ ((packed)) KMGetDateSupportRsp;
+
+typedef struct {
+  UINT32 CmdId;
+} __attribute__ ((packed)) KMFbeSetSeedReq;
+
+typedef struct {
+  INT32 Status;
+} __attribute__ ((packed)) KMFbeSetSeedRsp;
 
 EFI_STATUS
 KeyMasterStartApp (KMHandle *Handle)
@@ -485,5 +494,28 @@ KeyMasterSetRotForLE (KMRotAndBootStateForLE *BootState)
   }
 
   DEBUG ((EFI_D_INFO, "KeyMasterSetRotForLE success\n"));
+  return Status;
+}
+
+EFI_STATUS KeyMasterFbeSetSeed (VOID)
+{
+  EFI_STATUS Status = EFI_SUCCESS;
+  KMFbeSetSeedReq Req = {0};
+  KMFbeSetSeedRsp Rsp = {0};
+  KMHandle Handle = {NULL};
+
+  GUARD (KeyMasterStartApp (&Handle));
+  Req.CmdId = KEYMASTER_FBE_SET_SEED;
+  Status = Handle.QseeComProtocol->QseecomSendCmd (
+      Handle.QseeComProtocol, Handle.AppId, (UINT8 *)&Req, sizeof (Req),
+      (UINT8 *)&Rsp, sizeof (Rsp));
+  if (Status != EFI_SUCCESS ||
+                Rsp.Status != 0 ) {
+    DEBUG ((EFI_D_ERROR, "Keymaster: fbe set seed error, status: "
+                         "%d, response status: %d\n",
+            Status, Rsp.Status));
+    return EFI_LOAD_ERROR;
+  }
+
   return Status;
 }
