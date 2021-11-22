@@ -103,6 +103,11 @@ function SetupEnv()
     echo the EDK2 BuildEnv script.
     return 1
   fi
+
+  if [ -d "$TARGET_EDK_TOOLS_BIN" ]
+  then
+    export PATH=$TARGET_EDK_TOOLS_BIN:$PATH
+  fi
 }
 
 function SetupPython3()

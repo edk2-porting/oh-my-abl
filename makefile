@@ -1,7 +1,7 @@
 UEFI_TOP_DIR := .
 
 ifndef $(BOOTLOADER_OUT)
-	BOOTLOADER_OUT := .
+	BOOTLOADER_OUT := $(shell pwd)
 endif
 export $(BOOTLOADER_OUT)
 
@@ -32,6 +32,23 @@ EDK_TOOLS_BIN := $(EDK_TOOLS)/Source/C/bin
 ABL_FV_IMG := $(BUILD_ROOT)/FV/abl.fv
 ABL_FV_ELF := $(BOOTLOADER_OUT)/../../unsigned_abl.elf
 SHELL:=/bin/bash
+
+EDK_TOOLS_SRC_FILE := $(shell find $(EDK_TOOLS) -name "*" -type f)
+EDK_TOOLS_PATH_MARK_FILE := $(ANDROID_PRODUCT_OUT)/BaseTools_Mark
+EDK_TOOLS_GENERATE_CLEAN := $(ANDROID_PRODUCT_OUT)/BaseTools_Clean
+export TARGET_EDK_TOOLS_BIN := $(ANDROID_PRODUCT_OUT)/Source/C/bin
+
+define edk_tools_generate
+  mkdir -p $(ANDROID_PRODUCT_OUT)/Scripts
+  cp -rf $(EDK_TOOLS)/Scripts/GccBase.lds $(ANDROID_PRODUCT_OUT)/Scripts
+
+  (. ./edksetup.sh BaseTools && \
+  $(MAKEPATH)make -C $(EDK_TOOLS) $(PREBUILT_HOST_TOOLS) -j1)
+
+  mkdir -p $(TARGET_EDK_TOOLS_BIN)
+  cp -rf $(EDK_TOOLS_BIN)/* $(TARGET_EDK_TOOLS_BIN)
+  touch $(EDK_TOOLS_PATH_MARK_FILE)
+endef
 
 # This function is to check version compatibility, used to control features based on the compiler version. \
 Arguments should be return value, current version and supported version in order. \
@@ -120,12 +137,12 @@ cleanall:
 	@. ./edksetup.sh BaseTools && \
 	build -p $(WORKSPACE)/QcomModulePkg/QcomModulePkg.dsc -a $(ARCHITECTURE) -t $(TARGET_TOOLS) -b $(TARGET) -j build_modulepkg.log cleanall
 	rm -rf $(WORKSPACE)/QcomModulePkg/Bin64
+	rm -rf $(TARGET_EDK_TOOLS_BIN)
 
-EDK_TOOLS_BIN:
-	@. ./edksetup.sh BaseTools && \
-	$(MAKEPATH)make -C $(EDK_TOOLS) $(PREBUILT_HOST_TOOLS) -j1
+$(EDK_TOOLS_PATH_MARK_FILE): $(EDK_TOOLS_SRC_FILE)
+	@$(call edk_tools_generate)
 
-ABL_FV_IMG: EDK_TOOLS_BIN
+ABL_FV_IMG: $(EDK_TOOLS_PATH_MARK_FILE)
 	@. ./edksetup.sh BaseTools && \
 	build -p $(WORKSPACE)/QcomModulePkg/QcomModulePkg.dsc \
 	-a $(ARCHITECTURE) \
@@ -148,9 +165,12 @@ ABL_FV_IMG: EDK_TOOLS_BIN
 
 	cp $(BUILD_ROOT)/FV/FVMAIN_COMPACT.Fv $(ABL_FV_IMG)
 
-BASETOOLS_CLEAN: ABL_FV_IMG
-	@rm -rf $(BUILDDIR)/Conf/BuildEnv.sh && \
-	$(MAKEPATH)make -C $(BUILDDIR)/BaseTools/Source/C clean > /dev/null
+$(EDK_TOOLS_GENERATE_CLEAN): $(EDK_TOOLS_PATH_MARK_FILE)
+	@$(MAKEPATH)make -C $(BUILDDIR)/BaseTools/Source/C clean > /dev/null
+	touch $(EDK_TOOLS_GENERATE_CLEAN)
 
-ABL_FV_ELF: BASETOOLS_CLEAN
+BASETOOLS_CLEAN: ABL_FV_IMG
+	@rm -rf $(BUILDDIR)/Conf/BuildEnv.sh
+
+ABL_FV_ELF: BASETOOLS_CLEAN $(EDK_TOOLS_GENERATE_CLEAN)
 	python3 $(WORKSPACE)/QcomModulePkg/Tools/image_header.py $(ABL_FV_IMG) $(ABL_FV_ELF) $(LOAD_ADDRESS) elf 32 nohash
