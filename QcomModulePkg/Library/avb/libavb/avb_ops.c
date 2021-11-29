@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-/* Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -48,10 +48,41 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ */
+
+/*
+ * Changes from Qualcomm Innovation Center are provided under the following
+ * license:
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted (subject to the limitations in the disclaimer
+ * below) provided that the following conditions are met:
+ *  * Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided ?with the distribution.
+ *  * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+ *     contributors may be used to endorse or promote products derived from this
+ *     software without specific prior written permission.
+ *
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED
+ * BY THIS LICENSE.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #include "Board.h"
-#include "BootImage.h"
 #include "BootLinux.h"
 #include "LinuxLoaderLib.h"
 #include "OEMPublicKey.h"
@@ -63,16 +94,6 @@
 #include <Library/DebugLib.h>
 #include <Library/MemoryAllocationLib.h>
 #include <Uefi.h>
-
-#define ADD_TO_SIZE(OutSizeNumBytes, PageSize, tmp_size) do { \
-	OutSizeNumBytes = ADD_OF (OutSizeNumBytes, \
-														ROUND_TO_PAGE (tmp_size, PageSize - 1)); \
-	if (!OutSizeNumBytes) { \
-		DEBUG ((EFI_D_ERROR, \
-		"Integer Overflow: OutSizeNumBytes=%u, tmp_size=%u\n", \
-		OutSizeNumBytes, ROUND_TO_PAGE (tmp_size, PageSize - 1))); \
-		return AVB_IO_RESULT_ERROR_OOM; } \
-	} while(0)
 
 STATIC AvbIOResult GetHandleInfo(const char *Partition, HandleInfo *HandleInfo)
 {
@@ -584,146 +605,6 @@ AvbIOResult AvbGetUniqueGuidForPartition(AvbOps *Ops, const char *PartitionName,
 	return AVB_IO_RESULT_ERROR_NO_SUCH_PARTITION;
 }
 
-AvbIOResult AvbGetActualSizeOfBootImage(AvbOps *Ops,
-				const char *PARTITION, uint64_t *OutSizeNumBytes)
-{
-	AvbIOResult Result = AVB_IO_RESULT_OK;
-	HandleInfo HandleInfoList[1];
-	EFI_BLOCK_IO_PROTOCOL *BlockIo = NULL;
-	EFI_STATUS Status = EFI_SUCCESS;
-	UINT32 PageSize = 0;
-	VOID *ImageHdrBuffer = NULL;
-	UINT32 ImageHdrSize = 0;
-	CHAR16 PartitionName[MAX_GPT_NAME_SIZE];
-
-	// Boot Image header information variables
-	UINT32 HeaderVersion = 0;
-	UINT32 HeaderSize = 0;
-
-	if (Ops == NULL || PARTITION == NULL || OutSizeNumBytes == NULL) {
-		DEBUG((EFI_D_ERROR, "AvbGetSizeOfPartition invalid parameter pointers\n"));
-		return AVB_IO_RESULT_ERROR_IO;
-	}
-
-	Result = GetHandleInfo(PARTITION, HandleInfoList);
-	if (Result != AVB_IO_RESULT_OK) {
-		DEBUG((EFI_D_ERROR, "AvbGetSizeOfImage: GetHandleInfo failed"));
-		return Result;
-	}
-
-	*OutSizeNumBytes = 0;
-	BlockIo = HandleInfoList[0].BlkIo;
-	PageSize = BlockIo->Media->BlockSize;
-
-	AsciiStrToUnicodeStr (PARTITION, PartitionName);
-	Status = LoadImageHeader (PartitionName, &ImageHdrBuffer, &ImageHdrSize);
-	if (Status != EFI_SUCCESS ||
-			ImageHdrBuffer ==  NULL ||
-			ImageHdrSize < sizeof (boot_img_hdr)) {
-		DEBUG ((EFI_D_ERROR, "ERROR: Failed to load image header: %r\n", Status));
-		goto Out;
-	}
-
-	if (CompareMem ((VOID *)((boot_img_hdr *)(ImageHdrBuffer))->magic,
-					BOOT_MAGIC, BOOT_MAGIC_SIZE) == 0) {
-		HeaderVersion = ((boot_img_hdr *)(ImageHdrBuffer))->header_version;
-	} else if (CompareMem ((VOID *)((vendor_boot_img_hdr_v3 *)
-					(ImageHdrBuffer))->magic,
-					VENDOR_BOOT_MAGIC,VENDOR_BOOT_MAGIC_SIZE) == 0) {
-		HeaderVersion =
-				((vendor_boot_img_hdr_v3 *)(ImageHdrBuffer))->header_version;
-	} else {
-		DEBUG ((EFI_D_ERROR, "Invalid boot image header\n"));
-		goto Out;
-	}
-
-	if (HeaderVersion < BOOT_HEADER_VERSION_THREE) {
-		PageSize = ((boot_img_hdr *)(ImageHdrBuffer))->page_size;
-		HeaderSize = PageSize;
-
-		ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((boot_img_hdr *)(ImageHdrBuffer))->kernel_size);
-		ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((boot_img_hdr *)(ImageHdrBuffer))->ramdisk_size);
-		ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((boot_img_hdr *)(ImageHdrBuffer))->second_size);
-
-		if (HeaderVersion != BOOT_HEADER_VERSION_ZERO) {
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-						((struct boot_img_hdr_v1 *)(ImageHdrBuffer))->recovery_dtbo_size);
-			HeaderSize = ((struct boot_img_hdr_v1 *)(ImageHdrBuffer))->header_size;
-		}
-
-		ADD_TO_SIZE(*OutSizeNumBytes, PageSize, HeaderSize);
-
-		if (HeaderVersion == BOOT_HEADER_VERSION_TWO) {
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-								((struct boot_img_hdr_v2 *)(ImageHdrBuffer))->dtb_size);
-		}
-	} else if (HeaderVersion == BOOT_HEADER_VERSION_THREE) {
-		if (!AsciiStrnCmp (PARTITION, "boot", AsciiStrLen ("boot")) ||
-				!AsciiStrnCmp (PARTITION, "recovery", AsciiStrLen ("recovery"))) {
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((boot_img_hdr_v3 *)(ImageHdrBuffer))->header_size);
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((boot_img_hdr_v3 *)(ImageHdrBuffer))->kernel_size);
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((boot_img_hdr_v3 *)(ImageHdrBuffer))->ramdisk_size);
-		} else if (!AsciiStrnCmp (PARTITION, "vendor_boot",
-								AsciiStrLen ("vendor_boot"))) {
-			PageSize = ((vendor_boot_img_hdr_v3 *)(ImageHdrBuffer))->page_size;
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-						((vendor_boot_img_hdr_v3 *)(ImageHdrBuffer))->header_size);
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-						((vendor_boot_img_hdr_v3 *)(ImageHdrBuffer))->vendor_ramdisk_size);
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-						((vendor_boot_img_hdr_v3 *)(ImageHdrBuffer))->dtb_size);
-		}
-	} else if (HeaderVersion == BOOT_HEADER_VERSION_FOUR) {
-		if (!AsciiStrnCmp (PARTITION, "boot", AsciiStrLen ("boot")) ||
-				!AsciiStrnCmp (PARTITION, "recovery", AsciiStrLen ("recovery"))) {
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((boot_img_hdr_v4 *)(ImageHdrBuffer))->header_size);
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((boot_img_hdr_v4 *)(ImageHdrBuffer))->kernel_size);
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((boot_img_hdr_v4 *)(ImageHdrBuffer))->ramdisk_size);
-
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((boot_img_hdr_v4 *)(ImageHdrBuffer))->signature_size);
-		} else  if (!AsciiStrnCmp (PARTITION, "vendor_boot",
-								AsciiStrLen ("vendor_boot"))) {
-			PageSize = ((vendor_boot_img_hdr_v4 *)(ImageHdrBuffer))->page_size;
-
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((vendor_boot_img_hdr_v4 *)(ImageHdrBuffer))->header_size);
-
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((vendor_boot_img_hdr_v4 *)
-							(ImageHdrBuffer))->vendor_ramdisk_size);
-
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((vendor_boot_img_hdr_v4 *)
-							(ImageHdrBuffer))->VendorRamdiskTableSize);
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((vendor_boot_img_hdr_v4 *)
-							(ImageHdrBuffer))->VendorRamdiskTableEntrySize);
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((vendor_boot_img_hdr_v4 *)
-							(ImageHdrBuffer))->VendorBootconfigSize);
-			ADD_TO_SIZE(*OutSizeNumBytes, PageSize,
-							((vendor_boot_img_hdr_v4 *)(ImageHdrBuffer))->dtb_size);
-		}
-	}
-
-Out:
-	if (*OutSizeNumBytes == 0) {
-		return AVB_IO_RESULT_ERROR_RANGE_OUTSIDE_PARTITION;
-	} else {
-		return AVB_IO_RESULT_OK;
-	}
-}
-
 AvbIOResult AvbGetSizeOfPartition(AvbOps *Ops, const char *Partition, uint64_t *OutSizeNumBytes)
 {
 	AvbIOResult Result = AVB_IO_RESULT_OK;
@@ -744,42 +625,114 @@ AvbIOResult AvbGetSizeOfPartition(AvbOps *Ops, const char *Partition, uint64_t *
 	}
 
 	BlockIo = HandleInfoList[0].BlkIo;
-    *OutSizeNumBytes = GetPartitionSize (BlockIo);
-    if (*OutSizeNumBytes == 0) {
-      return AVB_IO_RESULT_ERROR_RANGE_OUTSIDE_PARTITION;
-    }
+ *OutSizeNumBytes = GetPartitionSize (BlockIo);
+ if (*OutSizeNumBytes == 0) {
+   return AVB_IO_RESULT_ERROR_RANGE_OUTSIDE_PARTITION;
+ }
 
-	return AVB_IO_RESULT_OK;
+ return AVB_IO_RESULT_OK;
 }
+
+
+AvbIOResult AvbReadPersistentValue (AvbOps     *ops,
+                                    const char *name,
+                                    size_t      buffer_size,
+                                    uint8_t    *out_buffer,
+                                    size_t     *out_num_bytes_read)
+{
+   EFI_STATUS  Status;
+
+   if ( name == NULL ||
+       out_num_bytes_read == NULL ||
+       ( out_buffer == NULL && buffer_size != 0 ) ) {
+      return AVB_IO_RESULT_ERROR_IO;
+   }
+
+  *out_num_bytes_read = buffer_size;
+   Status = ReadPersistentValue ( (const uint8_t *)name, AsciiStrLen(name),
+                                   out_buffer, out_num_bytes_read );
+
+   DEBUG ((EFI_D_ERROR, "ReadPersistentValue 0x%x \n", Status ));
+
+   switch ( Status )
+   {
+      case EFI_SUCCESS:
+           return AVB_IO_RESULT_OK;
+
+      case EFI_NOT_FOUND:
+           return  AVB_IO_RESULT_ERROR_NO_SUCH_VALUE;
+
+      case EFI_BUFFER_TOO_SMALL:
+           return AVB_IO_RESULT_ERROR_INSUFFICIENT_SPACE;
+
+      default:
+           return  AVB_IO_RESULT_ERROR_IO;
+   }
+}
+
+
+AvbIOResult AvbWritePersistentValue (AvbOps        *ops,
+                                     const char    *name,
+                                     size_t         value_size,
+                                     const uint8_t *value)
+{
+   EFI_STATUS  Status;
+
+   if ( name == NULL ) {
+      return AVB_IO_RESULT_ERROR_IO;
+   }
+
+   Status = WritePersistentValue ( (const uint8_t *)name, AsciiStrLen(name),
+                                    value, value_size);
+
+   DEBUG ((EFI_D_ERROR, "WritePersistentValue 0x%x \n", Status ));
+
+   switch ( Status )
+   {
+      case EFI_SUCCESS:
+           return AVB_IO_RESULT_OK;
+
+      case EFI_UNSUPPORTED:
+           return  AVB_IO_RESULT_ERROR_NO_SUCH_VALUE;
+
+      case EFI_BAD_BUFFER_SIZE:
+           return AVB_IO_RESULT_ERROR_INVALID_VALUE_SIZE;
+
+      default:
+           return  AVB_IO_RESULT_ERROR_IO;
+   }
+}
+
 
 AvbOps *AvbOpsNew(VOID *UserData)
 {
-	AvbOps *Ops = avb_calloc(sizeof(AvbOps));
+  AvbOps *Ops = avb_calloc(sizeof(AvbOps));
 
-	if (Ops == NULL) {
-		DEBUG((EFI_D_ERROR, "Error allocating memory for AvbOps.\n"));
-		goto out;
-	}
+  if (Ops == NULL) {
+    DEBUG((EFI_D_ERROR, "Error allocating memory for AvbOps.\n"));
+    goto out;
+  }
 
-	Ops->user_data = UserData;
-	Ops->read_from_partition = AvbReadFromPartition;
-	Ops->write_to_partition = AvbWriteToPartition;
-	Ops->validate_vbmeta_public_key = AvbValidateVbmetaPublicKey;
-	Ops->validate_public_key_for_partition = AvbValidatePartitionPublicKey;
-	Ops->read_rollback_index = AvbReadRollbackIndex;
-	Ops->write_rollback_index = AvbWriteRollbackIndex;
-	Ops->read_is_device_unlocked = AvbReadIsDeviceUnlocked;
-	Ops->get_unique_guid_for_partition = AvbGetUniqueGuidForPartition;
-	Ops->get_size_of_partition = AvbGetSizeOfPartition;
-	Ops->get_actual_size_of_boot_image = AvbGetActualSizeOfBootImage;
+  Ops->user_data = UserData;
+  Ops->read_from_partition = AvbReadFromPartition;
+  Ops->write_to_partition = AvbWriteToPartition;
+  Ops->validate_vbmeta_public_key = AvbValidateVbmetaPublicKey;
+  Ops->validate_public_key_for_partition = AvbValidatePartitionPublicKey;
+  Ops->read_rollback_index = AvbReadRollbackIndex;
+  Ops->write_rollback_index = AvbWriteRollbackIndex;
+  Ops->read_is_device_unlocked = AvbReadIsDeviceUnlocked;
+  Ops->get_unique_guid_for_partition = AvbGetUniqueGuidForPartition;
+  Ops->get_size_of_partition = AvbGetSizeOfPartition;
+  Ops->read_persistent_value = AvbReadPersistentValue;
+  Ops->write_persistent_value = AvbWritePersistentValue;
 
 out:
-	return Ops;
+  return Ops;
 }
 
 VOID AvbOpsFree(AvbOps *Ops)
 {
-	if (Ops != NULL) {
-		avb_free(Ops);
-	}
+  if (Ops != NULL) {
+    avb_free (Ops);
+  }
 }

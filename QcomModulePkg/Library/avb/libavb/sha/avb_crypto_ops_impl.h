@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -22,38 +22,50 @@
  * SOFTWARE.
  */
 
-#if !defined(AVB_INSIDE_LIBAVB_H) && !defined(AVB_COMPILATION)
-#error "Never include this file directly, include libavb.h instead."
+#ifdef AVB_INSIDE_LIBAVB_H
+#error "You can't include avb_crypto_ops_impl.h in the public header libavb.h."
 #endif
 
-#ifndef AVB_VERSION_H_
-#define AVB_VERSION_H_
+#ifndef AVB_COMPILATION
+#error "Never include this file, it may only be used from internal avb code."
+#endif
 
-#include "avb_sysdeps.h"
+#ifndef AVB_CRYPTO_OPS_IMPL_H_
+#define AVB_CRYPTO_OPS_IMPL_H_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* The version number of AVB - keep in sync with avbtool. */
-#define AVB_VERSION_MAJOR 1
-#define AVB_VERSION_MINOR 2
-#define AVB_VERSION_SUB 0
+#include <libavb/avb_sysdeps.h>
 
-/* Returns a NUL-terminated string for the libavb version in use.  The
- * returned string usually looks like "%d.%d.%d". Applications must
- * not make assumptions about the content of this string.
- *
- * Boot loaders should display this string in debug/diagnostics output
- * to aid with debugging.
- *
- * This is similar to the string put in the |release_string| string
- * field in the VBMeta struct by avbtool.
- */
-const char* avb_version_string(void);
+/* Block size in bytes of a SHA-256 digest. */
+#define AVB_SHA256_BLOCK_SIZE 64
+
+/* Block size in bytes of a SHA-512 digest. */
+#define AVB_SHA512_BLOCK_SIZE 128
+
+/* Data structure used for SHA-256. */
+typedef struct {
+  uint32_t h[8];
+  uint64_t tot_len;
+  size_t len;
+  uint8_t block[2 * AVB_SHA256_BLOCK_SIZE];
+} AvbSHA256ImplCtx;
+
+/* Data structure used for SHA-512. */
+typedef struct {
+  uint64_t h[8];
+  uint64_t tot_len;
+  size_t len;
+  uint8_t block[2 * AVB_SHA512_BLOCK_SIZE];
+} AvbSHA512ImplCtx;
+
+#define AVB_SHA256_CONTEXT_SIZE sizeof(AvbSHA256ImplCtx)
+#define AVB_SHA512_CONTEXT_SIZE sizeof(AvbSHA512ImplCtx)
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* AVB_VERSION_H_ */
+#endif /* AVB_CRYPTO_OPS_IMPL_H_ */

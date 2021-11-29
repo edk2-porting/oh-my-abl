@@ -155,11 +155,17 @@ extern "C" {
     avb_abort();                        \
   } while (0)
 
+/* Converts a 16-bit unsigned integer from big-endian to host byte order. */
+uint16_t avb_be16toh(uint16_t in) AVB_ATTR_WARN_UNUSED_RESULT;
+
 /* Converts a 32-bit unsigned integer from big-endian to host byte order. */
 uint32_t avb_be32toh(uint32_t in) AVB_ATTR_WARN_UNUSED_RESULT;
 
 /* Converts a 64-bit unsigned integer from big-endian to host byte order. */
 uint64_t avb_be64toh(uint64_t in) AVB_ATTR_WARN_UNUSED_RESULT;
+
+/* Converts a 16-bit unsigned integer from host to big-endian byte order. */
+uint16_t avb_htobe16(uint16_t in) AVB_ATTR_WARN_UNUSED_RESULT;
 
 /* Converts a 32-bit unsigned integer from host to big-endian byte order. */
 uint32_t avb_htobe32(uint32_t in) AVB_ATTR_WARN_UNUSED_RESULT;
@@ -278,6 +284,22 @@ uint32_t avb_crc32(const uint8_t* buf, size_t buf_size);
  * separators, returns |str|.
  */
 const char* avb_basename(const char* str);
+
+/* Converts any ascii lowercase characters in |str| to uppercase in-place.
+ * |str| must be NUL-terminated and valid UTF-8.
+ */
+void avb_uppercase(char* str);
+
+/* Converts |data_len| bytes of |data| to hex and returns the result. Returns
+ * NULL on OOM. Caller must free the returned string with avb_free.
+ */
+char* avb_bin2hex(const uint8_t* data, size_t data_len);
+
+/* Writes |value| to |digits| in base 10 followed by a NUL byte.
+ * Returns number of characters written excluding the NUL byte.
+ */
+#define AVB_MAX_DIGITS_UINT64 32
+size_t avb_uint64_to_base10(uint64_t value, char digits[AVB_MAX_DIGITS_UINT64]);
 
 UINT32 ReadSecurityState ();
 

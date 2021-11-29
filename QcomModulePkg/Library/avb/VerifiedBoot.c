@@ -1128,7 +1128,7 @@ LoadImageAndAuthVB2 (BootInfo *Info)
       AllowVerificationError ? AVB_SLOT_VERIFY_FLAGS_ALLOW_VERIFICATION_ERROR
                              : AVB_SLOT_VERIFY_FLAGS_NONE;
   AvbHashtreeErrorMode VerityFlags =
-      AVB_HASHTREE_ERROR_MODE_RESTART_AND_INVALIDATE;
+      AVB_HASHTREE_ERROR_MODE_MANAGED_RESTART_AND_EIO;
   CHAR8 Digest[AVB_SHA256_DIGEST_SIZE];
   BOOLEAN UpdateRollback = FALSE;
   UINT32 OSVersion;
@@ -1183,12 +1183,9 @@ LoadImageAndAuthVB2 (BootInfo *Info)
   DEBUG ((EFI_D_VERBOSE, "Slot: %a, allow verification error: %a\n", SlotSuffix,
           BooleanString[AllowVerificationError].name));
 
-  if (FixedPcdGetBool (AllowEio)) {
-    VerityFlags = IsEnforcing () ? AVB_HASHTREE_ERROR_MODE_RESTART
-                                 : AVB_HASHTREE_ERROR_MODE_EIO;
-  } else {
-    VerityFlags = AVB_HASHTREE_ERROR_MODE_RESTART_AND_INVALIDATE;
-  }
+  if ( !IsEnforcing () )
+    VerifyFlags |= AVB_SLOT_VERIFY_FLAGS_RESTART_CAUSED_BY_HASHTREE_CORRUPTION;
+
   RequestedPartition = RequestedPartitionAll;
 
   if ( ( (!Info->MultiSlotBoot) ||

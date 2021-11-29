@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-/* Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -59,38 +59,51 @@
 
 int avb_memcmp(const void *src1, const void *src2, size_t n)
 {
-	return CompareMem(src1, src2, n);
+  return CompareMem(src1, src2, n);
 }
 
 void *avb_memcpy(void *dest, const void *src, size_t n)
 {
-	return CopyMem(dest, src, n);
+  return CopyMem(dest, src, n);
 }
 
 void *avb_memset(void *dest, const int c, size_t n)
 {
-	return SetMem(dest, n, c);
+  return SetMem(dest, n, c);
 }
 
 int avb_strcmp(const char *s1, const char *s2)
 {
-	return AsciiStrCmp(s1, s2);
+  return AsciiStrCmp(s1, s2);
 }
 
-int Avb_StrnCmp (CONST CHAR8 *s1, CONST CHAR8 *s2, UINTN Len)
+int avb_strncmp(const char* s1, const char* s2, size_t n)
 {
-       return AsciiStrnCmp (s1, s2, Len);
+  return AsciiStrnCmp (s1, s2, n);
 }
 
 size_t avb_strlen(const char *str)
 {
-	return AsciiStrLen(str);
+  return AsciiStrLen(str);
 }
+
+/* Divide the |dividend| by 10 and saves back to the pointer. Return the
+ * remainder. */
+uint32_t avb_div_by_10(uint64_t* dividend)
+{
+  uint64_t quotient = (*dividend )/10;
+  uint32_t remainder = (*dividend )%10;
+
+  *dividend = quotient;
+
+  return remainder;
+}
+
 
 void avb_abort(void)
 {
-	DEBUG((EFI_D_INFO, "avb_abort!"));
-	ShutdownDevice();
+  DEBUG((EFI_D_INFO, "avb_abort!"));
+  ShutdownDevice();
 }
 
 void avb_print(UINTN ErrorLevel, const char *message)
@@ -100,23 +113,23 @@ void avb_print(UINTN ErrorLevel, const char *message)
 
 void avb_printv(UINTN ErrorLevel, const char *message, ...)
 {
-	VA_LIST ap;
-	const char *m;
+  VA_LIST ap;
+  const char *m;
 
-	VA_START(ap, message);
-	for (m = message; m != NULL; m = VA_ARG(ap, const char *)) {
-      avb_print (ErrorLevel, m);
-	}
-	VA_END(ap);
-	return;
+  VA_START(ap, message);
+  for (m = message; m != NULL; m = VA_ARG(ap, const char *)) {
+    avb_print (ErrorLevel, m);
+  }
+  VA_END(ap);
+  return;
 }
 
 void *avb_malloc_(size_t size)
 {
-        return AllocateZeroPool (size);
+  return AllocateZeroPool (size);
 }
 
 void avb_free(void *ptr)
 {
-	FreePool(ptr);
+  FreePool(ptr);
 }
