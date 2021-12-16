@@ -58,8 +58,17 @@ CHAR8 Magic[] = "#BOOTCONFIG\n";
  */
 static BOOLEAN IsTrailerPresent (UINT64 BootconfigEndAddr)
 {
-    return !AsciiStrnCmp ((CHAR8*)(BootconfigEndAddr - V4_BOOTCONFIG_MAGIC_SIZE)
-      , Magic, V4_BOOTCONFIG_MAGIC_SIZE);
+  CHAR8 TrailMagicBuffer[V4_BOOTCONFIG_MAGIC_SIZE + 1];
+
+  gBS->CopyMem (TrailMagicBuffer,
+    (CHAR8*) (BootconfigEndAddr - V4_BOOTCONFIG_MAGIC_SIZE),
+    V4_BOOTCONFIG_MAGIC_SIZE);
+
+  if ( TrailMagicBuffer[V4_BOOTCONFIG_MAGIC_SIZE + 1] != '\0') {
+    TrailMagicBuffer[V4_BOOTCONFIG_MAGIC_SIZE + 1] = '\0';
+  }
+  return !AsciiStrnCmp ((CHAR8*)(TrailMagicBuffer),
+            Magic, V4_BOOTCONFIG_MAGIC_SIZE);
 }
 /*
  * Add a string of boot config parameters to memory appended by the trailer.
