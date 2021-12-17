@@ -1238,9 +1238,9 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   if (*FinalCmdLine) {
     DEBUG ((EFI_D_INFO, "Cmdline: %a\n", *FinalCmdLine));
   }
-  DEBUG ((EFI_D_INFO, "\n"));
   if (*FinalBootConfig) {
-    DEBUG ((EFI_D_INFO, "BootConfig: %a\n", *FinalBootConfig));
+    DEBUG ((EFI_D_VERBOSE, "\n"));
+    DEBUG ((EFI_D_VERBOSE, "BootConfig: %a\n", *FinalBootConfig));
   }
 
   return EFI_SUCCESS;
