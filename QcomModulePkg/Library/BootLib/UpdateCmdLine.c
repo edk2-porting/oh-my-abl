@@ -584,6 +584,9 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
       Src = Param->SlotSuffixAscii;
       AsciiStrCatS (Dst, MaxCmdLineLen, Src);
     } else {
+      BootConfigFlag = IsAndroidBootParam (Param->AndroidSlotSuffix,
+                              AsciiStrLen (Param->AndroidSlotSuffix),
+                                       Param->HeaderVersion);
       AddtoBootConfigList (BootConfigFlag, Param->AndroidSlotSuffix,
                      Param->SlotSuffixAscii,
                      BootConfigListHead,
@@ -1235,9 +1238,9 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   if (*FinalCmdLine) {
     DEBUG ((EFI_D_INFO, "Cmdline: %a\n", *FinalCmdLine));
   }
-  DEBUG ((EFI_D_INFO, "\n"));
   if (*FinalBootConfig) {
-    DEBUG ((EFI_D_INFO, "BootConfig: %a\n", *FinalBootConfig));
+    DEBUG ((EFI_D_VERBOSE, "\n"));
+    DEBUG ((EFI_D_VERBOSE, "BootConfig: %a\n", *FinalBootConfig));
   }
 
   return EFI_SUCCESS;
