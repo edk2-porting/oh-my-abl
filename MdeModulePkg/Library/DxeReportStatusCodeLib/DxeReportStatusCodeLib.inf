@@ -36,7 +36,7 @@
   BaseLib
   DebugLib
   UefiBootServicesTableLib
-  BaseMemoryLib
+  BaseMemoryLibOptDxe
   PcdLib
   DevicePathLib
 
