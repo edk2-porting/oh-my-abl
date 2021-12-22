@@ -168,7 +168,8 @@
 	gQcomTokenSpaceGuid.KernelLoadAddress32
 	gQcomTokenSpaceGuid.EnableMdtpSupport
 	gQcomTokenSpaceGuid.EnableNewNodeSearchFuc
-       gQcomTokenSpaceGuid.EnableDdrRegion
+	gQcomTokenSpaceGuid.EnableDdrRegion
+	gQcomTokenSpaceGuid.EnableUpdateRankChannel
 
 [Depex]
 	TRUE
