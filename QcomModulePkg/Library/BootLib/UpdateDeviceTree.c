@@ -682,6 +682,15 @@ GetDDrRegionsInfo (struct ddr_regions_data_info *DdrRegionsInfo)
     return Status;
   }
 
+  Revision = pDDrGetInfoProtocol->Revision;
+  DEBUG ((EFI_D_VERBOSE, "DDR Header Revision =0x%x\n", Revision));
+
+  if (Revision < EFI_DDRGETINFO_PROTOCOL_REVISION) {
+    DEBUG ((EFI_D_VERBOSE,
+            "GetDDRMappedRegions not supported in Revision=0x%x\n", Revision));
+    return EFI_UNSUPPORTED;
+  }
+
   Status = pDDrGetInfoProtocol->GetDDRMappedRegions (pDDrGetInfoProtocol,
                                                      DdrRegionsInfo);
   if ((EFI_SUCCESS != Status) ||
@@ -689,15 +698,6 @@ GetDDrRegionsInfo (struct ddr_regions_data_info *DdrRegionsInfo)
     DEBUG ((EFI_D_ERROR,
            "ERROR: Get DDR Regions info failed=%r\n", Status));
     return EFI_OUT_OF_RESOURCES;
-  }
-
-  Revision = pDDrGetInfoProtocol->Revision;
-  DEBUG ((EFI_D_VERBOSE, "DDR Header Revision =0x%x\n", Revision));
-
-  if (Revision < DDR_DETAILS_STRUCT_VERSION) {
-    DEBUG ((EFI_D_INFO,
-          "DDr regions not supported in Revision=0x%x\n", Revision));
-    return EFI_UNSUPPORTED;
   }
 
   return Status;
