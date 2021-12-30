@@ -55,6 +55,15 @@
 /* Return True if integer overflow will occur */
 #define CHECK_ADD64(a, b) ((MAX_UINT64 - b < a) ? TRUE : FALSE)
 
+/* DDR region information have the layout like below, each item have 32bit:
+ * region = < StartAddr_high StartAddr_low
+ *                RegionsSize_high RegionsSize_low
+ *                SegmentsStartOffset_high SegmentsStartOffset_low
+ *                SegmentsStartIndex_high SegmentsStartIndex_low
+ *                GranuleSize_high GranuleSize_low
+*/
+#define MAX_DDR_REGION_PROP_MEM 10
+
 /* Look up table for fstab node */
 struct FstabNode {
   CONST CHAR8 *ParentNode; /* Parent Node name */

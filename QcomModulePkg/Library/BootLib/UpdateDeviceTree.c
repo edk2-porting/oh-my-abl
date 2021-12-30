@@ -730,10 +730,12 @@ STATIC INT32 AddDDrRegionNodeProp (struct ddr_regions_data_info *DdrRegionsInfo,
                                     VOID *Fdt, UINT32 Offset)
 {
   INT32 Ret;
-  UINT32 Idx;
+  UINT32 Idx, Count;
   UINT32 MaxDDrRegions;
   CHAR8 RegionName[DDR_REGION_NAME_LEN] = {""};
   CHAR8 RegionNameSuffix[DDR_REGION_NAME_SUFFIX] = {""};
+  UINT32 RegionPropArray[MAX_DDR_REGION_PROP_MEM];
+  UINT32 RegionPropArraySize = 0;
 
   if (DdrRegionsInfo == NULL ||
       Fdt == NULL) {
@@ -749,6 +751,8 @@ STATIC INT32 AddDDrRegionNodeProp (struct ddr_regions_data_info *DdrRegionsInfo,
     return -1;
   }
 
+  RegionPropArraySize = ARRAY_SIZE (RegionPropArray) *
+                                    sizeof (RegionPropArray[0]);
   for (Idx = 0; Idx < MaxDDrRegions; Idx++) {
     AsciiStrnCpyS (RegionName, DDR_REGION_NAME_LEN, "region",
                    AsciiStrLen ("region"));
@@ -756,89 +760,64 @@ STATIC INT32 AddDDrRegionNodeProp (struct ddr_regions_data_info *DdrRegionsInfo,
     AsciiStrnCatS (RegionName, DDR_REGION_NAME_LEN, RegionNameSuffix,
                    DDR_REGION_NAME_SUFFIX);
 
-     /* Add StartAddr Property */
-    FdtPropUpdateFunc (Fdt, Offset, RegionName,
-                       DdrRegionsInfo->ddr_region[Idx].start_address >>
-                       DDR_REGIONS_MASK, fdt_setprop_u32, Ret);
-    if (Ret) {
-      DEBUG ((EFI_D_ERROR,
-             "Failed to add start address(H) for %a\n", RegionName));
-      return Ret;
-    }
-    FdtPropUpdateFunc (Fdt, Offset, RegionName,
-                       DdrRegionsInfo->ddr_region[Idx].start_address &
-                       DDR_REGIONS_LOW_MASK, fdt_appendprop_u32, Ret);
-    if (Ret) {
-      DEBUG ((EFI_D_ERROR,
-             "Failed to add start address(L) for %a\n", RegionName));
-      return Ret;
-    }
+    Count = 0;
+    gBS->SetMem (RegionPropArray, RegionPropArraySize, 0);
+    /* Add StartAddr Property */
+    RegionPropArray[Count] = cpu_to_fdt32 (
+                   DdrRegionsInfo->ddr_region[Idx].start_address >>
+                   DDR_REGIONS_MASK);
+    Count++;
+    RegionPropArray[Count] = cpu_to_fdt32 (
+                   DdrRegionsInfo->ddr_region[Idx].start_address &
+                   DDR_REGIONS_LOW_MASK);
+    Count++;
 
     /* Add RegionsSize Property */
-    FdtPropUpdateFunc (Fdt, Offset, RegionName,
-                       DdrRegionsInfo->ddr_region[Idx].size >>
-                       DDR_REGIONS_MASK, fdt_appendprop_u32, Ret);
-    if (Ret) {
-      DEBUG ((EFI_D_ERROR,
-             "Failed to add region size(H) for %a\n", RegionName));
-      return Ret;
-    }
-    FdtPropUpdateFunc (Fdt, Offset, RegionName,
-                       DdrRegionsInfo->ddr_region[Idx].size &
-                       DDR_REGIONS_LOW_MASK, fdt_appendprop_u32, Ret);
-    if (Ret) {
-      DEBUG ((EFI_D_ERROR,
-             "Failed to add region size(L) for %a\n", RegionName));
-      return Ret;
-    }
+    RegionPropArray[Count] = cpu_to_fdt32 (
+                   DdrRegionsInfo->ddr_region[Idx].size >>
+                   DDR_REGIONS_MASK);
+    Count++;
+    RegionPropArray[Count] = cpu_to_fdt32 (
+                   DdrRegionsInfo->ddr_region[Idx].size &
+                   DDR_REGIONS_LOW_MASK);
+    Count++;
 
     /* Add SegmentsStartOffset Property */
-    FdtPropUpdateFunc (Fdt, Offset, RegionName,
-                       DdrRegionsInfo->ddr_region[Idx].segments_start_offset >>
-                       DDR_REGIONS_MASK, fdt_appendprop_u32, Ret);
-    if (Ret) {
-      DEBUG ((EFI_D_ERROR,
-             "Failed to add segments start offset(H) for %a\n", RegionName));
-      return Ret;
-    }
-    FdtPropUpdateFunc (Fdt, Offset, RegionName,
-                       DdrRegionsInfo->ddr_region[Idx].segments_start_offset &
-                       DDR_REGIONS_LOW_MASK, fdt_appendprop_u32, Ret);
-    if (Ret) {
-      DEBUG ((EFI_D_ERROR,
-             "Failed to add segments start offset(L) for %a\n", RegionName));
-      return Ret;
-    }
+    RegionPropArray[Count] = cpu_to_fdt32 (
+                   DdrRegionsInfo->ddr_region[Idx].segments_start_offset >>
+                   DDR_REGIONS_MASK);
+    Count++;
+    RegionPropArray[Count] = cpu_to_fdt32 (
+                   DdrRegionsInfo->ddr_region[Idx].segments_start_offset &
+                   DDR_REGIONS_LOW_MASK);
+    Count++;
 
     /* Add SegmentsStartIndex Property */
-    FdtPropUpdateFunc (Fdt, Offset, RegionName, 0, fdt_appendprop_u32, Ret);
-    if (Ret) {
-      DEBUG ((EFI_D_ERROR,
-            "Failed to add segments start index(H) for %a\n", RegionName));
-      return Ret;
-    }
-    FdtPropUpdateFunc (Fdt, Offset, RegionName,
-                       DdrRegionsInfo->ddr_region[Idx].segments_start_index &
-                       DDR_REGIONS_LOW_MASK, fdt_appendprop_u32, Ret);
-    if (Ret) {
-      DEBUG ((EFI_D_ERROR,
-             "Failed to add segments start index(L) for %a\n", RegionName));
-      return Ret;
-    }
+    RegionPropArray[Count] = 0;
+    Count++;
+    RegionPropArray[Count] = cpu_to_fdt32 (
+                   DdrRegionsInfo->ddr_region[Idx].segments_start_index &
+                   DDR_REGIONS_LOW_MASK);
+    Count++;
 
     /* Add GranuleSize Property */
-    FdtPropUpdateFunc (Fdt, Offset, RegionName, 0, fdt_appendprop_u32, Ret);
-    if (Ret) {
-      DEBUG ((EFI_D_ERROR,
-             "Failed to add granule size(H) for %a\n", RegionName));
-      return Ret;
+    RegionPropArray[Count] = 0;
+    Count++;
+    RegionPropArray[Count] = cpu_to_fdt32 (
+                   DdrRegionsInfo->ddr_region[Idx].granule_size &
+                   DDR_REGIONS_LOW_MASK);
+    Count++;
+
+    if (Count > MAX_DDR_REGION_PROP_MEM) {
+       DEBUG ((EFI_D_ERROR, "ERROR: Wrong number of DDR Region member\n"));
+       return -1;
     }
-    FdtPropUpdateFunc (Fdt, Offset, RegionName,
-                       DdrRegionsInfo->ddr_region[Idx].granule_size &
-                       DDR_REGIONS_LOW_MASK, fdt_appendprop_u32, Ret);
+
+    Ret = FdtSetProp (Fdt, Offset, RegionName, RegionPropArray,
+                      RegionPropArraySize);
     if (Ret) {
       DEBUG ((EFI_D_ERROR,
-             "Failed to add granule size(L) for %a\n", RegionName));
+             "ERROR: Failed to add DDR Regions : %a\n", RegionName));
       return Ret;
     }
   }
