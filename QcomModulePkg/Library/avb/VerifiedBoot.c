@@ -24,7 +24,43 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+ */
+
+ /*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted (subject to the limitations in the
+ *  disclaimer below) provided that the following conditions are met:
+ *
+ *      * Redistributions of source code must retain the above copyright
+ *        notice, this list of conditions and the following disclaimer.
+ *
+ *      * Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials provided
+ *        with the distribution.
+ *
+ *      * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+ *        contributors may be used to endorse or promote products derived
+ *        from this software without specific prior written permission.
+ *
+ *  NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ *  GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ *  HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ *   WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ *  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ *  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ *  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ *  GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ *  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ *  IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ *  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ *  IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #include "VerifiedBoot.h"
 #include "BootLinux.h"
@@ -51,7 +87,8 @@ static CHAR8 *avb_verify_partition_name[] = {
      "dtbo",
      "vbmeta",
      "recovery",
-     "vendor_boot"
+     "vendor_boot",
+     "init_boot"
 };
 
 STATIC struct verified_boot_verity_mode VbVm[] = {
@@ -482,6 +519,14 @@ LoadBootImageNoAuth (BootInfo *Info, UINT32 *PageSize, BOOLEAN *FastbootPath)
                 "ERROR: Failed to load recovery Image: %r\n", Status));
         goto ErrRecImgName;
       }
+    }
+  }
+
+  if (Info->HasBootInitRamdisk) {
+    Status = NoAVBLoadPartitionImage (Info, (CHAR16 *)L"init_boot");
+    if (Status != EFI_SUCCESS) {
+        DEBUG ((EFI_D_ERROR,
+               "ERROR: Failed to load init boot Image : %r\n", Status));
     }
   }
 
@@ -1259,6 +1304,11 @@ LoadImageAndAuthVB2 (BootInfo *Info)
       NumRequestedPartition += 1;
     }
 
+    if (Info->HasBootInitRamdisk) {
+      AddRequestedPartition (RequestedPartitionAll, IMG_INIT_BOOT);
+      NumRequestedPartition += 1;
+    }
+
     Result = avb_slot_verify (Ops, (CONST CHAR8 *CONST *)RequestedPartition,
                 SlotSuffix, VerifyFlags, VerityFlags, &SlotData);
   }
@@ -1656,6 +1706,8 @@ LoadImageAndAuth (BootInfo *Info)
   UINT32 AVBVersion = NO_AVB;
   VOID *RecoveryHdr = NULL;
   UINT32 RecoveryHdrSz = 0;
+  VOID *InitBootHdr = NULL;
+  UINT32 InitBootHdrSz = 0;
 
   WaitForFlashFinished ();
 
@@ -1675,6 +1727,31 @@ LoadImageAndAuth (BootInfo *Info)
                !((boot_img_hdr *)(RecoveryHdr))->kernel_size) {
     DEBUG ((EFI_D_VERBOSE, "Recovery partition has no kernel\n"));
     SetRecoveryHasNoKernel ();
+  }
+
+  /* HasBootInitRamdisk flag 0, if ini_boot partition is not present */
+  Info->HasBootInitRamdisk = false;
+
+  Status = LoadPartitionImageHeader (Info, (CHAR16 *)L"init_boot",
+                                     &InitBootHdr,
+                                     &InitBootHdrSz);
+
+  /* check early if init_boot exists */
+  if (!Status &&
+      InitBootHdrSz) {
+
+    if (((boot_img_hdr_v4 *)InitBootHdr)->header_version >=
+          BOOT_HEADER_VERSION_FOUR &&
+          ((boot_img_hdr_v4 *)InitBootHdr)->ramdisk_size) {
+
+      Info->HasBootInitRamdisk = true;
+
+    }
+  }
+
+  if (InitBootHdr) {
+    FreePages (InitBootHdr,
+               ALIGN_PAGES (BOOT_IMG_MAX_PAGE_SIZE, ALIGNMENT_MASK_4KB));
   }
 
   if (RecoveryHdr) {

@@ -310,12 +310,25 @@ typedef struct vendor_boot_img_hdr_v3 vendor_boot_img_hdr_v3;
  * +---------------------+
  * | kernel              | m pages
  * +---------------------+
+ * | boot signature      | g pages
+ * +---------------------+
+ *
+ * m = (kernel_size + 4096 - 1) / 4096
+ * g = (signature_size + 4096 - 1) / 4096
+ *
+ * The generic ramdisk is no longer be contained in the
+ * boot image, the generic ramdisk will be placed in a new init_boot partition
+ * Structure for the new init_boot partition:
+ *
+ *
+ * +---------------------+
+ * | boot header         | 4096 bytes
+ * +---------------------+
  * | ramdisk             | n pages
  * +---------------------+
  * | boot signature      | g pages
  * +---------------------+
  *
- * m = (kernel_size + 4096 - 1) / 4096
  * n = (ramdisk_size + 4096 - 1) / 4096
  * g = (signature_size + 4096 - 1) / 4096
  *
