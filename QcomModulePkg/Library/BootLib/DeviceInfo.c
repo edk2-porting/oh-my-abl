@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2018, 2021 The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -376,4 +376,169 @@ GetUserKey (CHAR8 **UserKey, UINT32 *UserKeySize)
   *UserKey = DevInfo.user_public_key;
   *UserKeySize = DevInfo.user_public_key_length;
   return EFI_SUCCESS;
+}
+
+
+EFI_STATUS ReadPersistentValue (CONST UINT8 *Name, UINTN NameSize,
+                                UINT8 *Value, UINTN *ValueSize)
+{
+   BOOLEAN  NameFound = FALSE;
+   UINT32   i;
+
+   if (FirstReadDevInfo) {
+      DEBUG ((EFI_D_ERROR, "ReadPersistentValue DeviceInfo not initalized \n"));
+      return EFI_NOT_STARTED;
+   }
+
+   if ( Name == NULL ||
+        NameSize == 0 ||
+        ValueSize == NULL  )
+      return EFI_INVALID_PARAMETER;
+
+   for ( i = 0; i < MAX_ENTRY_SIZE; ++i )
+   {
+      if ( DevInfo.persistent_value[i].in_use == 1 &&
+          NameSize == DevInfo.persistent_value[i].name_size &&
+          CompareMem ( Name, DevInfo.persistent_value[i].name, NameSize ) == 0 )
+      {
+         NameFound = TRUE;
+         break;
+      }
+   }
+
+   if ( NameFound == FALSE ) {
+      return EFI_NOT_FOUND;
+   }
+
+   if ( DevInfo.persistent_value[i].value_size == 0 ) {
+      return EFI_NOT_FOUND;
+   }
+
+   if ( *ValueSize < DevInfo.persistent_value[i].value_size )
+   {
+      *ValueSize =  DevInfo.persistent_value[i].value_size;
+      return EFI_BUFFER_TOO_SMALL;
+   }
+
+   if ( Value == NULL ) {
+      return EFI_INVALID_PARAMETER;
+   }
+
+   gBS->CopyMem ( Value,
+                  DevInfo.persistent_value[i].value,
+                  DevInfo.persistent_value[i].value_size);
+   *ValueSize =  DevInfo.persistent_value[i].value_size;
+
+   return EFI_SUCCESS;
+}
+
+
+EFI_STATUS WritePersistentValue (CONST UINT8 *Name, UINTN NameSize,
+                                 CONST UINT8 *Value, UINTN ValueSize)
+{
+   EFI_STATUS Status = EFI_SUCCESS;
+   BOOLEAN    NameFound = FALSE;
+   BOOLEAN    SlotFound = FALSE;
+   UINT32     NameFoundIndex;
+   UINT32     SlotFoundIndex;
+   UINT32     i;
+
+   if (FirstReadDevInfo) {
+      DEBUG ((EFI_D_ERROR, "ReadPersistentValue DeviceInfo not initalized \n"));
+      return EFI_NOT_STARTED;
+   }
+
+   if ( Name == NULL ||
+        NameSize == 0 ) {
+      return EFI_INVALID_PARAMETER;
+   }
+
+   if ( NameSize > MAX_NAME_SIZE ) {
+      return EFI_NOT_FOUND;
+   }
+
+   if ( ValueSize > MAX_VALUE_SIZE ) {
+      return EFI_BAD_BUFFER_SIZE;
+   }
+
+   for ( i = 0; i < MAX_ENTRY_SIZE; ++i )
+   {
+      if ( DevInfo.persistent_value[i].in_use == 1 )
+      {
+          if ( NameSize == DevInfo.persistent_value[i].name_size &&
+               CompareMem ( Name, DevInfo.persistent_value[i].name, NameSize )
+               == 0 )
+          {
+             NameFound = TRUE;
+             NameFoundIndex = i;
+             break;
+          }
+       }
+       else
+       {
+          if ( SlotFound == FALSE )
+          {
+             SlotFound = TRUE;
+             SlotFoundIndex = i;
+          }
+       }
+   }
+
+   DEBUG ((EFI_D_ERROR, "NameFound %d NameIndex %d SlotFound %d SlotIndex %d\n",
+           NameFound, NameFoundIndex, SlotFound, SlotFoundIndex ));
+
+   if ( NameFound == TRUE )
+   {
+      if ( ValueSize == 0 )
+      {
+         gBS->SetMem ( &DevInfo.persistent_value[NameFoundIndex],
+                       sizeof (persistent_value_type),
+                       0 );
+      }
+      else
+      {
+         if ( Value == NULL ) {
+            return EFI_INVALID_PARAMETER;
+         }
+
+         gBS->CopyMem ( (void *)DevInfo.persistent_value[NameFoundIndex].value,
+                        (void *)Value,
+                         ValueSize);
+         DevInfo.persistent_value[NameFoundIndex].value_size =(UINT16)ValueSize;
+      }
+   }
+   else if ( SlotFound == TRUE )
+   {
+      if ( Value == NULL ) {
+         return EFI_INVALID_PARAMETER;
+      }
+
+      if ( ValueSize == 0 ) {
+         return EFI_SUCCESS;
+      }
+
+      gBS->CopyMem ( (void *)DevInfo.persistent_value[SlotFoundIndex].name,
+                     (void *)Name,
+                      NameSize);
+      DevInfo.persistent_value[SlotFoundIndex].name_size = NameSize;
+      gBS->CopyMem ( (void *)DevInfo.persistent_value[SlotFoundIndex].value,
+                     (void *)Value,
+                     ValueSize);
+      DevInfo.persistent_value[SlotFoundIndex].value_size = (UINT16)ValueSize;
+      DevInfo.persistent_value[SlotFoundIndex].in_use = 1;
+   }
+   else
+   {
+      DEBUG ((EFI_D_ERROR, "No more slot available\n"));
+      return EFI_INVALID_PARAMETER;
+   }
+
+   Status = ReadWriteDeviceInfo ( WRITE_CONFIG,
+                                  (VOID *)&DevInfo,
+                                  sizeof (DevInfo) );
+   if (Status != EFI_SUCCESS) {
+      DEBUG ((EFI_D_ERROR, "Unable to Write Device Info: 0x%x\n", Status));
+   }
+
+   return Status;
 }

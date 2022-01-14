@@ -84,7 +84,13 @@ int avb_memcmp(const void* src1,
  */
 int avb_strcmp(const char* s1, const char* s2);
 
-int Avb_StrnCmp (CONST CHAR8* s1, CONST CHAR8* s2, UINTN Len);
+/* Compare |n| bytes in two strings.
+ *
+ * Return an integer less than, equal to, or greater than zero if the
+ * first |n| bytes of |s1| is found, respectively, to be less than,
+ * to match, or be greater than the first |n| bytes of |s2|.
+ */
+int avb_strncmp(const char* s1, const char* s2, size_t n);
 
 /* Copy |n| bytes from |src| to |dest|. */
 void* avb_memcpy(void* dest, const void* src, size_t n);
@@ -121,6 +127,10 @@ void avb_free(void* ptr);
 
 /* Returns the lenght of |str|, excluding the terminating NUL-byte. */
 size_t avb_strlen(const char* str) AVB_ATTR_WARN_UNUSED_RESULT;
+
+/* Divide the |dividend| by 10 and saves back to the pointer. Return the
+ * remainder. */
+uint32_t avb_div_by_10(uint64_t* dividend);
 
 #ifdef __cplusplus
 }

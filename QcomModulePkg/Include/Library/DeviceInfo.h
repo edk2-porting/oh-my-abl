@@ -1,5 +1,5 @@
 /*
- * * Copyright (c) 2011,2014-2015,2017 The Linux Foundation. All rights
+ * Copyright (c) 2011,2014-2015,2021 The Linux Foundation. All rights
  * reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,11 +38,22 @@
 #define MAX_VERSION_LEN 64
 #define MAX_VB_PARTITIONS 32
 #define MAX_USER_KEY_SIZE 2048
+#define MAX_NAME_SIZE      56
+#define MAX_VALUE_SIZE     32
+#define MAX_ENTRY_SIZE     8
 
 enum unlock_type {
   UNLOCK = 0,
   UNLOCK_CRITICAL,
 };
+
+typedef struct {
+  UINT16  in_use;
+  UINT16  name_size;
+  UINT16  value_size;
+  UINT8   name[MAX_NAME_SIZE];
+  UINT8   value[MAX_VALUE_SIZE];
+} persistent_value_type;
 
 typedef struct device_info {
   CHAR8 magic[DEVICE_MAGIC_SIZE];
@@ -55,6 +66,7 @@ typedef struct device_info {
   UINT32 user_public_key_length;
   CHAR8 user_public_key[MAX_USER_KEY_SIZE];
   UINT64 rollback_index[MAX_VB_PARTITIONS];
+  persistent_value_type  persistent_value[MAX_ENTRY_SIZE];
 } DeviceInfo;
 
 struct verified_boot_verity_mode {
@@ -71,24 +83,20 @@ BOOLEAN IsUnlocked (VOID);
 BOOLEAN IsUnlockCritical (VOID);
 BOOLEAN IsEnforcing (VOID);
 BOOLEAN IsChargingScreenEnable (VOID);
-VOID
-GetBootloaderVersion (CHAR8 *BootloaderVersion, UINT32 Len);
-VOID
-GetRadioVersion (CHAR8 *RadioVersion, UINT32 Len);
-EFI_STATUS
-EnableChargingScreen (BOOLEAN IsEnabled);
-EFI_STATUS
-EnableEnforcingMode (BOOLEAN IsEnabled);
-EFI_STATUS
-SetDeviceUnlockValue (UINT32 Type, BOOLEAN State);
+VOID GetBootloaderVersion (CHAR8 *BootloaderVersion, UINT32 Len);
+VOID GetRadioVersion (CHAR8 *RadioVersion, UINT32 Len);
+EFI_STATUS EnableChargingScreen (BOOLEAN IsEnabled);
+EFI_STATUS EnableEnforcingMode (BOOLEAN IsEnabled);
+EFI_STATUS SetDeviceUnlockValue (UINT32 Type, BOOLEAN State);
 EFI_STATUS DeviceInfoInit (VOID);
-EFI_STATUS
-ReadRollbackIndex (UINT32 Loc, UINT64 *RollbackIndex);
-EFI_STATUS
-WriteRollbackIndex (UINT32 Loc, UINT64 RollbackIndex);
-EFI_STATUS
-StoreUserKey (CHAR8 *UserKey, UINT32 UserKeySize);
-EFI_STATUS
-GetUserKey (CHAR8 **UserKey, UINT32 *UserKeySize);
+EFI_STATUS ReadRollbackIndex (UINT32 Loc, UINT64 *RollbackIndex);
+EFI_STATUS WriteRollbackIndex (UINT32 Loc, UINT64 RollbackIndex);
+EFI_STATUS StoreUserKey (CHAR8 *UserKey, UINT32 UserKeySize);
+EFI_STATUS GetUserKey (CHAR8 **UserKey, UINT32 *UserKeySize);
 EFI_STATUS EraseUserKey (VOID);
+EFI_STATUS ReadPersistentValue (CONST UINT8 *Name, UINTN NameSize,
+                                UINT8 *Value, UINTN *ValueSize);
+EFI_STATUS WritePersistentValue (CONST UINT8 *Name, UINTN NameSize,
+                                 CONST UINT8 *Value, UINTN ValueSize);
+
 #endif
