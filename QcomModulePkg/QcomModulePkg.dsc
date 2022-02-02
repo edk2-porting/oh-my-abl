@@ -1,5 +1,5 @@
 #/*
-# * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
+# * Copyright (c) 2015-2022, The Linux Foundation. All rights reserved.
 # *
 # * Redistribution and use in source and binary forms, with or without
 # * modification, are permitted provided that the following conditions are
@@ -119,7 +119,7 @@
       GCC:*_*_*_CC_FLAGS = -DBUILD_USES_RECOVERY_AS_BOOT
   !endif
   !ifdef $(INIT_BIN)
-      GCC:*_*_*_CC_FLAGS = -DINIT_BIN='$(INIT_BIN)'
+      GCC:*_*_*_CC_FLAGS = -DINIT_BIN='"$(INIT_BIN)"'
   !endif
   !if $(NAND_SQUASHFS_SUPPORT)
       GCC:*_*_*_CC_FLAGS = -DNAND_SQUASHFS_SUPPORT

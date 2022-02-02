@@ -105,7 +105,7 @@ endif
 ifneq "$(INIT_BIN_LE)" ""
 	INIT_BIN := $(INIT_BIN_LE)
 else
-	INIT_BIN := \"/init\"
+	INIT_BIN := "/init"
 endif
 
 export SDLLVM_COMPILE_ANALYZE := $(SDLLVM_COMPILE_ANALYZE)
