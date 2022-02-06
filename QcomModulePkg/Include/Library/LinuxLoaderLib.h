@@ -226,6 +226,14 @@ EFI_STATUS
 IsMdtpActive (BOOLEAN *IsActive);
 
 EFI_STATUS
+WriteBlockToPartitionNoFlush (EFI_BLOCK_IO_PROTOCOL *BlockIo,
+                   IN EFI_HANDLE *Handle,
+                   IN UINT64 Offset,
+                   IN UINT64 Size,
+                   IN VOID *Image);
+
+
+EFI_STATUS
 WriteBlockToPartition (EFI_BLOCK_IO_PROTOCOL *BlockIo,
                    IN EFI_HANDLE *Handle,
                    IN UINT64 Offset,

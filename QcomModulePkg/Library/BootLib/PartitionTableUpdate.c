@@ -477,6 +477,13 @@ VOID UpdatePartitionAttributes (UINT32 UpdateType)
         goto Exit;
       }
     }
+
+    Status = BlockIo->FlushBlocks (BlockIo);
+    if (EFI_ERROR (Status)) {
+      DEBUG ((EFI_D_ERROR, "Error flushing blocks primary GPT header: %r\n",
+              Status));
+      goto Exit;
+    }
     FreePool (GptHdrPtr);
     GptHdrPtr = NULL;
   }
@@ -1161,6 +1168,15 @@ WriteGpt (INT32 Lun, UINT32 Sz, UINT8 *Gpt)
             Status));
     return FAILURE;
   }
+
+  Status = BlockIo->FlushBlocks (BlockIo);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR,
+            "Error flushing partition entries array for Secondary Table: %x\n",
+            Status));
+    return FAILURE;
+  }
+
   FlashingGpt = 0;
   gBS->SetMem ((VOID *)Gpt, Sz, 0x0);
 
