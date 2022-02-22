@@ -3278,6 +3278,22 @@ CmdOemSetGpuPreemptionValue (CONST CHAR8 *arg, VOID *data, UINT32 Size)
   }
 }
 
+STATIC VOID
+CmdOemAudioFrameWork (CONST CHAR8 *Arg, VOID *Data, UINT32 Size)
+{
+  EFI_STATUS Status;
+
+  if (Arg[0] == ' ') {
+     Arg++;
+  }
+
+  Status = StoreAudioFrameWork (Arg, AsciiStrLen (Arg));
+  if (Status != EFI_SUCCESS) {
+    FastbootFail ("Failed to store Audio framework");
+  } else {
+    FastbootOkay ("");
+  }
+}
 
 STATIC VOID
 CmdOemSelectDisplayPanel (CONST CHAR8 *arg, VOID *data, UINT32 sz)
@@ -3886,6 +3902,7 @@ FastbootCommandSetup (IN VOID *Base, IN UINT64 Size)
       {"reboot-bootloader", CmdRebootBootloader},
       {"getvar:", CmdGetVar},
       {"download:", CmdDownload},
+      {"oem audio-framework", CmdOemAudioFrameWork},
   };
 
   /* Register the commands only for non-user builds */

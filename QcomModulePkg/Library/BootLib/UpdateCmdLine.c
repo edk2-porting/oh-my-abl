@@ -77,7 +77,7 @@
 #include <Protocol/Print2.h>
 
 #include "AutoGen.h"
-#include <DeviceInfo.h>
+#include "DeviceInfo.h"
 #include "UpdateCmdLine.h"
 #include "Recovery.h"
 #include "LECmdLine.h"
@@ -146,6 +146,11 @@ STATIC UINTN HwFenceCmdLineLen = sizeof (HwFenceCmdLine);
 #define MAX_GPU_CMD_LINE 256
 STATIC CHAR8 GpuCmdLine[MAX_GPU_CMD_LINE];
 STATIC UINTN GpuCmdLineLen = sizeof (GpuCmdLine);
+
+#define MAX_AUDIO_CMD_LENGTH 64
+STATIC CHAR8 AudioFrameWork[MAX_AUDIO_FW_LENGTH];
+STATIC UINT32 AudioFWLen;
+STATIC CHAR8 *AndroidBootAudioFW = " androidboot.audio=";
 
 #define MAX_DTBO_IDX_STR 64
 STATIC CHAR8 *AndroidBootDtboIdx = " androidboot.dtbo_idx=";
@@ -406,6 +411,20 @@ STATIC EFI_STATUS GetGpuCmdline (VOID)
   return Status;
 }
 
+
+STATIC VOID
+GetAudioFrameWork (CHAR8 *FrameWork, UINT32* Length)
+{
+  EFI_STATUS Status;
+  CHAR8 *Src;
+
+  Status = ReadAudioFrameWork (&Src, Length);
+  if (Status == EFI_SUCCESS) {
+     if (*Length) {
+        AsciiStrCatS (FrameWork, MAX_AUDIO_FW_LENGTH, Src);
+   }
+ }
+}
 
 /*
  * Returns length = 0 when there is failure.
@@ -1320,6 +1339,19 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
       AddtoBootConfigList (BootConfigFlag, GpuCmdLine, NULL,
                         BootConfigListHead, ParamLen, 0);
   }
+
+  GetAudioFrameWork (AudioFrameWork, &AudioFWLen);
+  if (AudioFWLen) {
+     ParamLen = AsciiStrLen (AndroidBootAudioFW);
+     BootConfigFlag = IsAndroidBootParam (AndroidBootAudioFW,
+     ParamLen, HeaderVersion);
+     ADD_PARAM_LEN (BootConfigFlag, ParamLen,
+     CmdLineLen, BootConfigLen);
+     AddtoBootConfigList (BootConfigFlag, AndroidBootAudioFW, AudioFrameWork,
+     BootConfigListHead, ParamLen, AsciiStrLen (AudioFrameWork));
+     ADD_PARAM_LEN (BootConfigFlag, AsciiStrLen (AudioFrameWork),
+     CmdLineLen, BootConfigLen);
+ }
 
   if (!IsLEVariant ()) {
     DtboIdx = GetDtboIdx ();
