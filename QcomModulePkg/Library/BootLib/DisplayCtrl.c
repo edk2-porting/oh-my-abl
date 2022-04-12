@@ -115,32 +115,8 @@ UpdatePLLCodesInfoInternel (VOID *fdt, CHAR16 *service_variable, CHAR8 *dt_node)
     goto error;
   }
 
-  ret = FdtPathOffset (fdt, dt_node);
-  if (ret < 0) {
-    /* Just return success if display node not exists */
-    DEBUG ((EFI_D_WARN, "Cannot find dt node:%a\n", dt_node));
-    Status = EFI_NOT_FOUND;
-    goto error;
-  }
-
-  offset = (UINT32)ret;
-  Prop = fdt_get_property (fdt, offset, "reg", &PropLen);
-
-  if (!Prop ||
-      !Prop->data) {
-    DEBUG ((EFI_D_WARN, "Invalid pll codes data property\n"));
-    Status = EFI_NOT_FOUND;
-    goto error;
-  }
-
   /* Round up to align with 4 bytes */
   PllCodesInfoSize = ((PllCodesInfoSize + 3) & ~3);
-
-  if (PropLen < PllCodesInfoSize) {
-    DEBUG ((EFI_D_WARN, "Not enough space in DT node\n"));
-    Status = EFI_INVALID_PARAMETER;
-    goto error;
-  }
 
   PllCodesInfo = (UINT32*) AllocateZeroPool (PllCodesInfoSize);
 
@@ -160,6 +136,30 @@ UpdatePLLCodesInfoInternel (VOID *fdt, CHAR16 *service_variable, CHAR8 *dt_node)
   if (EFI_ERROR (Status) ||
      (0 == SizeTmp)) {
     DEBUG ((EFI_D_WARN, "Fail get pll codes data from service variable\n"));
+    goto error;
+  }
+
+  ret = FdtPathOffset (fdt, dt_node);
+  if (ret < 0) {
+    /* Just return success if display node not exists */
+    DEBUG ((EFI_D_WARN, "Cannot find dt node:%a\n", dt_node));
+    Status = EFI_NOT_FOUND;
+    goto error;
+  }
+
+  offset = (UINT32)ret;
+  Prop = fdt_get_property (fdt, offset, "reg", &PropLen);
+
+  if (!Prop ||
+      !Prop->data) {
+    DEBUG ((EFI_D_WARN, "Invalid pll codes data property\n"));
+    Status = EFI_NOT_FOUND;
+    goto error;
+  }
+
+  if (PropLen < PllCodesInfoSize) {
+    DEBUG ((EFI_D_WARN, "Not enough space in DT node\n"));
+    Status = EFI_INVALID_PARAMETER;
     goto error;
   }
 
