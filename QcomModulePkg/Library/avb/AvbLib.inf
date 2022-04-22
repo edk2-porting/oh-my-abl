@@ -68,6 +68,7 @@
    libavb/avb_vbmeta_image.c
    libavb/avb_version.c
    libavb/avb_ops.c
+   libavb/avb_load_verify_parallel.c
    VerifiedBoot.c
    KeymasterClient.c
    Hash2Client.c

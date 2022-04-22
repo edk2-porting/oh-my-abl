@@ -68,6 +68,8 @@
 #include "avb_util.h"
 #include "avb_vbmeta_image.h"
 #include "avb_version.h"
+#include "avb_load_verify_parallel.h"
+
 
 /* Maximum number of partitions that can be loaded with avb_slot_verify(). */
 #define MAX_NUMBER_OF_LOADED_PARTITIONS 32
@@ -420,6 +422,18 @@ static AvbSlotVerifyResult load_and_verify_hash_partition(
   if (ret != AVB_SLOT_VERIFY_RESULT_OK) {
     goto out;
   }
+
+  if ((avb_strncmp ("boot", part_name, 4) == 0)) {
+    ret = LoadAndVerifyBootHashPartition (ops,
+                                          hash_desc,
+                                          part_name,
+                                          desc_digest,
+                                          desc_salt,
+                                          image_buf,
+                                          hash_desc.image_size);
+    goto out;
+  }
+
   // Although only one of the type might be used, we have to defined the
   // structure here so that they would live outside the 'if/else' scope to be
   // used later.
