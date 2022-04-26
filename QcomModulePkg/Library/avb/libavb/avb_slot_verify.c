@@ -423,6 +423,7 @@ static AvbSlotVerifyResult load_and_verify_hash_partition(
     goto out;
   }
 
+#if BOOTIMAGE_LOAD_VERIFY_IN_PARALLEL
   if ((avb_strncmp ("boot", part_name, 4) == 0)) {
     ret = LoadAndVerifyBootHashPartition (ops,
                                           hash_desc,
@@ -433,6 +434,7 @@ static AvbSlotVerifyResult load_and_verify_hash_partition(
                                           hash_desc.image_size);
     goto out;
   }
+#endif
 
   // Although only one of the type might be used, we have to defined the
   // structure here so that they would live outside the 'if/else' scope to be
