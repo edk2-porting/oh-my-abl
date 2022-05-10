@@ -549,6 +549,58 @@ DTBImgCheckAndAppendDT (BootInfo *Info, BootParamlist *BootParamlistPtr)
         DEBUG ((EFI_D_ERROR, "Error: Device Tree blob not found\n"));
         return EFI_NOT_FOUND;
       }
+      Dtb = SingleDtHdr;
+    }
+
+    /* If hypervisor boot info is present, append dtbo info passed from hyp */
+    if (IsVmEnabled ()) {
+      if (BootParamlistPtr->HypDtboBaseAddr == NULL) {
+        DEBUG ((EFI_D_ERROR, "Error: HypOverlay DT is NULL\n"));
+        return EFI_NOT_FOUND;
+      }
+
+      for (UINT32 i = 0; i < BootParamlistPtr->NumHypDtbos; i++) {
+        /* Flag the invalid dtbos and overlay the valid ones */
+        if (!BootParamlistPtr->HypDtboBaseAddr[i] ||
+             fdt_check_header ((VOID *)BootParamlistPtr->HypDtboBaseAddr[i])) {
+          DEBUG ((EFI_D_ERROR, "HypInfo: Not overlaying hyp dtbo"
+                  "Dtbo :%d is null or Bad DT header\n", i));
+          continue;
+        }
+
+        /* Allocate buffer temporarily */
+        TempHypBootInfo[i] = AllocateZeroPool (fdt_totalsize
+                                      (BootParamlistPtr->HypDtboBaseAddr[i]));
+
+        if (!TempHypBootInfo[i]) {
+          DEBUG ((EFI_D_ERROR,
+                 "Failed to allocate memory for HypDtbo %d\n", i));
+          return EFI_OUT_OF_RESOURCES;
+        }
+
+        /* Copy content from Hyp provided memory to temp buffer */
+        gBS->CopyMem ((VOID *)TempHypBootInfo[i],
+                      (VOID *)BootParamlistPtr->HypDtboBaseAddr[i],
+                      fdt_totalsize (BootParamlistPtr->HypDtboBaseAddr[i]));
+
+        if (!AppendToDtList (&DtsList,
+                       (fdt64_t)TempHypBootInfo[i],
+                       fdt_totalsize (BootParamlistPtr->HypDtboBaseAddr[i]))) {
+          DEBUG ((EFI_D_ERROR,
+                  "Unable to Allocate buffer for HypOverlay DT num: %d\n", i));
+          FreePool ((VOID *)TempHypBootInfo[i]);
+          DeleteDtList (&DtsList);
+          return EFI_OUT_OF_RESOURCES;
+        }
+      }
+    }
+
+    Status = ApplyOverlay (BootParamlistPtr,
+                           Dtb,
+                           DtsList);
+    if (Status != EFI_SUCCESS) {
+      DEBUG ((EFI_D_ERROR, "Error: Dtb overlay failed\n"));
+      return Status;
     }
   } else {
     /*It is the case of DTB overlay Get the Soc specific dtb */
