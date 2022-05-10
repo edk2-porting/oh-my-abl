@@ -1526,10 +1526,9 @@ DisplayVerifiedBootScreen (BootInfo *Info)
   }
 
   /* dm-verity warning */
-  if ((GetAVBVersion () != AVB_2) &&
-      !IsEnforcing () &&
-     !Info->BootIntoRecovery) {
-    Status = DisplayVerifiedBootMenu (DISPLAY_MENU_EIO);
+  if ( !IsEnforcing () &&
+       !Info->BootIntoRecovery) {
+      Status = DisplayVerifiedBootMenu (DISPLAY_MENU_EIO);
       if (Status == EFI_SUCCESS) {
         WaitForExitKeysDetection ();
       } else {
