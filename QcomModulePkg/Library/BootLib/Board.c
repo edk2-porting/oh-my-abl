@@ -771,6 +771,10 @@ EFI_STATUS BoardDdrType (UINT32 *Type)
     *Type = DDRTYPE_1024MB;
   } else if (DdrSize <= DDR_2048MB) {
     *Type = DDRTYPE_2048MB;
+  } else if (DdrSize <= DDR_3072MB) {
+    *Type = DDRTYPE_3072MB;
+  } else if (DdrSize <= DDR_4096MB) {
+    *Type = DDRTYPE_4096MB;
   }
 
   return Status;
