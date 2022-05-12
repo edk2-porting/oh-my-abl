@@ -74,6 +74,7 @@
 #include <Library/BaseMemoryLib.h>
 #include <Library/CacheMaintenanceLib.h>
 #include <Library/DebugLib.h>
+#include <Library/Debug.h>
 #include <Library/DevicePathLib.h>
 #include <Library/DrawUI.h>
 #include <Library/IoLib.h>

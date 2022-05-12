@@ -67,6 +67,7 @@
 #include <Library/MemoryAllocationLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
 #include <Library/DebugLib.h>
+#include <Library/Debug.h>
 #include <Library/FdtRw.h>
 
 #define DISPLAY_PLL_CODES_MAX_SIZE              2048
