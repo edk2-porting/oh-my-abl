@@ -1482,7 +1482,7 @@ LoadImageAndAuthVB2 (BootInfo *Info)
   GUARD_OUT (KeyMasterSetRotAndBootState (&Data));
   ComputeVbMetaDigest (SlotData, (CHAR8 *)&Digest);
   GUARD_OUT (SetVerifiedBootHash ((CONST CHAR8 *)&Digest, sizeof(Digest)));
-  DEBUG ((EFI_D_INFO, "VB2: Authenticate complete! boot state is: %a\n",
+  DEBUG ((EFI_D_VERBOSE, "VB2: Authenticate complete! boot state is: %a\n",
           VbSn[Info->BootState].name));
 
 out:
