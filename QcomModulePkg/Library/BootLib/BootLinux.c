@@ -1273,9 +1273,11 @@ BootLinux (BootInfo *Info)
     goto Exit;
   }
 
-  ThreadNum = KernIntf->Thread->GetCurrentThread ();
-  StackBase = KernIntf->Thread->ThreadGetUnsafeSPBase (ThreadNum);
-  StackCurrent = KernIntf->Thread->ThreadGetUnsafeSPCurrent (ThreadNum);
+  if (KernIntf->Version >= EFI_KERNEL_PROTOCOL_VERSION) {
+    ThreadNum = KernIntf->Thread->GetCurrentThread ();
+    StackCurrent = KernIntf->Thread->ThreadGetUnsafeSPCurrent (ThreadNum);
+    StackBase = KernIntf->Thread->ThreadGetUnsafeSPBase (ThreadNum);
+  }
 
   DataSize = sizeof (KernelSizeReserved);
   Status = gRT->GetVariable ((CHAR16 *)L"KernelSize", &gQcomTokenSpaceGuid,
