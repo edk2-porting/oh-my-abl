@@ -598,7 +598,7 @@ WriteToDisk (IN EFI_BLOCK_IO_PROTOCOL *BlockIo,
              IN UINT64 Size,
              IN UINT64 offset)
 {
-  return WriteBlockToPartition (BlockIo, Handle, offset, Size, Image);
+  return WriteBlockToPartitionNoFlush (BlockIo, Handle, offset, Size, Image);
 }
 
 STATIC BOOLEAN
@@ -1017,10 +1017,13 @@ HandleSparseImgFlash (IN CHAR16 *PartitionName,
   DEBUG ((EFI_D_INFO, "Wrote %d blocks, expected to write %d blocks\n",
             SparseImgData.TotalBlocks, sparse_header->total_blks));
 
-  if (SparseImgData.TotalBlocks != sparse_header->total_blks ||
-          ((SparseImgData.BlockIo)->FlushBlocks (SparseImgData.BlockIo))) {
+  if (SparseImgData.TotalBlocks != sparse_header->total_blks) {
     DEBUG ((EFI_D_ERROR, "Sparse Image Write Failure\n"));
     Status = EFI_VOLUME_CORRUPTED;
+  } else if (((SparseImgData.BlockIo)->FlushBlocks (SparseImgData.BlockIo))
+               != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "Sparse Image Flush Failure\n"));
+    Status = EFI_DEVICE_ERROR;
   }
   return Status;
 }
@@ -1114,8 +1117,7 @@ HandleRawImgFlash (IN CHAR16 *PartitionName,
   }
 
   Status = WriteBlockToPartition (BlockIo, Handle, 0, Size, Image);
-  if (EFI_ERROR (Status) ||
-      (BlockIo->FlushBlocks (BlockIo))) {
+  if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "Writing Block to partition Failure\n"));
   }
 
@@ -1123,6 +1125,7 @@ HandleRawImgFlash (IN CHAR16 *PartitionName,
       !(StrnCmp (PartitionName, (CONST CHAR16 *)L"boot",
                  StrLen ((CONST CHAR16 *)L"boot"))))
     FastbootUpdateAttr (SlotSuffix);
+
   return Status;
 }
 

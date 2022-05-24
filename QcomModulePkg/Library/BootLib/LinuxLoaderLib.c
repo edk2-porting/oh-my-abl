@@ -531,7 +531,7 @@ GetNandMiscPartiGuid (EFI_GUID *Ptype)
 }
 
 EFI_STATUS
-WriteBlockToPartition (EFI_BLOCK_IO_PROTOCOL *BlockIo,
+WriteBlockToPartitionNoFlush (EFI_BLOCK_IO_PROTOCOL *BlockIo,
                    IN EFI_HANDLE *Handle,
                    IN UINT64 Offset,
                    IN UINT64 Size,
@@ -649,6 +649,27 @@ WriteBlockToPartition (EFI_BLOCK_IO_PROTOCOL *BlockIo,
   }
 
   return Status;
+}
+
+EFI_STATUS
+WriteBlockToPartition (EFI_BLOCK_IO_PROTOCOL *BlockIo,
+                   IN EFI_HANDLE *Handle,
+                   IN UINT64 Offset,
+                   IN UINT64 Size,
+                   IN VOID *Image) {
+
+
+  EFI_STATUS Status = EFI_SUCCESS;
+  Status = WriteBlockToPartitionNoFlush (BlockIo, Handle, Offset, Size, Image);
+  if (Status != EFI_SUCCESS) {
+    return Status;
+  }
+
+  Status = BlockIo->FlushBlocks (BlockIo);
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "Flushing single block failed :%r\n", Status));
+  }
+    return Status;
 }
 
 
