@@ -111,6 +111,7 @@ typedef struct UpdateCmdLineParamList {
   CONST CHAR8 *UsbSerialCmdLine;
   CONST CHAR8 *VBCmdLine;
   CONST CHAR8 *LogLevel;
+  CONST CHAR8 *NoPasr;
   CONST CHAR8 *BootDeviceCmdLine;
   CONST CHAR8 *AndroidBootMode;
   CONST CHAR8 *AndroidBootFstabSuffix;
