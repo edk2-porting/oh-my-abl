@@ -134,7 +134,7 @@
   !if $(AB_RETRYCOUNT_DISABLE)
       GCC:*_*_*_CC_FLAGS = -DAB_RETRYCOUNT_DISABLE
   !endif
-  !if $(TARGET_BOARD_TYPE_AUTO) == 1
+  !if $(TARGET_BOARD_TYPE_AUTO)
       GCC:*_*_*_CC_FLAGS = -DTARGET_BOARD_TYPE_AUTO
   !endif
   !if $(VERITY_LE)

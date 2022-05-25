@@ -1721,6 +1721,9 @@ LoadImageAndAuth (BootInfo *Info)
   if (Status != EFI_SUCCESS) {
     DEBUG ((EFI_D_VERBOSE,
             "Recovery partition doesn't exist; continue normal boot\n"));
+    if (IsTargetAuto ()) {
+      SetRecoveryHasNoKernel ();
+    }
   } else if (((boot_img_hdr *)(RecoveryHdr))->header_version >=
              BOOT_HEADER_VERSION_THREE &&
                !((boot_img_hdr *)(RecoveryHdr))->kernel_size) {

@@ -1941,9 +1941,19 @@ BOOLEAN IsEnableDisplayMenuFlagSupported (VOID)
 {
   return FALSE;
 }
+
+BOOLEAN IsTargetAuto (VOID)
+{
+  return TRUE;
+}
 #else
 BOOLEAN IsEnableDisplayMenuFlagSupported (VOID)
 {
   return TRUE;
+}
+
+BOOLEAN IsTargetAuto (VOID)
+{
+  return FALSE;
 }
 #endif
