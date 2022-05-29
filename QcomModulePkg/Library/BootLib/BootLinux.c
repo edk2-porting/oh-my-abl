@@ -173,23 +173,48 @@ QueryBootParams (UINT64 *KernelLoadAddr, UINT64 *KernelSizeReserved)
           SizeStatus == EFI_SUCCESS);
 }
 
+#ifdef ENABLE_EARLY_SERVICES
+STATIC VOID
+QueryEarlyServiceBootParams (UINT64 *KernelLoadAddr, UINT64 *KernelSizeReserved)
+{
+  *KernelLoadAddr = KERNEL_LOAD_ADDRESS;
+  *KernelSizeReserved = KERNEL_SIZE_RESERVED;
+  return;
+}
+#else
+STATIC VOID
+QueryEarlyServiceBootParams (UINT64 *KernelLoadAddr, UINT64 *KernelSizeReserved)
+{
+  *KernelLoadAddr = 0;
+  *KernelSizeReserved = 0;
+  return;
+}
+#endif
+
 STATIC EFI_STATUS
 UpdateBootParams (BootParamlist *BootParamlistPtr)
 {
   UINT64 KernelSizeReserved;
   UINT64 KernelLoadAddr;
   Kernel64Hdr *Kptr = NULL;
+  UINT64 KernelLoadAddr_new = 0;
+  UINT64 KernelSizeReserved_new = 0;
 
   if (BootParamlistPtr == NULL ) {
     DEBUG ((EFI_D_ERROR, "Invalid input parameters\n"));
     return EFI_INVALID_PARAMETER;
   }
+  QueryEarlyServiceBootParams (&KernelLoadAddr_new, &KernelSizeReserved_new);
 
   /* The three regions Kernel, Ramdisk and DT should be reserved in memory map
    * Query the kernel load address and size from UEFI core, if it's not
    * successful use the predefined load addresses */
   if (QueryBootParams (&KernelLoadAddr, &KernelSizeReserved)) {
-    BootParamlistPtr->KernelLoadAddr = KernelLoadAddr;
+    if (EarlyServicesEnabled ()) {
+      BootParamlistPtr->KernelLoadAddr = KernelLoadAddr_new;
+    } else {
+      BootParamlistPtr->KernelLoadAddr = KernelLoadAddr;
+    }
     if (BootParamlistPtr->BootingWith32BitKernel) {
       BootParamlistPtr->KernelLoadAddr += KERNEL_32BIT_LOAD_OFFSET;
     } else {
@@ -202,7 +227,13 @@ UpdateBootParams (BootParamlist *BootParamlistPtr)
         BootParamlistPtr->KernelLoadAddr += KERNEL_64BIT_LOAD_OFFSET;
       }
     }
-    BootParamlistPtr->KernelEndAddr = KernelLoadAddr + KernelSizeReserved;
+
+    if (EarlyServicesEnabled ()) {
+      BootParamlistPtr->KernelEndAddr =
+          KernelLoadAddr_new + KernelSizeReserved_new;
+    } else {
+      BootParamlistPtr->KernelEndAddr = KernelLoadAddr + KernelSizeReserved;
+    }
   } else {
     DEBUG ((EFI_D_VERBOSE, "QueryBootParams Failed: "));
     /* If Query of boot params fails, RamdiskEndAddress is end of the
@@ -213,19 +244,36 @@ UpdateBootParams (BootParamlist *BootParamlistPtr)
       /* For 32-bit Not all memory is accessible as defined by
          RamdiskEndAddress. Using pre-defined offset for backward
          compatability */
+    if (EarlyServicesEnabled ()) {
       BootParamlistPtr->KernelLoadAddr =
-            (EFI_PHYSICAL_ADDRESS) (BootParamlistPtr->BaseMemory |
+            (EFI_PHYSICAL_ADDRESS) (KernelLoadAddr_new |
                                     PcdGet32 (KernelLoadAddress32));
-      KernelSizeReserved = PcdGet32 (RamdiskEndAddress32);
     } else {
       BootParamlistPtr->KernelLoadAddr =
             (EFI_PHYSICAL_ADDRESS) (BootParamlistPtr->BaseMemory |
+                                    PcdGet32 (KernelLoadAddress32));
+    }
+      KernelSizeReserved = PcdGet32 (RamdiskEndAddress32);
+    } else {
+      if (EarlyServicesEnabled ()) {
+         BootParamlistPtr->KernelLoadAddr =
+            (EFI_PHYSICAL_ADDRESS) (KernelLoadAddr_new |
                                     PcdGet32 (KernelLoadAddress));
+      } else {
+      BootParamlistPtr->KernelLoadAddr =
+            (EFI_PHYSICAL_ADDRESS) (BootParamlistPtr->BaseMemory |
+                                    PcdGet32 (KernelLoadAddress));
+      }
       KernelSizeReserved = PcdGet32 (RamdiskEndAddress);
     }
 
-    BootParamlistPtr->KernelEndAddr = BootParamlistPtr->BaseMemory +
+    if (EarlyServicesEnabled ()) {
+      BootParamlistPtr->KernelEndAddr = KernelLoadAddr_new +
                                        KernelSizeReserved;
+    } else {
+      BootParamlistPtr->KernelEndAddr = BootParamlistPtr->BaseMemory +
+                                       KernelSizeReserved;
+    }
     DEBUG ((EFI_D_VERBOSE, "calculating dynamic offsets\n"));
   }
 
@@ -1952,6 +2000,18 @@ BOOLEAN IsBuildAsSystemRootImage (BootParamlist *BootParamlistPtr)
 {
    return BootParamlistPtr->RamdiskSize == 0;
 }
+
+#ifdef ENABLE_EARLY_SERVICES
+BOOLEAN EarlyServicesEnabled (VOID)
+{
+  return TRUE;
+}
+#else
+BOOLEAN EarlyServicesEnabled (VOID)
+{
+  return FALSE;
+}
+#endif
 
 #ifdef BUILD_USES_RECOVERY_AS_BOOT
 BOOLEAN IsBuildUseRecoveryAsBoot (VOID)

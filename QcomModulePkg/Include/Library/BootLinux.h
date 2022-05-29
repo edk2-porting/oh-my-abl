@@ -274,6 +274,7 @@ BOOLEAN IsBuildAsSystemRootImage (BootParamlist *BootParamlistPtr);
 BOOLEAN IsBuildUseRecoveryAsBoot (VOID);
 VOID SetRecoveryHasNoKernel (VOID);
 BOOLEAN IsRecoveryHasNoKernel (VOID);
+BOOLEAN EarlyServicesEnabled (VOID);
 EFI_STATUS
 GetImage (CONST BootInfo *Info,
           VOID **ImageBuffer,
