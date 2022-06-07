@@ -71,6 +71,7 @@
 #include <Library/ShutdownServices.h>
 #include <Library/VerifiedBootMenu.h>
 #include <Library/HypervisorMvCalls.h>
+#include <Library/Rtic.h>
 #include <Protocol/EFIMdtp.h>
 #include <Protocol/EFIScmModeSwitch.h>
 #include <libufdt_sysdeps.h>
@@ -1282,6 +1283,11 @@ BootLinux (BootInfo *Info)
   if (Status != EFI_SUCCESS) {
     return Status;
   }
+
+  /* Updating Kernel start Physical address to KP which will be used
+   * by QRKS service later.
+   */
+  GetQrksKernelStartAddress ();
 
   /* Updates the command line from boot image, appends device serial no.,
    * baseband information, etc.
