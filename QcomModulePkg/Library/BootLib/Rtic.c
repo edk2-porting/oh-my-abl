@@ -75,11 +75,22 @@ static VOID
 TxMpdatatoQhee (UINT64 *MpDataAddr, size_t MpDataSize)
 {
   EFI_STATUS Status = EFI_SUCCESS;
+  STATIC BOOLEAN Hyp_Call_Done = FALSE;
   QCOM_SCM_PROTOCOL *QcomScmProtocol = NULL;
   UINT64 Parameters[SCM_MAX_NUM_PARAMETERS] = {0};
   UINT64 Results[SCM_MAX_NUM_RESULTS] = {0};
   UINT64 KernelLoadAddr;
   HypNotifyRticDtb *HypNotify = (HypNotifyRticDtb *)Parameters;
+
+  /* Make sure to call it either from GetRticDtb or
+   * GetQrksKernelStartAddress but not from both.
+   */
+  if (Hyp_Call_Done) {
+    DEBUG ((EFI_D_VERBOSE, "KP got required info\n"));
+    return;
+  }
+
+  Hyp_Call_Done = TRUE;
 
   /* Locate QCOM_SCM_PROTOCOL */
   Status = gBS->LocateProtocol (&gQcomScmProtocolGuid, NULL,
@@ -102,7 +113,10 @@ TxMpdatatoQhee (UINT64 *MpDataAddr, size_t MpDataSize)
           KERNEL64_HDR_MAGIC));
 
   /* Flush Data cache */
-  WriteBackInvalidateDataCacheRange ((VOID*)MpDataAddr, MpDataSize);
+  if ((MpDataAddr) &&
+      (MpDataSize > 0)) {
+    WriteBackInvalidateDataCacheRange ((VOID*)MpDataAddr, MpDataSize);
+  }
 
   /* Make ScmSipSysCall */
   Status = QcomScmProtocol->ScmSipSysCall (
@@ -184,3 +198,12 @@ GetRticDtb (VOID *Dtb)
 
   return TRUE;
 }
+
+VOID
+GetQrksKernelStartAddress (VOID)
+{
+
+  TxMpdatatoQhee (NULL, 0);
+
+}
+
