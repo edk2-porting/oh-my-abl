@@ -118,6 +118,7 @@ typedef struct {
   AvbSlotVerifyData *SlotData;
 } VB2Data;
 
+#if VERIFIED_BOOT_ENABLED
 BOOLEAN Is_VERIFIED_BOOT_2 (VOID)
 {
   UINT32 PtnCount;
@@ -138,6 +139,12 @@ BOOLEAN Is_VERIFIED_BOOT_2 (VOID)
   }
   return FALSE;
 }
+#else
+BOOLEAN Is_VERIFIED_BOOT_2 (VOID)
+{
+  return FALSE;
+}
+#endif
 
 UINT32
 GetAVBVersion ()

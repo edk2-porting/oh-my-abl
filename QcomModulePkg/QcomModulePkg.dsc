@@ -160,6 +160,9 @@
   !if $(NAND_SQUASHFS_SUPPORT)
       GCC:*_*_*_CC_FLAGS = -DNAND_SQUASHFS_SUPPORT
   !endif
+  !if $(VERIFIED_BOOT_ENABLED)
+      GCC:*_*_*_CC_FLAGS = -DVERIFIED_BOOT_ENABLED
+  !endif
 
 [PcdsFixedAtBuild.common]
 
