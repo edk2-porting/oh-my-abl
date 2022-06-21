@@ -433,3 +433,57 @@ KeyMasterGetDateSupport (BOOLEAN *Supported)
   *Supported = TRUE;
   return Status;
 }
+
+EFI_STATUS
+KeyMasterSetRotForLE (KMRotAndBootStateForLE *BootState)
+{
+  EFI_STATUS Status = EFI_SUCCESS;
+  CHAR8 *RotDigest = NULL;
+  AvbSHA256Ctx RotCtx;
+  KMHandle Handle = {NULL};
+  KMSetRotReq RotReq = {0};
+  KMSetRotRsp RotRsp = {0};
+
+  if (BootState == NULL) {
+    DEBUG ((EFI_D_ERROR, "Invalid parameter BootState\n"));
+    return EFI_INVALID_PARAMETER;
+  }
+
+  /* Compute ROT digest */
+  avb_sha256_init (&RotCtx);
+  avb_sha256_update (&RotCtx, BootState->PublicKeyMod,
+                       BootState->PublicKeyModLength);
+  avb_sha256_update (&RotCtx, BootState->PublicKeyExp,
+                       BootState->PublicKeyExpLength);
+  avb_sha256_update (&RotCtx, &BootState->IsUnlocked,
+                       sizeof (BootState->IsUnlocked));
+  /* RotDigest is a fixed size array, cannot be NULL */
+  RotDigest = (CHAR8 *)avb_sha256_final (&RotCtx);
+  if (!*RotDigest) {
+      DEBUG ((EFI_D_ERROR, "Failed to set ROT Digest\n"));
+      return EFI_INVALID_PARAMETER;
+  }
+
+  /* Load KeyMaster App */
+  GUARD (KeyMasterStartApp (&Handle));
+
+  /* Set ROT */
+  RotReq.CmdId = KEYMASTER_SET_ROT;
+  RotReq.RotOffset = (UINT8 *)&RotReq.RotDigest - (UINT8 *)&RotReq;
+  RotReq.RotSize = sizeof (RotReq.RotDigest);
+  CopyMem (RotReq.RotDigest, RotDigest, AVB_SHA256_DIGEST_SIZE);
+
+  Status = Handle.QseeComProtocol->QseecomSendCmd (
+      Handle.QseeComProtocol, Handle.AppId, (UINT8 *)&RotReq, sizeof (RotReq),
+      (UINT8 *)&RotRsp, sizeof (RotRsp));
+  if (Status != EFI_SUCCESS ||
+        RotRsp.Status != 0) {
+    DEBUG ((EFI_D_ERROR, "KeyMasterSendRotAndBootState: Set ROT err, "
+                         "Status: %r, response status: %d\n",
+            Status, RotRsp.Status));
+    return EFI_LOAD_ERROR;
+  }
+
+  DEBUG ((EFI_D_INFO, "KeyMasterSetRotForLE success\n"));
+  return Status;
+}
