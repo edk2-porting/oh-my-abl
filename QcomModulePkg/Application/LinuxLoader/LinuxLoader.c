@@ -178,7 +178,7 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
   UINT32 BootReason = NORMAL_MODE;
   UINT32 KeyPressed = SCAN_NULL;
   /* MultiSlot Boot */
-  BOOLEAN MultiSlotBoot;
+  BOOLEAN MultiSlotBoot = FALSE;
   /* Flashless Boot */
   BOOLEAN FlashlessBoot = FALSE;
   EFI_MEM_CARDINFO_PROTOCOL *CardInfo = NULL;
