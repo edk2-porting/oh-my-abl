@@ -144,6 +144,7 @@ EFI_STATUS
 UpdateCmdLine (BootParamlist *BootParamlistPtr,
                CHAR8 *FfbmStr,
                BOOLEAN Recovery,
+               BOOLEAN FlashlessBoot,
                BOOLEAN AlarmBoot,
                CONST CHAR8 *VBCmdLine,
                UINT32 HeaderVersion);

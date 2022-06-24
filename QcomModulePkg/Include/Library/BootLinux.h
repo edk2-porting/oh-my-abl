@@ -166,6 +166,7 @@ typedef struct {
 
 typedef struct BootInfo {
   BOOLEAN MultiSlotBoot;
+  BOOLEAN FlashlessBoot;
   BOOLEAN BootIntoRecovery;
   BOOLEAN BootReasonAlarm;
   CHAR16 Pname[MAX_GPT_NAME_SIZE];

@@ -1117,6 +1117,7 @@ BootLinux (BootInfo *Info)
   CHAR16 *PartitionName = NULL;
   BOOLEAN Recovery = FALSE;
   BOOLEAN AlarmBoot = FALSE;
+  BOOLEAN FlashlessBoot = Info->FlashlessBoot;
 
   LINUX_KERNEL LinuxKernel;
   LINUX_KERNEL32 LinuxKernel32;
@@ -1153,12 +1154,14 @@ BootLinux (BootInfo *Info)
   Recovery = Info->BootIntoRecovery;
   AlarmBoot = Info->BootReasonAlarm;
 
-  if (!StrnCmp (PartitionName, (CONST CHAR16 *)L"boot",
-                StrLen ((CONST CHAR16 *)L"boot"))) {
-    Status = GetFfbmCommand (FfbmStr, FFBM_MODE_BUF_SIZE);
-    if (Status != EFI_SUCCESS) {
-      DEBUG ((EFI_D_VERBOSE, "No Ffbm cookie found, ignore: %r\n", Status));
-      FfbmStr[0] = '\0';
+  if (!FlashlessBoot) {
+    if (!StrnCmp (PartitionName, (CONST CHAR16 *)L"boot",
+                  StrLen ((CONST CHAR16 *)L"boot"))) {
+      Status = GetFfbmCommand (FfbmStr, FFBM_MODE_BUF_SIZE);
+      if (Status != EFI_SUCCESS) {
+        DEBUG ((EFI_D_VERBOSE, "No Ffbm cookie found, ignore: %r\n", Status));
+        FfbmStr[0] = '\0';
+      }
     }
   }
 
@@ -1294,8 +1297,8 @@ BootLinux (BootInfo *Info)
    * Called before ShutdownUefiBootServices as it uses some boot service
    * functions
    */
-  Status = UpdateCmdLine (&BootParamlistPtr, FfbmStr, Recovery, AlarmBoot,
-                    Info->VBCmdLine, Info->HeaderVersion);
+  Status = UpdateCmdLine (&BootParamlistPtr, FfbmStr, Recovery, FlashlessBoot,
+                    AlarmBoot, Info->VBCmdLine, Info->HeaderVersion);
 
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "Error updating cmdline. Device Error %r\n", Status));
