@@ -120,6 +120,10 @@ STATIC CHAR8 MacEthAddrBufCmdLine[MAX_IP_ADDR_BUF];
 STATIC CHAR8 DisplayCmdLine[MAX_DISPLAY_CMD_LINE];
 STATIC UINTN DisplayCmdLineLen = sizeof (DisplayCmdLine);
 
+#define MAX_HW_FENCE_CMD_LINE 32
+STATIC CHAR8 HwFenceCmdLine[MAX_HW_FENCE_CMD_LINE];
+STATIC UINTN HwFenceCmdLineLen = sizeof (HwFenceCmdLine);
+
 #define MAX_DTBO_IDX_STR 64
 STATIC CHAR8 *AndroidBootDtboIdx = " androidboot.dtbo_idx=";
 STATIC CHAR8 *AndroidBootDtbIdx = " androidboot.dtb_idx=";
@@ -347,6 +351,18 @@ STATIC VOID GetDisplayCmdline (VOID)
                              DisplayCmdLine);
   if (Status != EFI_SUCCESS) {
     DEBUG ((EFI_D_ERROR, "Unable to get Panel Config, %r\n", Status));
+  }
+}
+
+STATIC VOID GetHwFenceCmdline (VOID)
+{
+  EFI_STATUS Status;
+
+  Status = gRT->GetVariable ((CHAR16 *)L"HwFenceConfiguration",
+                             &gQcomTokenSpaceGuid, NULL, &HwFenceCmdLineLen,
+                             HwFenceCmdLine);
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "Unable to get hw fence Config, %r\n", Status));
   }
 }
 
@@ -607,6 +623,9 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
   }
 
   Src = Param->DisplayCmdLine;
+  AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+
+  Src = Param->HwFenceCmdLine;
   AsciiStrCatS (Dst, MaxCmdLineLen, Src);
 
   if (Param->MdtpActive) {
@@ -1155,6 +1174,15 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   AddtoBootConfigList (BootConfigFlag, DisplayCmdLine, NULL,
                    BootConfigListHead, ParamLen, 0);
 
+  GetHwFenceCmdline ();
+  ParamLen = AsciiStrLen (HwFenceCmdLine);
+  BootConfigFlag = IsAndroidBootParam (HwFenceCmdLine,
+                             ParamLen, HeaderVersion);
+  ADD_PARAM_LEN (BootConfigFlag, ParamLen, CmdLineLen,
+                                       BootConfigLen);
+  AddtoBootConfigList (BootConfigFlag, HwFenceCmdLine, NULL,
+                   BootConfigListHead, ParamLen, 0);
+
   if (!IsLEVariant ()) {
     DtboIdx = GetDtboIdx ();
     if (DtboIdx != INVALID_PTN) {
@@ -1281,6 +1309,7 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   Param.SlotSuffixAscii = SlotSuffixAscii;
   Param.ChipBaseBand = ChipBaseBand;
   Param.DisplayCmdLine = DisplayCmdLine;
+  Param.HwFenceCmdLine = HwFenceCmdLine;
   Param.CmdLine = CmdLine;
   Param.AlarmBootCmdLine = AlarmBootCmdLine;
   Param.MdtpActiveFlag = MdtpActiveFlag;

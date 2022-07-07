@@ -3185,6 +3185,45 @@ DisplayGetVariable (CHAR16 *VariableName, VOID *VariableValue, UINTN *DataSize)
 }
 
 STATIC VOID
+CmdOemSetHwFenceValue (CONST CHAR8 *arg, VOID *data, UINT32 Size)
+{
+  EFI_STATUS Status;
+  CHAR8 Resp[MAX_RSP_SIZE] = "Set HW fence value: ";
+  CHAR8 HwFenceValue[MAX_DISPLAY_PANEL_OVERRIDE] = " msm_hw_fence.enable=";
+  INTN Pos = 0;
+
+  for (Pos = 0; Pos < AsciiStrLen (arg); Pos++) {
+    if (arg[Pos] == ' ') {
+      arg++;
+      Pos--;
+    } else {
+      break;
+    }
+  }
+
+  AsciiStrnCatS (HwFenceValue,
+                 MAX_DISPLAY_PANEL_OVERRIDE,
+                 arg,
+                 AsciiStrLen (arg));
+
+  Status = gRT->SetVariable ((CHAR16 *)L"HwFenceConfiguration",
+                               &gQcomTokenSpaceGuid,
+                               EFI_VARIABLE_RUNTIME_ACCESS |
+                               EFI_VARIABLE_BOOTSERVICE_ACCESS |
+                               EFI_VARIABLE_NON_VOLATILE,
+                               AsciiStrLen (HwFenceValue),
+                               (VOID *)HwFenceValue);
+
+  if (EFI_ERROR (Status)) {
+    AsciiStrnCatS (Resp, sizeof (Resp), ": failed!", AsciiStrLen (": failed!"));
+    FastbootFail (Resp);
+  } else {
+    AsciiStrnCatS (Resp, sizeof (Resp), ": done", AsciiStrLen (": done"));
+    FastbootOkay (Resp);
+  }
+}
+
+STATIC VOID
 CmdOemSelectDisplayPanel (CONST CHAR8 *arg, VOID *data, UINT32 sz)
 {
   EFI_STATUS Status;
@@ -3727,6 +3766,7 @@ FastbootCommandSetup (IN VOID *Base, IN UINT64 Size)
       {"oem disable-charger-screen", CmdOemDisableChargerScreen},
       {"oem off-mode-charge", CmdOemOffModeCharger},
       {"oem select-display-panel", CmdOemSelectDisplayPanel},
+      {"oem set-hw-fence-value", CmdOemSetHwFenceValue},
       {"oem device-info", CmdOemDevinfo},
       {"continue", CmdContinue},
       {"reboot", CmdReboot},
