@@ -119,6 +119,7 @@ typedef enum {
   EFI_PLATFORMINFO_TYPE_WDP = 0x24,  /**< WDP device. */
   EFI_PLATFORMINFO_TYPE_QAM = 0x25,  /**< QAM device. */
   EFI_PLATFORMINFO_TYPE_QXR = 0x26,  /**< QXR device. */
+  EFI_PLATFORMINFO_TYPE_X100 = 0x27, /**< Target is A PCIe card   */
 
   EFI_PLATFORMINFO_NUM_TYPES, /**< Number of known targets
                                                  (including unknown). @newpage
