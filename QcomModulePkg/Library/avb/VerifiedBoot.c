@@ -78,6 +78,7 @@ STATIC CONST CHAR8 *KeymasterLoadState = " androidboot.keymaster=1";
 STATIC CONST CHAR8 *DmVerityCmd = " root=/dev/dm-0 dm=\"system none ro,0 1 "
                                     "android-verity";
 STATIC CONST CHAR8 *Space = " ";
+extern UINT64 FlashlessBootImageAddr;
 
 #define MAX_NUM_REQ_PARTITION    8
 #define MAX_PROPERTY_SIZE        10
@@ -345,6 +346,33 @@ IsRootCmdLineUpdated (BootInfo *Info)
   }
 }
 
+STATIC EFI_STATUS
+LocateImageNoAuth (BootInfo *Info, UINT32 *PageSize)
+{
+  EFI_STATUS Status = EFI_SUCCESS;
+  UINT32 ImageHdrSize = BOOT_IMG_MAX_PAGE_SIZE;
+
+  Info->Images[0].ImageBuffer = (VOID *)FlashlessBootImageAddr;
+  Status = CheckImageHeader (Info->Images[0].ImageBuffer, ImageHdrSize,
+                             NULL, 0, (UINT32 *)&(Info->Images[0].ImageSize),
+                             PageSize, FALSE, NULL);
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "Unable to locate image in memory\n"));
+    return Status;
+  }
+
+  Info->NumLoadedImages = 1;
+  Info->Images[0].Name = AllocateZeroPool (StrLen (Info->Pname) + 1);
+  if (!Info->Images[0].Name) {
+    DEBUG ((EFI_D_ERROR, "Out of memory for image name\n"));
+    return EFI_OUT_OF_RESOURCES;
+  }
+
+  /* Flow ahead searches for Images.Name to find "boot" so we make it as "boot"
+   * as if we loaded from the boot partition */
+  UnicodeStrToAsciiStr (Info->Pname, Info->Images[0].Name);
+  return Status;
+}
 
 /**
   Load Partition Boot image if the boot image is v3
@@ -424,6 +452,15 @@ LoadBootImageNoAuth (BootInfo *Info, UINT32 *PageSize, BOOLEAN *FastbootPath)
   VOID *RecoveryImageHdrBuffer = NULL;
   UINT32 RecoveryImageHdrSize = 0;
   BOOLEAN BootImageLoaded;
+  /* In case of flashless LE devices images are already loaded and verified
+   * by previous bootloaders, so just fill the BootInfo structure with
+   * required parameters
+   */
+  if (Info->FlashlessBoot) {
+    GUARD (LocateImageNoAuth (Info, PageSize));
+    goto SkipImageVerification;
+  }
+
 
   /** The Images[0].ImageBuffer would have been loaded with the boot image
    *  already if we are coming from fastboot boot path. Ignore loading it
@@ -509,6 +546,7 @@ LoadBootImageNoAuth (BootInfo *Info, UINT32 *PageSize, BOOLEAN *FastbootPath)
 
   Info->Images[0].ImageSize = ImageSizeActual;
 
+SkipImageVerification:
   if (Info->HeaderVersion >= BOOT_HEADER_VERSION_THREE) {
     Status = NoAVBLoadPartitionImage (Info, (CHAR16 *)L"vendor_boot");
     if (Status != EFI_SUCCESS) {
@@ -1614,10 +1652,21 @@ STATIC EFI_STATUS LoadImageAndAuthForLE (BootInfo *Info)
     CHAR8 *SystemPath = NULL;
     UINT32 SystemPathLen = 0;
     BOOLEAN SecureDevice = FALSE;
+    UINT32 PageSize = 0;
     /*Load image*/
     GUARD (VBAllocateCmdLine (Info));
     GUARD (VBCommonInit (Info));
-    GUARD (LoadImageNoAuth (Info));
+
+    /* In case of flashless LE devices images are already loaded and verified
+     * by previous bootloaders, so just fill the BootInfo structure with
+     * required parameters
+     */
+    if (Info->FlashlessBoot) {
+      GUARD (LocateImageNoAuth (Info, &PageSize));
+      goto skip_verification;
+    } else {
+      GUARD (LoadImageNoAuth (Info));
+    }
 
     Status = IsSecureDevice (&SecureDevice);
     if (Status != EFI_SUCCESS) {
@@ -1722,6 +1771,10 @@ LoadImageAndAuth (BootInfo *Info)
     return EFI_INVALID_PARAMETER;
   }
 
+  if (Info->FlashlessBoot) {
+    goto get_ptn_name;
+  }
+
   /* check early if recovery exists and has a kernel size */
   Status = LoadPartitionImageHeader (Info, (CHAR16 *)L"recovery", &RecoveryHdr,
                                      &RecoveryHdrSz);
@@ -1768,6 +1821,7 @@ LoadImageAndAuth (BootInfo *Info)
                ALIGN_PAGES (BOOT_IMG_MAX_PAGE_SIZE, ALIGNMENT_MASK_4KB));
   }
 
+get_ptn_name:
   /* Get Partition Name*/
   if (!Info->MultiSlotBoot) {
     if (Info->BootIntoRecovery &&

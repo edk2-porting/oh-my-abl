@@ -30,6 +30,42 @@
  *
  */
 
+/*
+ *  Changes from Qualcomm Innovation Center are provided under the following license:
+ *
+ *  Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted (subject to the limitations in the
+ *  disclaimer below) provided that the following conditions are met:
+ *
+ *      * Redistributions of source code must retain the above copyright
+ *        notice, this list of conditions and the following disclaimer.
+ *
+ *      * Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials provided
+ *        with the distribution.
+ *
+ *      * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+ *        contributors may be used to endorse or promote products derived
+ *        from this software without specific prior written permission.
+ *
+ *  NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ *  GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ *  HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ *  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ *  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ *  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ *  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ *  GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ *  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ *  IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ *  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ *  IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 #include "AutoGen.h"
 #include "BootLinux.h"
 #include "BootStats.h"
@@ -45,6 +81,7 @@
 #include "Library/ThreadStack.h"
 #include <Library/HypervisorMvCalls.h>
 #include <Library/UpdateCmdLine.h>
+#include <Protocol/EFICardInfo.h>
 
 #define MAX_APP_STR_LEN 64
 #define MAX_NUM_FS 10
@@ -53,6 +90,7 @@
 STATIC BOOLEAN BootReasonAlarm = FALSE;
 STATIC BOOLEAN BootIntoFastboot = FALSE;
 STATIC BOOLEAN BootIntoRecovery = FALSE;
+UINT64 FlashlessBootImageAddr = 0;
 
 // This function is used to Deactivate MDTP by entering recovery UI
 STATIC EFI_STATUS MdtpDisable (VOID)
@@ -140,7 +178,10 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
   UINT32 BootReason = NORMAL_MODE;
   UINT32 KeyPressed = SCAN_NULL;
   /* MultiSlot Boot */
-  BOOLEAN MultiSlotBoot;
+  BOOLEAN MultiSlotBoot = FALSE;
+  /* Flashless Boot */
+  BOOLEAN FlashlessBoot = FALSE;
+  EFI_MEM_CARDINFO_PROTOCOL *CardInfo = NULL;
 
   DEBUG ((EFI_D_INFO, "Loader Build Info: %a %a\n", __DATE__, __TIME__));
   DEBUG ((EFI_D_VERBOSE, "LinuxLoader Load Address to debug ABL: 0x%llx\n",
@@ -159,6 +200,16 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
   StackGuardChkSetup ();
 
   BootStatsSetTimeStamp (BS_BL_START);
+
+  /* Check if memory card is present; goto flashless if not */
+  Status = gBS->LocateProtocol (&gEfiMemCardInfoProtocolGuid, NULL,
+                                  (VOID **)&CardInfo);
+  if (EFI_ERROR (Status)) {
+    FlashlessBootImageAddr = BASE_ADDRESS;
+    FlashlessBoot = TRUE;
+    /* In flashless boot avoid all access to secondary storage during boot */
+    goto flashless_boot;
+  }
 
   // Initialize verified boot & Read Device Info
   Status = DeviceInfoInit ();
@@ -252,6 +303,7 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
   if (Status != EFI_SUCCESS)
     DEBUG ((EFI_D_VERBOSE, "RecoveryInit failed ignore: %r\n", Status));
 
+flashless_boot:
   /* Populate board data required for fastboot, dtb selection and cmd line */
   Status = BoardInit ();
   if (Status != EFI_SUCCESS) {
@@ -271,6 +323,7 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
     Info.MultiSlotBoot = MultiSlotBoot;
     Info.BootIntoRecovery = BootIntoRecovery;
     Info.BootReasonAlarm = BootReasonAlarm;
+    Info.FlashlessBoot = FlashlessBoot;
     Status = LoadImageAndAuth (&Info);
     if (Status != EFI_SUCCESS) {
       DEBUG ((EFI_D_ERROR, "LoadImageAndAuth failed: %r\n", Status));
@@ -281,6 +334,11 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
   }
 
 fastboot:
+  if (FlashlessBoot) {
+    DEBUG ((EFI_D_ERROR, "No fastboot support for flashless chipsets,"
+                               " Infinte loop\n"));
+    while (1);
+  }
   DEBUG ((EFI_D_INFO, "Launching fastboot\n"));
   Status = FastbootInitialize ();
   if (EFI_ERROR (Status)) {

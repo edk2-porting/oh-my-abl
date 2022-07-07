@@ -369,6 +369,12 @@ GetSystemPath (CHAR8 **SysPath, BootInfo *Info)
     return 0;
   }
 
+  if (Info->FlashlessBoot) {
+     AsciiSPrint (*SysPath, MAX_PATH_SIZE,
+                     " rootfstype=squashfs root=/dev/ram0");
+     return AsciiStrLen (*SysPath);
+  }
+
   if (IsLEVariant () &&
       Info->BootIntoRecovery) {
     StrnCpyS (PartitionName, MAX_GPT_NAME_SIZE, (CONST CHAR16 *)L"recoveryfs",
@@ -899,6 +905,7 @@ EFI_STATUS
 UpdateCmdLine (BootParamlist *BootParamlistPtr,
                CHAR8 *FfbmStr,
                BOOLEAN Recovery,
+               BOOLEAN FlashlessBoot,
                BOOLEAN AlarmBoot,
                CONST CHAR8 *VBCmdLine,
                UINT32 HeaderVersion)
@@ -936,10 +943,12 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   BootConfigListHead = (LIST_ENTRY*) AllocateZeroPool (sizeof (LIST_ENTRY));
   InitializeListHead (BootConfigListHead);
 
-  Status = BoardSerialNum (StrSerialNum, sizeof (StrSerialNum));
-  if (Status != EFI_SUCCESS) {
-    DEBUG ((EFI_D_ERROR, "Error Finding board serial num: %x\n", Status));
-    return Status;
+  if (!FlashlessBoot) {
+    Status = BoardSerialNum (StrSerialNum, sizeof (StrSerialNum));
+    if (Status != EFI_SUCCESS) {
+      DEBUG ((EFI_D_ERROR, "Error Finding board serial num: %x\n", Status));
+      return Status;
+    }
   }
 
   if (CmdLine && CmdLine[0]) {
