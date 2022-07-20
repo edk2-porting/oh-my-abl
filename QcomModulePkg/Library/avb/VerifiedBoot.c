@@ -1126,42 +1126,163 @@ ComputeVbMetaDigest (AvbSlotVerifyData* SlotData, CHAR8* Digest) {
   avb_memcpy (Digest, avb_sha256_final(&Ctx), AVB_SHA256_DIGEST_SIZE);
 }
 
-static UINT32 ParseBootSecurityLevel (CONST CHAR8 *BootSecurityLevel,
-                                      size_t BootSecurityLevelSize)
-{
-  UINT32 PatchLevelDate = 0;
-  UINT32 PatchLevelMonth = 0;
-  UINT32 PatchLevelYear = 0;
-  UINT32 SeparatorCount = 0;
-  UINT32 Count = 0;
 
-  /*Parse the value of security patch as per YYYY-MM-DD format*/
-  while (Count < BootSecurityLevelSize) {
-    if (BootSecurityLevel[Count] == '-') {
-      SeparatorCount++;
+static UINT32 ParseFooterOsVersion (CONST CHAR8 *Ptr, UINTN Size)
+{
+  UINT32 Major = 0;
+  UINT32 Minor = 0;
+  UINT32 SubMinor = 0;
+  UINT32 Separator = 0;
+  UINTN Index = 0;
+
+  while (Index < Size) {
+    if (Ptr[Index] == '.') {
+      Separator++;
     }
-    else if (SeparatorCount == 2) {
-      PatchLevelDate *= 10;
-      PatchLevelDate += (BootSecurityLevel[Count] - '0');
+    else if (Separator == 0) {
+      Major *= 10;
+      Major += Ptr[Index] - '0';
     }
-    else if (SeparatorCount == 1) {
-      PatchLevelMonth *= 10;
-      PatchLevelMonth += (BootSecurityLevel[Count] - '0');
+    else if (Separator == 1) {
+      Minor *= 10;
+      Minor += Ptr[Index] - '0';
     }
-    else if (SeparatorCount == 0) {
-      PatchLevelYear *= 10;
-      PatchLevelYear += (BootSecurityLevel[Count] - '0');
+    else if (Separator == 2) {
+      SubMinor *= 10;
+      SubMinor += Ptr[Index] - '0';
     }
     else {
-      return -1;
+      return 0;
     }
-    Count++;
+
+    Index++;
   }
 
-  PatchLevelDate = PatchLevelDate << 11;
-  PatchLevelYear = (PatchLevelYear - 2000) << 4;
-  return (PatchLevelDate | PatchLevelYear | PatchLevelMonth);
+  return ((Major << 14) | (Minor << 7) | SubMinor);
 }
+
+
+static UINT32 ParseFooterSecPatch (CONST CHAR8 *Ptr, UINTN Size)
+{
+  UINT32 Year = 0;
+  UINT32 Month = 0;
+  UINT32 Day = 0;
+  UINT32 Separator = 0;
+  UINTN Index = 0;
+
+  while (Index < Size) {
+    if (Ptr[Index] == '-') {
+      Separator++;
+    }
+    else if (Separator == 0) {
+      Year *= 10;
+      Year += Ptr[Index] - '0';
+    }
+    else if (Separator == 1) {
+      Month *= 10;
+      Month += Ptr[Index] - '0';
+    }
+    else if (Separator == 2) {
+      Day *= 10;
+      Day += Ptr[Index] - '0';
+    }
+    else {
+      return 0;
+    }
+
+    Index++;
+  }
+
+  if (Year == 0 ||
+    Year < 2000 ||
+    Month == 0 ||
+    Month > 12 ||
+    Day == 0 ||
+    Day > 31) {
+    return 0;
+  }
+
+  return ((Day << 11) | ((Year - 2000) << 4) | Month);
+}
+
+
+static EFI_STATUS GetOsVerAndSecPactchLevel (AvbSlotVerifyData *SlotData,
+                                             boot_img_hdr *BootImgHdr,
+                                             UINT32 *OsVersion,
+                                             UINT32 *SecPatch)
+{
+  CONST CHAR8 *PropValPtr  = NULL;
+  UINTN PropValSize = 0;
+  UINT32 OsVersionRaw;
+
+  PropValPtr = avb_property_lookup (SlotData->vbmeta_images[0].vbmeta_data,
+                                    SlotData->vbmeta_images[0].vbmeta_size,
+                                    "com.android.build.boot.os_version",
+                                    0,
+                                    &PropValSize);
+  if (PropValPtr != NULL) {
+    *OsVersion = ParseFooterOsVersion (PropValPtr, PropValSize);
+    if (*OsVersion == 0) {
+      DEBUG ((EFI_D_ERROR, "Footer os_version format invalid\n"));
+      return EFI_INVALID_PARAMETER;
+    }
+  }
+  else {
+    DEBUG ((EFI_D_ERROR, "Footer osP_version prop not found \n"));
+    goto Try_Header;
+  }
+
+  PropValPtr = NULL;
+  PropValPtr = avb_property_lookup (SlotData->vbmeta_images[0].vbmeta_data,
+                                    SlotData->vbmeta_images[0].vbmeta_size,
+                                    "com.android.build.boot.security_patch",
+                                    0,
+                                    &PropValSize);
+  if (PropValPtr != NULL) {
+    *SecPatch = ParseFooterSecPatch (PropValPtr, PropValSize);
+    if (*SecPatch == 0) {
+      DEBUG ((EFI_D_ERROR, "Footer security_patch format invalid\n"));
+      return EFI_INVALID_PARAMETER;
+    }
+  }
+  else {
+    DEBUG ((EFI_D_ERROR, "Footer SecPatch prop not found \n"));
+    goto Try_Header;
+  }
+
+  DEBUG ((EFI_D_INFO, "Ftr OsVer:0x%x SPL:0x%x\n", *OsVersion, *SecPatch));
+  return EFI_SUCCESS;
+
+Try_Header:
+
+  if (BootImgHdr->header_version >= BOOT_HEADER_VERSION_THREE) {
+    OsVersionRaw = ((boot_img_hdr_v3 *)BootImgHdr)->os_version;
+  }
+  else {
+    OsVersionRaw = ((boot_img_hdr *)BootImgHdr)->os_version;
+  }
+
+  if (OsVersionRaw == 0) {
+    DEBUG ((EFI_D_ERROR, "Boot image header OS version == 0 \n"));
+    return EFI_INVALID_PARAMETER;
+  }
+
+  *OsVersion = (OsVersionRaw >> 11) & 0x1FFFFF;
+  if (*OsVersion == 0) {
+    DEBUG ((EFI_D_ERROR, "Header Os Version format invalid\n"));
+    return EFI_INVALID_PARAMETER;
+  }
+
+  *SecPatch = OsVersionRaw & 0x7FF;
+  if (*SecPatch == 0) {
+    DEBUG ((EFI_D_ERROR, "Header security patch format invalid\n"));
+    return EFI_INVALID_PARAMETER;
+  }
+
+  DEBUG ((EFI_D_INFO, "Hdr OsVer:0x%x SPL:0x%x\n", *OsVersion, *SecPatch));
+  return EFI_SUCCESS;
+}
+
 
 STATIC BOOLEAN
 IsValidPartition (Slot *Slot, CONST CHAR16 *Name)
@@ -1184,6 +1305,7 @@ IsValidPartition (Slot *Slot, CONST CHAR16 *Name)
           Index >= MAX_NUM_PARTITIONS) ?
           FALSE : TRUE;
 }
+
 
 STATIC EFI_STATUS
 LoadImageAndAuthVB2 (BootInfo *Info)
@@ -1210,10 +1332,7 @@ LoadImageAndAuthVB2 (BootInfo *Info)
   VOID *RecoveryImageBuffer = NULL;
   UINTN RecoveryImageSize = 0;
   KMRotAndBootState Data = {0};
-  CONST CHAR8 *BootSecurityLevel = NULL;
-  size_t BootSecurityLevelSize = 0;
-  BOOLEAN DateSupport = FALSE;
-  CONST boot_img_hdr *BootImgHdr = NULL;
+  boot_img_hdr *BootImgHdr = NULL;
   AvbSlotVerifyFlags VerifyFlags =
       AllowVerificationError ? AVB_SLOT_VERIFY_FLAGS_ALLOW_VERIFICATION_ERROR
                              : AVB_SLOT_VERIFY_FLAGS_NONE;
@@ -1221,7 +1340,6 @@ LoadImageAndAuthVB2 (BootInfo *Info)
       AVB_HASHTREE_ERROR_MODE_MANAGED_RESTART_AND_EIO;
   CHAR8 Digest[AVB_SHA256_DIGEST_SIZE];
   BOOLEAN UpdateRollback = FALSE;
-  UINT32 OSVersion;
 
   Info->BootState = RED;
   GUARD (VBCommonInit (Info));
@@ -1486,43 +1604,10 @@ LoadImageAndAuthVB2 (BootInfo *Info)
   Data.PublicKeyLength = UserData->PublicKeyLen;
   Data.PublicKey = UserData->PublicKey;
 
-  GUARD_OUT (KeyMasterGetDateSupport (&DateSupport));
-
-  if (BootImgHdr->header_version >= BOOT_HEADER_VERSION_THREE) {
-    OSVersion = ((boot_img_hdr_v3 *)(ImageBuffer))->os_version;
-  } else {
-    OSVersion = BootImgHdr->os_version;
-  }
-
-  /* Send date value in security patch only when KM TA supports it and the
-   * property is available in vbmeta data, send the old value in other cases
-  */
-  DEBUG ((EFI_D_VERBOSE, "DateSupport: %d\n", DateSupport));
-  if (DateSupport) {
-    BootSecurityLevel = avb_property_lookup (
-                           SlotData->vbmeta_images[0].vbmeta_data,
-                           SlotData->vbmeta_images[0].vbmeta_size,
-                           "com.android.build.boot.security_patch",
-                           0, &BootSecurityLevelSize);
-
-    if (BootSecurityLevel != NULL &&
-        BootSecurityLevelSize == MAX_PROPERTY_SIZE) {
-      Data.SystemSecurityLevel = ParseBootSecurityLevel (BootSecurityLevel,
-                                                         BootSecurityLevelSize);
-      if (Data.SystemSecurityLevel < 0) {
-        DEBUG ((EFI_D_ERROR, "System security patch level format invalid\n"));
-        Status = EFI_INVALID_PARAMETER;
-        goto out;
-      }
-    }
-    else {
-      Data.SystemSecurityLevel = (OSVersion & 0x7FF);
-    }
-  }
-  else {
-    Data.SystemSecurityLevel = (OSVersion & 0x7FF);
-  }
-  Data.SystemVersion = (OSVersion & 0xFFFFF800) >> 11;
+  GUARD_OUT (GetOsVerAndSecPactchLevel (SlotData,
+                                        BootImgHdr,
+                                        &Data.SystemVersion,
+                                        &Data.SystemSecurityLevel));
 
   GUARD_OUT (KeyMasterSetRotAndBootState (&Data));
   ComputeVbMetaDigest (SlotData, (CHAR8 *)&Digest);
