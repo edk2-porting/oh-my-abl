@@ -215,7 +215,7 @@ VOID FdtUpdateNodeOffsetInList (INT32 NodeOffset, INT32 DiffLen)
   }
 
   for (Node = NodeList; Node; Node = Node->Next) {
-    if (Node->NodeOffset >= NodeOffset) {
+    if (Node->NodeOffset > NodeOffset) {
       Node->NodeOffset +=  DiffLen;
     } else {
       break;
