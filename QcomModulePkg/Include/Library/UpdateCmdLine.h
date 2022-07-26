@@ -105,6 +105,7 @@ typedef struct UpdateCmdLineParamList {
   CHAR8 *SlotSuffixAscii;
   CHAR8 *ChipBaseBand;
   CHAR8 *DisplayCmdLine;
+  CHAR8 *HwFenceCmdLine;
   CONST CHAR8 *CmdLine;
   CONST CHAR8 *AlarmBootCmdLine;
   CONST CHAR8 *MdtpActiveFlag;
