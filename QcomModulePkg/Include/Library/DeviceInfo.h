@@ -33,7 +33,6 @@
 
 #include <Protocol/EFIVerifiedBoot.h>
 #define DEVICE_MAGIC "ANDROID-BOOT!"
-#define PRODUCT_NAME "QC_Reference_Phone"
 #define DEVICE_MAGIC_SIZE 13
 #define MAX_VERSION_LEN 64
 #define MAX_VB_PARTITIONS 32
