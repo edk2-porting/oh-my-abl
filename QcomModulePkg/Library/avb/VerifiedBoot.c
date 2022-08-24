@@ -1686,7 +1686,6 @@ DisplayVerifiedBootScreen (BootInfo *Info)
     } else {
       DEBUG ((EFI_D_INFO, "Your device has loaded a different operating system."
                           "\nWait for 5 seconds before proceeding\n"));
-      MicroSecondDelay (5000000);
     }
     break;
   case ORANGE:
@@ -1699,7 +1698,6 @@ DisplayVerifiedBootScreen (BootInfo *Info)
       } else {
         DEBUG (
             (EFI_D_INFO, "Device is unlocked, Skipping boot verification\n"));
-        MicroSecondDelay (5000000);
       }
     }
     break;
@@ -1716,7 +1714,6 @@ DisplayVerifiedBootScreen (BootInfo *Info)
       } else {
         DEBUG ((EFI_D_INFO, "The dm-verity is not started in restart mode." \
               "\nWait for 30 seconds before proceeding\n"));
-        MicroSecondDelay (30000000);
       }
   }
 
