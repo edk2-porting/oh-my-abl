@@ -1,6 +1,8 @@
 ################################################################################
 ## Inheriting configs from ACK
-. ${ROOT_DIR}/common/build.config.common
+if [ -f "${ROOT_DIR}/common/build.config.common" ]; then
+    . "${ROOT_DIR}/common/build.config.common"
+fi
 
 PREBUILT_PYTHON_PATH=prebuilts/build-tools/path/linux-x86/python3
 
