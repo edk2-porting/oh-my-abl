@@ -136,6 +136,9 @@
   !if $(EARLY_ETH_ENABLED)
       GCC:*_*_*_CC_FLAGS = -DEARLY_ETH_ENABLED
   !endif
+  !if $(HIBERNATION_SUPPORT)
+      GCC:*_*_*_CC_FLAGS = -DHIBERNATION_SUPPORT
+  !endif
   !if $(AB_RETRYCOUNT_DISABLE)
       GCC:*_*_*_CC_FLAGS = -DAB_RETRYCOUNT_DISABLE
   !endif
