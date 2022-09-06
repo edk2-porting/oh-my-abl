@@ -10,4 +10,4 @@ DISABLE_PARALLEL_DOWNLOAD_FLASH=0
 
 ################################################################################
 . ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.common
-. ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.la.common
+. ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.signature_v2
