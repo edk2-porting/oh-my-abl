@@ -1,6 +1,4 @@
 ################################################################################
-. ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.common
-
 MSM_ARCH=gen4auto
 BOOTLOADER_ARCH=AARCH64
 
@@ -12,6 +10,9 @@ DEVICE_STATUS="DEFAULT_UNLOCK=true"
 INIT_BIN_LE="\"/sbin/init\""
 DISABLE_PARALLEL_DOWNLOAD_FLASH=1
 VERIFIED_BOOT_ENABLED=1
+
+################################################################################
+. ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.common
 
 if [ "${SOC_NAME}" = "lemans" ]; then
   SECTOOLS=${SECTOOLS_V2}
@@ -34,11 +35,3 @@ SECABL_ARGS+=("${SECTOOLS_SECURITY_PROFILE}")
 SECABL_ARGS+=("--sign" "--signing-mode" "TEST")
 
 SECABL_CMD=("${SECTOOLS}" "${SECABL_ARGS[@]}")
-
-MAKE_FLAGS=("USER_BUILD_VARIANT=${USER_BUILD_VARIANT}")
-MAKE_FLAGS+=("BOARD_BOOTLOADER_PRODUCT_NAME=${MSM_ARCH}")
-MAKE_FLAGS+=("TARGET_ARCHITECTURE=${BOOTLOADER_ARCH}")
-MAKE_FLAGS+=("AB_RETRYCOUNT_DISABLE=${AB_RETRYCOUNT_DISABLE}")
-MAKE_FLAGS+=("TARGET_BOARD_TYPE_AUTO=${TARGET_BOARD_TYPE_AUTO}")
-MAKE_FLAGS+=("DISABLE_PARALLEL_DOWNLOAD_FLASH=${DISABLE_PARALLEL_DOWNLOAD_FLASH}")
-MAKE_FLAGS+=("INIT_BIN_LE=${INIT_BIN_LE}")
