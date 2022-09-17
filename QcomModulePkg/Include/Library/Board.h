@@ -101,12 +101,16 @@ typedef enum {
 #define DDR_512MB      (512 * MB)
 #define DDR_1024MB     (1024 * MB)
 #define DDR_2048MB     (2048 * MB)
+#define DDR_3072MB     (3072 * MB)
+#define DDR_4096MB     (4096 * MB)
 
 typedef enum {
   DDRTYPE_256MB = 1,
   DDRTYPE_512MB,
   DDRTYPE_1024MB,
   DDRTYPE_2048MB,
+  DDRTYPE_3072MB,
+  DDRTYPE_4096MB,
 } DdrType;
 
 struct BoardInfo {
