@@ -97,10 +97,15 @@ GetAVBVersion ();
  * for cold boot sequence and TRUE
  * for Hibernation Resume
  *
+ * @param[in] SetRotAndBootState FALSE by
+ * default and TRUE incase of ROT and
+ * BootState already set
+ *
  * @return EFI_STATUS
  */
 EFI_STATUS
-LoadImageAndAuth (BootInfo *Info, BOOLEAN HibernationResume);
+LoadImageAndAuth (BootInfo *Info, BOOLEAN HibernationResume,
+        BOOLEAN SetRotAndBootState);
 
 /**
  *  Free resources/memory allocated by

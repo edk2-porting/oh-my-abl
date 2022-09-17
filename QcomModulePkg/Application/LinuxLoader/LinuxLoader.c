@@ -186,10 +186,8 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
   /* Flashless Boot */
   BOOLEAN FlashlessBoot = FALSE;
   EFI_MEM_CARDINFO_PROTOCOL *CardInfo = NULL;
-  #if HIBERNATION_SUPPORT
   /* set ROT and BootSatte only once per boot*/
   BOOLEAN SetRotAndBootState = FALSE;
-  #endif
 
   DEBUG ((EFI_D_INFO, "Loader Build Info: %a %a\n", __DATE__, __TIME__));
   DEBUG ((EFI_D_VERBOSE, "LinuxLoader Load Address to debug ABL: 0x%llx\n",
@@ -338,7 +336,7 @@ flashless_boot:
   #if HIBERNATION_SUPPORT
     BootIntoHibernationImage (&Info, &SetRotAndBootState);
   #endif
-    Status = LoadImageAndAuth (&Info, FALSE);
+    Status = LoadImageAndAuth (&Info, FALSE, SetRotAndBootState);
     if (Status != EFI_SUCCESS) {
       DEBUG ((EFI_D_ERROR, "LoadImageAndAuth failed: %r\n", Status));
       goto fastboot;
