@@ -108,13 +108,13 @@ STATIC CHAR8 SystemdSlotEnv[] = " systemd.setenv=\"SLOT_SUFFIX=_a\"";
 STATIC CONST CHAR8 *NoPasr = " mem_offline.nopasr=1";
 /*Silent Boot Mode */
 STATIC CHAR8 *SilentBootEnbCmdLine =
-                           " androidboot.silent_boot_mode=silent";
+                           " silent_boot.mode=silent";
 STATIC CHAR8 *SilentBootDisCmdLine =
-                           " androidboot.silent_boot_mode=nonsilent";
+                           " silent_boot.mode=nonsilent";
 STATIC CHAR8 *SilentBootForCmdLine =
-                           " androidboot.silent_boot_mode=forcedsilent";
+                           " silent_boot.mode=forcedsilent";
 STATIC CHAR8 *SilentBootNForCmdLine =
-                           " androidboot.silent_boot_mode=forcednonsilent";
+                           " silent_boot.mode=forcednonsilent";
 
 
 /*Send slot suffix in cmdline with which we have booted*/
