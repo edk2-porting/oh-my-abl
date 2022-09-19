@@ -720,6 +720,11 @@ UINT32 BoardPlatformSubType (VOID)
   return platform_board_info.PlatformInfo.subtype;
 }
 
+UINT32 BoardOEMVariantId (VOID)
+{
+  return platform_board_info.PlatformInfo.OEMVariantID;
+}
+
 BOOLEAN BoardPlatformFusion (VOID)
 {
   return platform_board_info.PlatformInfo.fusion;

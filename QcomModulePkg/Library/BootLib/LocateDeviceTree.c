@@ -26,6 +26,42 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted (subject to the limitations in the
+ *  disclaimer below) provided that the following conditions are met:
+ *
+ *      * Redistributions of source code must retain the above copyright
+ *        notice, this list of conditions and the following disclaimer.
+ *
+ *      * Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials provided
+ *        with the distribution.
+ *
+ *      * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+ *        contributors may be used to endorse or promote products derived
+ *        from this software without specific prior written permission.
+ *
+ *  NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ *  GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ *  HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ *   WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ *  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ *  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ *  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ *  GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ *  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ *  IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ *  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ *  IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 #include "LocateDeviceTree.h"
 #include "UpdateDeviceTree.h"
 #include <Library/Board.h>
@@ -697,7 +733,7 @@ STATIC EFI_STATUS GetBoardMatchDtb (DtInfo *CurDtbInfo,
     }
 
     DEBUG ((EFI_D_VERBOSE, "BoardVariant = %x, DtVariant = %x\n",
-            BoardPlatformType (), CurDtbInfo->DtVariantId));
+            BoardPlatformType (), CurDtbInfo->DtVariantId & VARIANT_MASK));
     CurDtbInfo->DtVariantMajor = CurDtbInfo->DtVariantId & VARIANT_MAJOR_MASK;
     CurDtbInfo->DtVariantMinor = CurDtbInfo->DtVariantId & VARIANT_MINOR_MASK;
     CurDtbInfo->DtVariantId = CurDtbInfo->DtVariantId & VARIANT_MASK;
@@ -777,6 +813,8 @@ STATIC EFI_STATUS GetBoardMatchDtb (DtInfo *CurDtbInfo,
   |     |               | PmicMetalRev    | N     | Y    | N       |
   |     |               | PmicLayerRev    | N     | Y    | N       |
   |     |               | PmicVariantRev  | N     | Y    | N       |
+  |     |  qcom,oem-id  |                 |       |      |         |
+  |     |               | OEMVariantId    | Y     | N    | 0       |
 */
 STATIC BOOLEAN
 ReadDtbFindMatch (DtInfo *CurDtbInfo, DtInfo *BestDtbInfo, UINT32 ExactMatch)
@@ -786,10 +824,12 @@ ReadDtbFindMatch (DtInfo *CurDtbInfo, DtInfo *BestDtbInfo, UINT32 ExactMatch)
   CONST CHAR8 *BoardProp = NULL;
   CONST CHAR8 *PmicProp = NULL;
   CONST CHAR8 *PmicPropSz = NULL;
+  CONST CHAR8 *OemVarProp = NULL;
   INT32 LenBoardId;
   INT32 LenPlatId;
   INT32 LenPmicId;
   INT32 LenPmicIdSz;
+  INT32 LenOemId;
   INT32 PmicMaxIdx;
   INT32 PmicEntSz;
   INT32 MinPlatIdLen = PLAT_ID_SIZE;
@@ -905,6 +945,26 @@ ReadDtbFindMatch (DtInfo *CurDtbInfo, DtInfo *BestDtbInfo, UINT32 ExactMatch)
     DEBUG ((EFI_D_VERBOSE, "qcom,pmic-id does not exit\n"));
   }
 
+  DEBUG ((EFI_D_VERBOSE, "OEMVariantId: %d\n", BoardOEMVariantId ()));
+  if (BoardOEMVariantId ()) {
+    OemVarProp = (CONST CHAR8 *)fdt_getprop (Dtb, RootOffset, "qcom,oem-id",
+                                          &LenOemId);
+    if (OemVarProp &&
+        (LenOemId > 0)) {
+      CurDtbInfo->DtOEMVariantId =
+        ((((struct oem_id *)OemVarProp)->oem_variant_id) & OEM_ID_MASK)
+         >> OEM_ID_SHIFT;
+      if (CurDtbInfo->DtOEMVariantId == BoardOEMVariantId ()) {
+        CurDtbInfo->DtMatchVal |= BIT (OEM_FLAVOR_EXACT_MATCH);
+      }
+      else {
+        CurDtbInfo->DtMatchVal |= BIT (NONE_MATCH);
+      }
+    } else {
+      CurDtbInfo->DtMatchVal |= BIT (OEM_FLAVOR_DEFAULT_MATCH);
+    }
+  }
+
 cleanup:
   if (CurDtbInfo->DtMatchVal & BIT (ExactMatch)) {
     if (BestDtbInfo->DtMatchVal < CurDtbInfo->DtMatchVal) {
@@ -928,6 +988,8 @@ cleanup:
         gBS->CopyMem (BestDtbInfo, CurDtbInfo, sizeof (struct DtInfo));
       } else if (BestDtbInfo->DtPlatformSubtype >
                           CurDtbInfo->DtPlatformSubtype) {
+        gBS->CopyMem (BestDtbInfo, CurDtbInfo, sizeof (struct DtInfo));
+      } else if (BestDtbInfo->DtOEMVariantId < CurDtbInfo->DtOEMVariantId) {
         gBS->CopyMem (BestDtbInfo, CurDtbInfo, sizeof (struct DtInfo));
       } else {
         FindBestMatch = FALSE;
