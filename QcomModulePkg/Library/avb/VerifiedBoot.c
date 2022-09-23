@@ -1374,6 +1374,7 @@ LoadImageAndAuthVB2 (BootInfo *Info, BOOLEAN HibernationResume,
       AVB_HASHTREE_ERROR_MODE_MANAGED_RESTART_AND_EIO;
   CHAR8 Digest[AVB_SHA256_DIGEST_SIZE];
   BOOLEAN UpdateRollback = FALSE;
+  BOOLEAN UpdateRollbackIndex = FALSE;
 
   Info->BootState = RED;
   if (!HibernationResume) {
@@ -1554,15 +1555,18 @@ LoadImageAndAuthVB2 (BootInfo *Info, BOOLEAN HibernationResume,
 
   if (AllowVerificationError && ResultShouldContinue (Result)) {
     DEBUG ((EFI_D_VERBOSE, "State: Unlocked, AvbSlotVerify returned "
-                         "%a, continue boot\n",
-            avb_slot_verify_result_to_string (Result)));
+                           "%a, continue boot\n",
+                           avb_slot_verify_result_to_string (Result)));
   } else if (Result != AVB_SLOT_VERIFY_RESULT_OK) {
     DEBUG ((EFI_D_ERROR, "ERROR: Device State %a, AvbSlotVerify returned %a\n",
-            AllowVerificationError ? "Unlocked" : "Locked",
-            avb_slot_verify_result_to_string (Result)));
+                          AllowVerificationError ? "Unlocked" : "Locked",
+                          avb_slot_verify_result_to_string (Result)));
     Status = EFI_LOAD_ERROR;
     Info->BootState = RED;
     goto out;
+  } else {
+    UpdateRollbackIndex = TRUE;
+    DEBUG ((EFI_D_INFO, "VB2: UpdateRollbackIndex flag set \n"));
   }
 
   for (UINTN ReqIndex = 0; ReqIndex < NumRequestedPartition; ReqIndex++) {
@@ -1607,6 +1611,36 @@ LoadImageAndAuthVB2 (BootInfo *Info, BOOLEAN HibernationResume,
   }
 
   DEBUG ((EFI_D_VERBOSE, "Total loaded partition %d\n", Info->NumLoadedImages));
+
+  if (UpdateRollbackIndex == TRUE) {
+
+    AvbIOResult AvbStatus = AVB_IO_RESULT_OK;
+    UINT64 CurrentValue;
+    UINT64 StoredValue;
+    UINT32 Idx;
+
+    for (Idx = 0; Idx < AVB_MAX_NUMBER_OF_ROLLBACK_INDEX_LOCATIONS; Idx++) {
+      CurrentValue = SlotData->rollback_indexes[Idx];
+      if (CurrentValue != 0) {
+        AvbStatus = Ops->read_rollback_index (Ops, Idx, &StoredValue);
+        if (AvbStatus == AVB_IO_RESULT_OK) {
+          if (StoredValue < CurrentValue) {
+            AvbStatus = Ops->write_rollback_index (Ops, Idx, CurrentValue);
+          }
+        }
+      }
+
+      if (AvbStatus == AVB_IO_RESULT_ERROR_OOM) {
+        Status = EFI_OUT_OF_RESOURCES;
+        goto out;
+      } else if (AvbStatus != AVB_IO_RESULT_OK) {
+        DEBUG ((EFI_D_ERROR, "Error getting rollback index for slot.\n"));
+        Status = EFI_DEVICE_ERROR;
+        goto out;
+      }
+    }
+    DEBUG ((EFI_D_INFO, "VB2: UpdateRollbackIndex done. \n"));
+  }
 
   VBData = (VB2Data *)avb_calloc (sizeof (VB2Data));
   if (VBData == NULL) {
