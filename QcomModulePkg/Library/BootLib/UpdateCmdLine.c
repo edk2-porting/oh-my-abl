@@ -141,6 +141,8 @@ STATIC CHAR8 *MemOff = " mem=";
 STATIC CONST CHAR8 *MemHpState = " memhp_default_state=online";
 STATIC CONST CHAR8 *MovableNode = " movable_node";
 
+STATIC CONST CHAR8 *WarmResetArgs = " reboot=w";
+
 LIST_ENTRY *BootConfigListHead = NULL;
 EFI_STATUS
 TargetPauseForBatteryCharge (BOOLEAN *BatteryStatus)
@@ -584,6 +586,11 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
       AddtoBootConfigList (BootConfigFlag, Param->VBCmdLine, NULL,
                   BootConfigListHead, AsciiStrLen (Param->VBCmdLine), 0);
     }
+  }
+
+  if (Param->FlashlessBoot) {
+    Src = WarmResetArgs;
+    AsciiStrCatS (Dst, MaxCmdLineLen, Src);
   }
 
   if ((Param->BootDevBuf) &&
@@ -1345,6 +1352,7 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   Param.MultiSlotBoot = MultiSlotBoot;
   Param.AlarmBoot = AlarmBoot;
   Param.MdtpActive = MdtpActive;
+  Param.FlashlessBoot = FlashlessBoot;
   Param.CmdLineLen = CmdLineLen;
   Param.HaveCmdLine = HaveCmdLine;
   Param.PauseAtBootUp = PauseAtBootUp;
