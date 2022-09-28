@@ -1214,7 +1214,6 @@ static VOID CopyBounceAndBootKernel ()
         printf ("Disable UEFI Boot services\n");
         printf ("Kernel entry point = 0x%lx\n", CpuResume);
         printf ("Relocation code at = 0x%lx\n", RelocateAddress);
-        BootStatsSetTimeStamp (BS_BL_END);
 
         /* Shut down UEFI boot services */
         Status = ShutdownUefiBootServices ();
