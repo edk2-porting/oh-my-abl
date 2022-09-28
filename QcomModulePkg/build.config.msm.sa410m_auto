@@ -1,5 +1,5 @@
 ################################################################################
-MSM_ARCH=scuba_auto
+MSM_ARCH=sa410m_auto
 BOOTLOADER_ARCH=AARCH64
 
 ENABLE_SYSTEMD_BOOTSLOT=1
