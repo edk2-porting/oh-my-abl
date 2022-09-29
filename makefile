@@ -10,6 +10,13 @@ export WRAPPER := $(PREBUILT_PYTHON_PATH) $(BUILDDIR)/clang-wrapper.py
 export MAKEPATH := $(MAKEPATH)
 
 export CLANG35_BIN := $(CLANG_BIN)
+ifeq ($(BUILD_NATIVE_AARCH64),true)
+	export FUSE_LD := $(CLANG35_BIN)/ld
+	export EXTRA_GCC_ARG := -Wno-error=unused-command-line-argument
+else
+	export FUSE_LD := $(CLANG35_BIN)/ld.lld
+	export EXTRA_GCC_ARG :=
+endif
 export CLANG35_GCC_TOOLCHAIN := $(CLANG35_GCC_TOOLCHAIN)
 export $(BOARD_BOOTLOADER_PRODUCT_NAME)
 
