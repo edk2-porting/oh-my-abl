@@ -904,7 +904,8 @@ LoadAddrAndDTUpdate (BootInfo *Info, BootParamlist *BootParamlistPtr)
     }
   }
 
-  if (Info->HasBootInitRamdisk) {
+  if ((Info->HasBootInitRamdisk) &&
+     (Info->HeaderVersion >= BOOT_HEADER_VERSION_FOUR)) {
     gBS->CopyMem ((CHAR8 *)RamdiskLoadAddr,
                   BootParamlistPtr->RamdiskBuffer+
                   BOOT_IMG_MAX_PAGE_SIZE,
@@ -1241,7 +1242,8 @@ BootLinux (BootInfo *Info)
    * only set true when there is init_boot partition.
    */
   BootParamlistPtr.RamdiskBuffer = NULL;
-  if (Info->HasBootInitRamdisk) {
+  if ((Info->HasBootInitRamdisk) &&
+     (Info->HeaderVersion >= BOOT_HEADER_VERSION_FOUR)) {
     Status = GetImage (Info,
                        &BootParamlistPtr.RamdiskBuffer,
                        (UINTN *)&BootParamlistPtr.RamdiskSize,
