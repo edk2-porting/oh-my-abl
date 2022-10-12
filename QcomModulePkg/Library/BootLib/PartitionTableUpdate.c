@@ -300,6 +300,9 @@ VOID UpdatePartitionAttributes (UINT32 UpdateType)
       Status = GetStorageHandle (NO_LUN, BlockIoHandle, &MaxHandles);
     } else if (!AsciiStrnCmp (BootDeviceType, "UFS", AsciiStrLen ("UFS"))) {
       Status = GetStorageHandle (Lun, BlockIoHandle, &MaxHandles);
+    } else if (!AsciiStrnCmp (BootDeviceType, "NAND", AsciiStrLen ("NAND"))) {
+      DEBUG ((EFI_D_ERROR, "Skip setting if boot device type is NAND\n"));
+      return;
     } else {
       DEBUG ((EFI_D_ERROR, "Unsupported  boot device type\n"));
       return;
@@ -1722,7 +1725,8 @@ FindBootableSlot (Slot *BootableSlot)
   }
 
   /* Validate slot suffix and partition guids */
-  if (Status == EFI_SUCCESS) {
+  if ((Status == EFI_SUCCESS) &&
+      (NAND != CheckRootDeviceType ())) {
     GUARD_OUT (ValidateSlotGuids (BootableSlot));
   }
   MarkPtnActive (BootableSlot->Suffix);
