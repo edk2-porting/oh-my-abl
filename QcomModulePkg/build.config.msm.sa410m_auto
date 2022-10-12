@@ -15,8 +15,10 @@ BUILD_USES_RECOVERY_AS_BOOT=0
 INIT_BIN_LE="\"/sbin/init\""
 VERIFIED_BOOT_ENABLED=0
 
+ENABLE_LE_VARIANT=true
+
 SOC_VERS=0x9008
-SOC_HW_VERSION=0x9008100
+SOC_HW_VERSION=0x90080100
 
 ################################################################################
 . ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.common
