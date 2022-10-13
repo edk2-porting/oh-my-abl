@@ -1390,6 +1390,8 @@ static INT32 InitAesDecrypt (VOID)
         if (InitTaAndGetKey (&TaHandle)) {
                 return -1;
         }
+
+        printf ("Hibernation: AES init done\n");
         return 0;
 }
 #else
