@@ -1001,12 +1001,10 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   BootConfigListHead = (LIST_ENTRY*) AllocateZeroPool (sizeof (LIST_ENTRY));
   InitializeListHead (BootConfigListHead);
 
-  if (!FlashlessBoot) {
-    Status = BoardSerialNum (StrSerialNum, sizeof (StrSerialNum));
-    if (Status != EFI_SUCCESS) {
-      DEBUG ((EFI_D_ERROR, "Error Finding board serial num: %x\n", Status));
-      return Status;
-    }
+  Status = BoardSerialNum (StrSerialNum, sizeof (StrSerialNum));
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "Error Finding board serial num: %x\n", Status));
+    return Status;
   }
 
   if (CmdLine && CmdLine[0]) {
