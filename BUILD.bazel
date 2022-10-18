@@ -1,0 +1,2 @@
+load(":abl.bzl", "define_abl_targets")
+define_abl_targets()
