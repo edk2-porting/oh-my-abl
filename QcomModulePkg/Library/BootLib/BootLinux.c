@@ -2010,7 +2010,19 @@ BOOLEAN IsTargetAuto (VOID)
 #if HIBERNATION_SUPPORT_NO_AES
 BOOLEAN IsHibernationEnabled (VOID)
 {
-  return TRUE;
+  UINT32 PtnCount;
+  INT32 PtnIdx;
+
+  GetPartitionCount (&PtnCount);
+
+  PtnIdx = GetPartitionIndex ((CHAR16 *)L"swap_a");
+
+  if (PtnIdx < PtnCount &&
+      PtnIdx != INVALID_PTN) {
+    return TRUE;
+  } else {
+    return FALSE;
+  }
 }
 #else
 BOOLEAN IsHibernationEnabled (VOID)
