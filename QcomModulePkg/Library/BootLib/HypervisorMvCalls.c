@@ -83,6 +83,11 @@ BOOLEAN IsVmEnabled (VOID)
   return VmEnabled;
 }
 
+VOID SetVmDisable (VOID)
+{
+  VmEnabled = FALSE;
+}
+
 HypBootInfo *GetVmData (VOID)
 {
   EFI_STATUS Status;

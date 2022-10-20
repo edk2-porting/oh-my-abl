@@ -638,7 +638,7 @@ DTBImgCheckAndAppendDT (BootInfo *Info, BootParamlist *BootParamlistPtr)
                            DtsList);
     if (Status != EFI_SUCCESS) {
       DEBUG ((EFI_D_ERROR, "Error: Dtb overlay failed\n"));
-      return Status;
+      SetVmDisable ();
     }
   } else {
     /*It is the case of DTB overlay Get the Soc specific dtb */
@@ -735,7 +735,7 @@ DTBImgCheckAndAppendDT (BootInfo *Info, BootParamlist *BootParamlistPtr)
                            DtsList);
     if (Status != EFI_SUCCESS) {
       DEBUG ((EFI_D_ERROR, "Error: Dtb overlay failed\n"));
-      return Status;
+      SetVmDisable ();
     }
   }
   return EFI_SUCCESS;
