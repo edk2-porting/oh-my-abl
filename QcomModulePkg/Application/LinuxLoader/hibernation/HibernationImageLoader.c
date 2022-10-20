@@ -74,8 +74,8 @@
 #include <VerifiedBoot.h>
 #if HIBERNATION_SUPPORT_AES
 #include <Library/aes/aes_public.h>
-#endif
 #include <Protocol/EFIQseecom.h>
+#endif
 #include "KeymasterClient.h"
 
 #define BUG(Fmt, ...) {\
@@ -96,6 +96,11 @@ typedef struct FreeRanges {
 #if HIBERNATION_SUPPORT_AES
 static struct DecryptParam Dp;
 static CHAR8 *Authtags;
+
+#define QSEECOM_ALIGN_SIZE      0x40
+#define QSEECOM_ALIGN_MASK      (QSEECOM_ALIGN_SIZE - 1)
+#define QSEECOM_ALIGN(x)        \
+        ((x + QSEECOM_ALIGN_MASK) & (~QSEECOM_ALIGN_MASK))
 #endif
 
 /* Holds free memory ranges read from UEFI memory map */
@@ -1310,6 +1315,7 @@ static INT32 InitTaAndGetKey (struct Secs2dTaHandle *TaHandle)
         INT32 Status;
         CmdReq Req = {0};
         CmdRsp Rsp = {0};
+        UINT32 ReqLen, RspLen;
 
         Status = gBS->LocateProtocol (&gQcomQseecomProtocolGuid, NULL,
                 (VOID **)&(TaHandle->QseeComProtocol));
@@ -1324,6 +1330,16 @@ static INT32 InitTaAndGetKey (struct Secs2dTaHandle *TaHandle)
                 return -1;
         }
 
+        ReqLen = sizeof (CmdReq);
+        if (ReqLen & QSEECOM_ALIGN_MASK) {
+                ReqLen = QSEECOM_ALIGN (ReqLen);
+        }
+
+        RspLen = sizeof (CmdRsp);
+        if (RspLen & QSEECOM_ALIGN_MASK) {
+                RspLen = QSEECOM_ALIGN (RspLen);
+        }
+
         Req.Cmd = UNWRAP_KEY_CMD;
         Req.UnwrapkeyReq.WrappedKeySize = WRAPPED_KEY_SIZE;
         gBS->CopyMem ((VOID *)Req.UnwrapkeyReq.WrappedKeyBuffer,
@@ -1331,8 +1347,8 @@ static INT32 InitTaAndGetKey (struct Secs2dTaHandle *TaHandle)
         Req.UnwrapkeyReq.CurrTime.Hour = 4;
         Status = TaHandle->QseeComProtocol->QseecomSendCmd (
                 TaHandle->QseeComProtocol, TaHandle->AppId,
-                        (UINT8 *)&Req, sizeof (Req),
-                        (UINT8 *)&Rsp, sizeof (Rsp));
+                        (UINT8 *)&Req, ReqLen,
+                        (UINT8 *)&Rsp, RspLen);
         if (Status) {
                 printf ("Error in conversion wrappeded key to unwrapped key\n");
                 return -1;
