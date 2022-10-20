@@ -206,9 +206,9 @@ typedef struct ArchHibernateHdr {
        struct ArchHibernateHdrInvariants Invariants;
        UINT64 Ttbr1El1;
        VOID   (*reenter_kernel)(VOID);
-       UINT64 PhysReEnterKernel;
        UINT64 __hyp_stub_vectors;
        UINT64 SleepCpuMpidr;
+       UINT64 PhysReEnterKernel;
 }ArchHibernateHdr;
 
 #endif
