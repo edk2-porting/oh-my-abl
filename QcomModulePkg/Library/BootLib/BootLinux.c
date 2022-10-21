@@ -559,6 +559,10 @@ DTBImgCheckAndAppendDT (BootInfo *Info, BootParamlist *BootParamlistPtr)
       SingleDtHdr = (BootParamlistPtr->ImageBuffer +
                      BootParamlistPtr->DtbOffset);
 
+      if (HeaderVersion < BOOT_HEADER_VERSION_ONE) {
+        SingleDtHdr += BootParamlistPtr->PageSize;
+      }
+
       if (!fdt_check_header (SingleDtHdr)) {
         if ((ImageSize - BootParamlistPtr->DtbOffset) <
             fdt_totalsize (SingleDtHdr)) {
