@@ -133,6 +133,9 @@
   !if $(VERIFIED_BOOT_LE)
       GCC:*_*_*_CC_FLAGS = -DVERIFIED_BOOT_LE
   !endif
+  !if $(SUPPORT_AB_BOOT_LXC)
+      GCC:*_*_*_CC_FLAGS = -DSUPPORT_AB_BOOT_LXC
+  !endif
   !if $(EARLY_ETH_ENABLED)
       GCC:*_*_*_CC_FLAGS = -DEARLY_ETH_ENABLED
   !endif
