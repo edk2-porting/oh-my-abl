@@ -404,6 +404,39 @@ static struct PartialGoods PartialGoodsMmType[] = {
      {"qcom,mss", "status", "ok", "no"}},
 };
 
+STATIC EFI_STATUS
+CheckCPUType (VOID *fdt,
+              UINT32 TableSz,
+              struct PartialGoods *Table)
+{
+  struct SubNodeListNew *SNode = NULL;
+  INT32 SubNodeOffset = 0;
+  INT32 ParentOffset = 0;
+  UINT32 i;
+
+  for (i = 0; i < TableSz; i++, Table++)
+  {
+    /* Find the parent node */
+    ParentOffset = fdt_path_offset (fdt, Table->ParentNode);
+    if (ParentOffset < 0) {
+      DEBUG ((EFI_D_ERROR, "Failed to Get parent node: %a\terror: %d\n",
+                                Table->ParentNode, ParentOffset));
+      return EFI_NOT_FOUND;
+    }
+
+    /* Find the subnode */
+    SNode = &(Table->SubNode);
+    SubNodeOffset = fdt_subnode_offset (fdt, ParentOffset,
+                                      SNode->SubNodeName);
+    if (SubNodeOffset < 0) {
+      DEBUG ((EFI_D_INFO, "Subnode: %a is not present, breaking loop\n",
+                                SNode->SubNodeName));
+      return EFI_NOT_FOUND;
+    }
+  }
+  return EFI_SUCCESS;
+}
+
 STATIC VOID
 FindNodeAndUpdateProperty (VOID *fdt,
                            UINT32 TableSz,
@@ -455,24 +488,18 @@ FindNodeAndUpdateProperty (VOID *fdt,
 STATIC EFI_STATUS
 ReadCpuPartialGoods (EFI_CHIPINFO_PROTOCOL *pChipInfoProtocol, UINT32 *Value)
 {
-  UINT32 i;
+  UINT32 CpuCluster = 0;
   EFI_STATUS Status = EFI_SUCCESS;
-  UINT32 DefectVal;
 
-  for (i = 0; i < MAX_CPU_CLUSTER; i++) {
-    /* Ensure to reset the Value before checking CPU part for defect */
-    DefectVal = 0;
-    Value[i] = 0;
+   /* Ensure to reset the Value before checking CPU part for defect */
+  *Value = 0;
 
-    Status =
-        pChipInfoProtocol->GetDefectiveCPUs (pChipInfoProtocol, i, &DefectVal);
-    if (EFI_ERROR (Status)) {
-      DEBUG ((EFI_D_VERBOSE, "Failed to get CPU defective[%d] part. %r\n", i,
-              Status));
-      continue;
-    }
-
-    Value[i] = DefectVal;
+  Status =
+      pChipInfoProtocol->GetDefectiveCPUs (pChipInfoProtocol, CpuCluster,
+                                           Value);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_VERBOSE, "Failed to get CPU defective[%d] part. %r\n",
+            CpuCluster, Status));
   }
 
   if (Status == EFI_NOT_FOUND)
@@ -515,7 +542,8 @@ UpdatePartialGoodsNode (VOID *fdt)
 {
   UINT32 i;
   UINT32 PartialGoodsMMValue = 0;
-  UINT32 PartialGoodsCpuValue[MAX_CPU_CLUSTER];
+  UINT32 PartialGoodsCpuValue;
+  UINT32 PartialGoodsCPUTypeValue = 0;
   EFI_CHIPINFO_PROTOCOL *pChipInfoProtocol;
   EFI_STATUS Status = EFI_SUCCESS;
 
@@ -542,20 +570,33 @@ UpdatePartialGoodsNode (VOID *fdt)
   }
 
   /* Read and update CPU Partial Goods nodes */
-  Status = ReadCpuPartialGoods (pChipInfoProtocol, PartialGoodsCpuValue);
+  Status = ReadCpuPartialGoods (pChipInfoProtocol, &PartialGoodsCpuValue);
   if (Status != EFI_SUCCESS) {
     DEBUG ((EFI_D_INFO, "No partial goods for cpu ss found.\n"));
   }
 
+  DEBUG ((EFI_D_INFO, "PartialGoods Value: 0x%x\n",
+              PartialGoodsCpuValue));
+
+  if (!PartialGoodsCpuValue) {
+    return EFI_SUCCESS;
+  }
+
   for (i = 0; i < MAX_CPU_CLUSTER; i++) {
-    if (PartialGoodsCpuValue[i]) {
-      DEBUG ((EFI_D_INFO, "PartialGoods for Cluster[%d]: 0x%x\n", i,
-              PartialGoodsCpuValue[i]));
-      FindNodeAndUpdateProperty (fdt, NUM_OF_CPUS,
-                                 &PartialGoodsCpuType[i][0],
-                                 PartialGoodsCpuValue[i]);
+    Status = CheckCPUType (fdt, NUM_OF_CPUS, &PartialGoodsCpuType[i][0]);
+
+    if (Status == EFI_SUCCESS) {
+      PartialGoodsCPUTypeValue = i;
+      DEBUG ((EFI_D_INFO, "CPUType Match for for Cluster[%d]\n", i));
+      break;
+    } else {
+        DEBUG ((EFI_D_INFO, "CPUType Mismatch for for Cluster[%d]\n", i));
     }
   }
+
+  FindNodeAndUpdateProperty (fdt, NUM_OF_CPUS,
+                             &PartialGoodsCpuType[PartialGoodsCPUTypeValue][0],
+                             PartialGoodsCpuValue);
 
   return EFI_SUCCESS;
 }
