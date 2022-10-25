@@ -627,20 +627,7 @@ BoardSerialNum (CHAR8 *StrSerialNum, UINT32 Len)
   MemCardType Type = EMMC;
 
   Type = CheckRootDeviceType ();
-  if (Type == UNKNOWN)
-    return EFI_NOT_FOUND;
-
-  Status = GetDeviceHandleInfo (HandleInfoList, MaxHandles, Type);
-  if (EFI_ERROR (Status)) {
-    return Status;
-  }
-
-  Status =
-      gBS->HandleProtocol (HandleInfoList[0].Handle,
-                           &gEfiMemCardInfoProtocolGuid, (VOID **)&CardInfo);
-  if (Status != EFI_SUCCESS) {
-    DEBUG ((EFI_D_ERROR, "Error locating MemCardInfoProtocol:%x\n", Status));
-
+  if (Type == UNKNOWN) {
     Status = gBS->LocateProtocol (&gEfiChipInfoProtocolGuid, NULL,
                                   (VOID **)&ChipInfo);
     if (Status != EFI_SUCCESS) {
@@ -657,6 +644,20 @@ BoardSerialNum (CHAR8 *StrSerialNum, UINT32 Len)
 
     AsciiSPrint (StrSerialNum, Len, "%x", SerialNo);
     ToLower (StrSerialNum);
+    return Status;
+  };
+
+  Status = GetDeviceHandleInfo (HandleInfoList, MaxHandles, Type);
+  if (EFI_ERROR (Status)) {
+    return Status;
+  }
+
+  Status =
+      gBS->HandleProtocol (HandleInfoList[0].Handle,
+                           &gEfiMemCardInfoProtocolGuid, (VOID **)&CardInfo);
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "Error locating MemCardInfoProtocol:%x\n", Status));
+
     return Status;
   }
 
