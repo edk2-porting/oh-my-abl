@@ -859,10 +859,17 @@ LoadAddrAndDTUpdate (BootInfo *Info, BootParamlist *BootParamlistPtr)
   UINT32 VRamdiskTablesizePageAligned =
     LOCAL_ROUND_TO_PAGE (BootParamlistPtr->VendorRamdiskTableSize,
     BootParamlistPtr->PageSize);
+  VOID *RamdiskImageBuffer;
 
   if (BootParamlistPtr == NULL) {
     DEBUG ((EFI_D_ERROR, "Invalid input parameters\n"));
     return EFI_INVALID_PARAMETER;
+  }
+
+  if (Info->HasBootInitRamdisk) {
+    RamdiskImageBuffer = BootParamlistPtr->RamdiskBuffer;
+  } else {
+    RamdiskImageBuffer = BootParamlistPtr->ImageBuffer;
   }
 
   RamdiskLoadAddr = BootParamlistPtr->RamdiskLoadAddr;
@@ -876,11 +883,11 @@ LoadAddrAndDTUpdate (BootInfo *Info, BootParamlist *BootParamlistPtr)
     return EFI_BAD_BUFFER_SIZE;
   }
 
-  if (CHECK_ADD64 ((UINT64)BootParamlistPtr->ImageBuffer,
+  if (CHECK_ADD64 ((UINT64)RamdiskImageBuffer,
       BootParamlistPtr->RamdiskOffset)) {
     DEBUG ((EFI_D_ERROR, "Integer Overflow: ImageBuffer=%u, "
                          "RamdiskOffset=%u\n",
-                         BootParamlistPtr->ImageBuffer,
+                         RamdiskImageBuffer,
                          BootParamlistPtr->RamdiskOffset));
     return EFI_BAD_BUFFER_SIZE;
   }
@@ -908,18 +915,10 @@ LoadAddrAndDTUpdate (BootInfo *Info, BootParamlist *BootParamlistPtr)
     }
   }
 
-  if ((Info->HasBootInitRamdisk) &&
-     (Info->HeaderVersion >= BOOT_HEADER_VERSION_FOUR)) {
-    gBS->CopyMem ((CHAR8 *)RamdiskLoadAddr,
-                  BootParamlistPtr->RamdiskBuffer+
-                  BOOT_IMG_MAX_PAGE_SIZE,
-                  BootParamlistPtr->RamdiskSize);
-  } else {
-    gBS->CopyMem ((CHAR8 *)RamdiskLoadAddr,
-                  BootParamlistPtr->ImageBuffer+
-                  BootParamlistPtr->RamdiskOffset,
-                  BootParamlistPtr->RamdiskSize);
-  }
+  gBS->CopyMem ((CHAR8 *)RamdiskLoadAddr,
+                RamdiskImageBuffer+
+                BootParamlistPtr->RamdiskOffset,
+                BootParamlistPtr->RamdiskSize);
 
   RamdiskLoadAddr +=BootParamlistPtr->RamdiskSize;
 
@@ -1246,19 +1245,53 @@ BootLinux (BootInfo *Info)
    * only set true when there is init_boot partition.
    */
   BootParamlistPtr.RamdiskBuffer = NULL;
+
   if ((Info->HasBootInitRamdisk) &&
      (Info->HeaderVersion >= BOOT_HEADER_VERSION_FOUR)) {
+    UINT32 InitBootSize;
+    boot_img_hdr_v4 *InitBootHdr;
+
     Status = GetImage (Info,
                        &BootParamlistPtr.RamdiskBuffer,
-                       (UINTN *)&BootParamlistPtr.RamdiskSize,
+                       (UINTN *)&InitBootSize,
                        "init_boot");
 
     if (Status ||
-        BootParamlistPtr.RamdiskSize <= 0) {
+        InitBootSize <= 0) {
 
       DEBUG ((EFI_D_ERROR, "BootLinux: Get%aImage failed!\n",
              "init_boot"));
       return EFI_NOT_STARTED;
+    }
+
+    /*
+     * Get the actual ramdisk offset and ramdisk size from
+     * header.
+     */
+    InitBootHdr = BootParamlistPtr.RamdiskBuffer;
+
+    if (InitBootHdr->header_size > InitBootSize ||
+        InitBootHdr->ramdisk_size > InitBootSize ||
+        InitBootHdr->ramdisk_size > InitBootSize - InitBootHdr->header_size) {
+        DEBUG ((EFI_D_ERROR, "Wrong size in init boot header!\n"));
+        return EFI_NOT_STARTED;
+    }
+
+    BootParamlistPtr.RamdiskOffset = ROUND_TO_PAGE (InitBootHdr->header_size,
+            BOOT_IMG_MAX_PAGE_SIZE - 1);
+    if (!BootParamlistPtr.RamdiskOffset &&
+        InitBootHdr->header_size) {
+          DEBUG ((EFI_D_ERROR, "Integer Overflow: Ramdisk offset = %u\n",
+                     InitBootHdr->header_size));
+          return EFI_BAD_BUFFER_SIZE;
+    }
+    BootParamlistPtr.RamdiskSize = ROUND_TO_PAGE (InitBootHdr->ramdisk_size,
+            BOOT_IMG_MAX_PAGE_SIZE - 1);
+    if (!BootParamlistPtr.RamdiskSize &&
+        InitBootHdr->ramdisk_size) {
+          DEBUG ((EFI_D_ERROR, "Integer Overflow: Ramdisk size = %u\n",
+                     InitBootHdr->ramdisk_size));
+          return EFI_BAD_BUFFER_SIZE;
     }
   }
 
@@ -1299,12 +1332,15 @@ BootLinux (BootInfo *Info)
 
   /*Offsets are the location of the images within the boot image*/
 
-  BootParamlistPtr.RamdiskOffset = ADD_OF (BootParamlistPtr.PageSize,
-                           BootParamlistPtr.KernelSizeActual);
-  if (!BootParamlistPtr.RamdiskOffset) {
-    DEBUG ((EFI_D_ERROR, "Integer Overflow: PageSize=%u, KernelSizeActual=%u\n",
-           BootParamlistPtr.PageSize, BootParamlistPtr.KernelSizeActual));
-    return EFI_BAD_BUFFER_SIZE;
+  if (!Info->HasBootInitRamdisk) {
+    BootParamlistPtr.RamdiskOffset = ADD_OF (BootParamlistPtr.PageSize,
+                                             BootParamlistPtr.KernelSizeActual);
+    if (!BootParamlistPtr.RamdiskOffset) {
+        DEBUG ((EFI_D_ERROR,
+                "Integer Overflow: PageSize=%u, KernelSizeActual=%u\n",
+                BootParamlistPtr.PageSize, BootParamlistPtr.KernelSizeActual));
+      return EFI_BAD_BUFFER_SIZE;
+    }
   }
 
   DEBUG ((EFI_D_VERBOSE, "Kernel Load Address: 0x%x\n",
