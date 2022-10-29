@@ -590,7 +590,8 @@ SkipImageVerification:
     }
   }
 
-  if (Info->HasBootInitRamdisk) {
+  if ((Info->HasBootInitRamdisk) &&
+     (Info->HeaderVersion >= BOOT_HEADER_VERSION_FOUR)) {
     Status = NoAVBLoadPartitionImage (Info, (CHAR16 *)L"init_boot");
     if (Status != EFI_SUCCESS) {
         DEBUG ((EFI_D_ERROR,
@@ -1538,7 +1539,8 @@ LoadImageAndAuthVB2 (BootInfo *Info, BOOLEAN HibernationResume,
       NumRequestedPartition += 1;
     }
 
-    if (Info->HasBootInitRamdisk) {
+    if ((Info->HasBootInitRamdisk) &&
+       (Info->HeaderVersion >= BOOT_HEADER_VERSION_FOUR)) {
       AddRequestedPartition (RequestedPartitionAll, IMG_INIT_BOOT);
       NumRequestedPartition += 1;
     }

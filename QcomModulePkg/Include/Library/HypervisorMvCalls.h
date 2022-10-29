@@ -60,5 +60,6 @@ typedef struct hyp_boot_info {
 /* SCM call related functions */
 HypBootInfo *GetVmData (VOID);
 BOOLEAN IsVmEnabled (VOID);
+VOID SetVmDisable (VOID);
 EFI_STATUS CheckAndSetVmData (BootParamlist *BootParamlistPtr);
 VOID DisableHypUartUsageForLogging (VOID);

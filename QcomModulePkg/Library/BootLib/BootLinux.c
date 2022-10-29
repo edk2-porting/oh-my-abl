@@ -559,6 +559,10 @@ DTBImgCheckAndAppendDT (BootInfo *Info, BootParamlist *BootParamlistPtr)
       SingleDtHdr = (BootParamlistPtr->ImageBuffer +
                      BootParamlistPtr->DtbOffset);
 
+      if (HeaderVersion < BOOT_HEADER_VERSION_ONE) {
+        SingleDtHdr += BootParamlistPtr->PageSize;
+      }
+
       if (!fdt_check_header (SingleDtHdr)) {
         if ((ImageSize - BootParamlistPtr->DtbOffset) <
             fdt_totalsize (SingleDtHdr)) {
@@ -638,7 +642,7 @@ DTBImgCheckAndAppendDT (BootInfo *Info, BootParamlist *BootParamlistPtr)
                            DtsList);
     if (Status != EFI_SUCCESS) {
       DEBUG ((EFI_D_ERROR, "Error: Dtb overlay failed\n"));
-      return Status;
+      SetVmDisable ();
     }
   } else {
     /*It is the case of DTB overlay Get the Soc specific dtb */
@@ -735,7 +739,7 @@ DTBImgCheckAndAppendDT (BootInfo *Info, BootParamlist *BootParamlistPtr)
                            DtsList);
     if (Status != EFI_SUCCESS) {
       DEBUG ((EFI_D_ERROR, "Error: Dtb overlay failed\n"));
-      return Status;
+      SetVmDisable ();
     }
   }
   return EFI_SUCCESS;
@@ -904,7 +908,8 @@ LoadAddrAndDTUpdate (BootInfo *Info, BootParamlist *BootParamlistPtr)
     }
   }
 
-  if (Info->HasBootInitRamdisk) {
+  if ((Info->HasBootInitRamdisk) &&
+     (Info->HeaderVersion >= BOOT_HEADER_VERSION_FOUR)) {
     gBS->CopyMem ((CHAR8 *)RamdiskLoadAddr,
                   BootParamlistPtr->RamdiskBuffer+
                   BOOT_IMG_MAX_PAGE_SIZE,
@@ -1241,7 +1246,8 @@ BootLinux (BootInfo *Info)
    * only set true when there is init_boot partition.
    */
   BootParamlistPtr.RamdiskBuffer = NULL;
-  if (Info->HasBootInitRamdisk) {
+  if ((Info->HasBootInitRamdisk) &&
+     (Info->HeaderVersion >= BOOT_HEADER_VERSION_FOUR)) {
     Status = GetImage (Info,
                        &BootParamlistPtr.RamdiskBuffer,
                        (UINTN *)&BootParamlistPtr.RamdiskSize,
