@@ -137,6 +137,11 @@ STATIC UINTN DisplayCmdLineLen = sizeof (DisplayCmdLine);
 STATIC CHAR8 HwFenceCmdLine[MAX_HW_FENCE_CMD_LINE];
 STATIC UINTN HwFenceCmdLineLen = sizeof (HwFenceCmdLine);
 
+/* GPU command line related structures */
+#define MAX_GPU_CMD_LINE 256
+STATIC CHAR8 GpuCmdLine[MAX_GPU_CMD_LINE];
+STATIC UINTN GpuCmdLineLen = sizeof (GpuCmdLine);
+
 #define MAX_DTBO_IDX_STR 64
 STATIC CHAR8 *AndroidBootDtboIdx = " androidboot.dtbo_idx=";
 STATIC CHAR8 *AndroidBootDtbIdx = " androidboot.dtb_idx=";
@@ -381,6 +386,21 @@ STATIC VOID GetHwFenceCmdline (VOID)
     DEBUG ((EFI_D_ERROR, "Unable to get hw fence Config, %r\n", Status));
   }
 }
+
+STATIC EFI_STATUS GetGpuCmdline (VOID)
+{
+  EFI_STATUS Status;
+
+  Status = gRT->GetVariable ((CHAR16 *)L"GpuConfiguration",
+                             &gQcomTokenSpaceGuid, NULL, &GpuCmdLineLen,
+                             GpuCmdLine);
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "Unable to get GPU Preempt Config, %r\n", Status));
+  }
+
+  return Status;
+}
+
 
 /*
  * Returns length = 0 when there is failure.
@@ -681,6 +701,9 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
   AsciiStrCatS (Dst, MaxCmdLineLen, Src);
 
   Src = Param->HwFenceCmdLine;
+  AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+
+  Src = Param->GpuCmdLine;
   AsciiStrCatS (Dst, MaxCmdLineLen, Src);
 
   if (Param->MdtpActive) {
@@ -1272,6 +1295,16 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   AddtoBootConfigList (BootConfigFlag, HwFenceCmdLine, NULL,
                    BootConfigListHead, ParamLen, 0);
 
+  if (EFI_SUCCESS == GetGpuCmdline ()) {
+      ParamLen = AsciiStrLen (GpuCmdLine);
+      BootConfigFlag = IsAndroidBootParam (GpuCmdLine,
+                              ParamLen, HeaderVersion);
+      ADD_PARAM_LEN (BootConfigFlag, ParamLen, CmdLineLen,
+                                          BootConfigLen);
+      AddtoBootConfigList (BootConfigFlag, GpuCmdLine, NULL,
+                        BootConfigListHead, ParamLen, 0);
+  }
+
   if (!IsLEVariant ()) {
     DtboIdx = GetDtboIdx ();
     if (DtboIdx != INVALID_PTN) {
@@ -1427,6 +1460,7 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   Param.ChipBaseBand = ChipBaseBand;
   Param.DisplayCmdLine = DisplayCmdLine;
   Param.HwFenceCmdLine = HwFenceCmdLine;
+  Param.GpuCmdLine = GpuCmdLine;
   Param.CmdLine = CmdLine;
   Param.AlarmBootCmdLine = AlarmBootCmdLine;
   Param.MdtpActiveFlag = MdtpActiveFlag;

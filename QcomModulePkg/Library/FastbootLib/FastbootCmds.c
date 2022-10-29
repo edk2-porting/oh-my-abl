@@ -190,6 +190,7 @@ STATIC CHAR8 CurrentSlotFB[MAX_SLOT_SUFFIX_SZ];
   } while (0);
 
 #define MAX_DISPLAY_PANEL_OVERRIDE 256
+#define MAX_GPU_CONFIG_OVERRIDE 256
 
 /*This variable is used to skip populating the FastbootVar
  * When PopulateMultiSlotInfo called while flashing each Lun
@@ -3238,6 +3239,47 @@ CmdOemSetHwFenceValue (CONST CHAR8 *arg, VOID *data, UINT32 Size)
 }
 
 STATIC VOID
+CmdOemSetGpuPreemptionValue (CONST CHAR8 *arg, VOID *data, UINT32 Size)
+{
+  EFI_STATUS Status;
+  CHAR8 Resp[MAX_RSP_SIZE] = "Set GPU HW Preemption: ";
+  CHAR8 GpuPreemptionValue[MAX_GPU_CONFIG_OVERRIDE] =
+          " msm_kgsl.preempt_enable=";
+  INTN Pos = 0;
+
+  for (Pos = 0; Pos < AsciiStrLen (arg); Pos++) {
+    if (arg[Pos] == ' ') {
+      arg++;
+      Pos--;
+    } else {
+      break;
+    }
+  }
+
+  AsciiStrnCatS (GpuPreemptionValue,
+                 MAX_GPU_CONFIG_OVERRIDE,
+                 arg,
+                 AsciiStrLen (arg));
+
+  Status = gRT->SetVariable ((CHAR16 *)L"GpuConfiguration",
+                               &gQcomTokenSpaceGuid,
+                               EFI_VARIABLE_RUNTIME_ACCESS |
+                               EFI_VARIABLE_BOOTSERVICE_ACCESS |
+                               EFI_VARIABLE_NON_VOLATILE,
+                               AsciiStrLen (GpuPreemptionValue),
+                               (VOID *)GpuPreemptionValue);
+
+  if (EFI_ERROR (Status)) {
+    AsciiStrnCatS (Resp, sizeof (Resp), ": failed!", AsciiStrLen (": failed!"));
+    FastbootFail (Resp);
+  } else {
+    AsciiStrnCatS (Resp, sizeof (Resp), ": done", AsciiStrLen (": done"));
+    FastbootOkay (Resp);
+  }
+}
+
+
+STATIC VOID
 CmdOemSelectDisplayPanel (CONST CHAR8 *arg, VOID *data, UINT32 sz)
 {
   EFI_STATUS Status;
@@ -3834,6 +3876,7 @@ FastbootCommandSetup (IN VOID *Base, IN UINT64 Size)
       {"oem off-mode-charge", CmdOemOffModeCharger},
       {"oem select-display-panel", CmdOemSelectDisplayPanel},
       {"oem set-hw-fence-value", CmdOemSetHwFenceValue},
+      {"oem set-gpu-preemption", CmdOemSetGpuPreemptionValue},
       {"oem device-info", CmdOemDevinfo},
 #if HIBERNATION_SUPPORT_NO_AES
       {"oem golden-snapshot", CmdGoldenSnapshot},
