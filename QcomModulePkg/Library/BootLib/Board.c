@@ -819,7 +819,9 @@ EFI_STATUS BoardDdrType (UINT32 *Type)
   DEBUG ((EFI_D_INFO, "Total DDR Size: 0x%016lx \n", DdrSize));
 
   *Type = 0;
-  if (DdrSize <= DDR_256MB) {
+  if (DdrSize <= DDR_128MB) {
+    *Type = DDRTYPE_128MB;
+  } else if (DdrSize <= DDR_256MB) {
     *Type = DDRTYPE_256MB;
   } else if (DdrSize <= DDR_512MB) {
     *Type = DDRTYPE_512MB;
