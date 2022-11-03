@@ -144,6 +144,7 @@ EFIChipInfoFoundryIdType BoardPlatformFoundryId (VOID);
 EFI_PLATFORMINFO_PLATFORM_TYPE BoardPlatformType (VOID);
 UINT32 BoardPlatformVersion (VOID);
 UINT32 BoardPlatformSubType (VOID);
+UINT32 BoardOEMVariantId (VOID);
 UINT32 BoardTargetId (VOID);
 VOID
 GetRootDeviceType (CHAR8 *StrDeviceType, UINT32 Len);
