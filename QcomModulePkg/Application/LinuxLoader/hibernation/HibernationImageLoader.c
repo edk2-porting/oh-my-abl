@@ -652,7 +652,7 @@ static INT32 ReadSwapInfoStruct (VOID)
 {
         struct SwsuspInfo *Info;
 
-        BootStatsSetTimeStamp (BS_KERNEL_LOAD_START);
+        BootStatsSetTimeStamp (BS_KERNEL_LOAD_BOOT_START);
 
         Info = AllocateZeroPool (PAGE_SIZE);
         if (!Info) {
@@ -856,7 +856,7 @@ static INT32 ReadDataPages (UINT64 *KernelPfnIndexes,
                 }
         }
 
-        BootStatsSetTimeStamp (BS_KERNEL_LOAD_DONE);
+        BootStatsSetTimeStamp (BS_KERNEL_LOAD_BOOT_END);
 
         MBs = (NrCopyPages * PAGE_SIZE) / (1024 * 1024);
         if ((DiskReadMs == 0)
@@ -1253,6 +1253,8 @@ static VOID CopyBounceAndBootKernel ()
          */
         gBS->CopyMem ((VOID*)RelocateAddress, (VOID*)&JumpToKernel, PAGE_SIZE);
         Ttbr0 = CopyPageTables ();
+
+        BootStatsSetTimeStamp (BS_BL_END);
 
         printf ("Disable UEFI Boot services\n");
         printf ("Kernel entry point = 0x%lx\n", CpuResume);
