@@ -202,7 +202,7 @@ NoAVBLoadReqImage (BootInfo *Info, VOID **DtboImage,
         UINT32 *DtboSize, CHAR16 *Pname, CHAR16 *RequestedPartition)
 {
   EFI_STATUS Status = EFI_SUCCESS;
-  Slot CurrentSlot;
+  Slot CurrentSlot = {{0}};
   CHAR8 *AsciiPname = NULL;
   UINT64 PartSize = 0;
   AvbIOResult AvbStatus;
@@ -1482,7 +1482,7 @@ LoadImageAndAuthVB2 (BootInfo *Info, BOOLEAN HibernationResume,
                   SlotSuffix, VerifyFlags, VerityFlags, &SlotData);
     }
   } else {
-    Slot CurrentSlot;
+    Slot CurrentSlot = {{0}};
     VOID *ImageHdrBuffer = NULL;
     UINT32 ImageHdrSize = 0;
 
