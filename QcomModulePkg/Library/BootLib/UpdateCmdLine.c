@@ -103,6 +103,7 @@ STATIC CONST CHAR8 *LogLevel = " quite";
 STATIC CONST CHAR8 *BatteryChgPause = " androidboot.mode=charger";
 STATIC CONST CHAR8 *MdtpActiveFlag = " mdtp";
 STATIC CONST CHAR8 *AlarmBootCmdLine = " androidboot.alarmboot=true";
+STATIC CHAR8 SystemdSlotEnv[] = " systemd.setenv=\"SLOT_SUFFIX=_a\"";
 STATIC CONST CHAR8 *NoPasr = " mem_offline.nopasr=1";
 
 /*Send slot suffix in cmdline with which we have booted*/
@@ -677,27 +678,34 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
 
   if (Param->MultiSlotBoot &&
      !IsBootDevImage ()) {
-     /* Slot suffix */
-    if (Param->HeaderVersion <= BOOT_HEADER_VERSION_THREE) {
-      Src = Param->AndroidSlotSuffix;
-      AsciiStrCatS (Dst, MaxCmdLineLen, Src);
-    }
-
-    UnicodeStrToAsciiStr (GetCurrentSlotSuffix ().Suffix,
-                          Param->SlotSuffixAscii);
-    if (Param->HeaderVersion <= BOOT_HEADER_VERSION_THREE) {
-      Src = Param->SlotSuffixAscii;
-      AsciiStrCatS (Dst, MaxCmdLineLen, Src);
-    } else {
-      BootConfigFlag = IsAndroidBootParam (Param->AndroidSlotSuffix,
-                              AsciiStrLen (Param->AndroidSlotSuffix),
-                                       Param->HeaderVersion);
-      AddtoBootConfigList (BootConfigFlag, Param->AndroidSlotSuffix,
-                     Param->SlotSuffixAscii,
-                     BootConfigListHead,
-                     AsciiStrLen (Param->AndroidSlotSuffix),
-                     AsciiStrLen (Param->SlotSuffixAscii));
-    }
+        UnicodeStrToAsciiStr (GetCurrentSlotSuffix ().Suffix,
+                              Param->SlotSuffixAscii);
+        if (IsLEVariant ()) {
+          INT32 StrLen = 0;
+          StrLen = AsciiStrLen (SystemdSlotEnv);
+          SystemdSlotEnv[StrLen - 2] = Param->SlotSuffixAscii[1];
+          Src = Param->SystemdSlotEnv;
+          AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+        } else {
+          /* Slot suffix */
+          if (Param->HeaderVersion <= BOOT_HEADER_VERSION_THREE) {
+                  Src = Param->AndroidSlotSuffix;
+                  AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+          }
+          if (Param->HeaderVersion <= BOOT_HEADER_VERSION_THREE) {
+                  Src = Param->SlotSuffixAscii;
+                  AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+          } else {
+                  BootConfigFlag = IsAndroidBootParam (Param->AndroidSlotSuffix,
+                  AsciiStrLen (Param->AndroidSlotSuffix),
+                                  Param->HeaderVersion);
+                  AddtoBootConfigList (BootConfigFlag, Param->AndroidSlotSuffix,
+                                  Param->SlotSuffixAscii,
+                                  BootConfigListHead,
+                                  AsciiStrLen (Param->AndroidSlotSuffix),
+                                  AsciiStrLen (Param->SlotSuffixAscii));
+          }
+        }
   }
 
   if ((IsBuildAsSystemRootImage (BootParamlistPtr) &&
@@ -1172,12 +1180,21 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   MultiSlotBoot = PartitionHasMultiSlot ((CONST CHAR16 *)L"boot");
   if (MultiSlotBoot &&
      !IsBootDevImage ()) {
-    /* Add additional length for slot suffix */
-    ParamLen = AsciiStrLen (AndroidSlotSuffix) + MAX_SLOT_SUFFIX_SZ;
-    BootConfigFlag = IsAndroidBootParam (AndroidSlotSuffix,
-                               ParamLen, HeaderVersion);
-    ADD_PARAM_LEN (BootConfigFlag, ParamLen, CmdLineLen,
-                                         BootConfigLen);
+       if (IsLEVariant ()) {
+         ParamLen = AsciiStrLen (SystemdSlotEnv);
+         BootConfigFlag = IsAndroidBootParam (SystemdSlotEnv,
+                         ParamLen, HeaderVersion);
+         ADD_PARAM_LEN (BootConfigFlag, ParamLen, CmdLineLen, BootConfigLen);
+         AddtoBootConfigList (BootConfigFlag, SystemdSlotEnv, NULL,
+                         BootConfigListHead, ParamLen, 0);
+       } else {
+         /* Add additional length for slot suffix */
+         ParamLen = AsciiStrLen (AndroidSlotSuffix) + MAX_SLOT_SUFFIX_SZ;
+         BootConfigFlag = IsAndroidBootParam (AndroidSlotSuffix,
+                         ParamLen, HeaderVersion);
+         ADD_PARAM_LEN (BootConfigFlag, ParamLen, CmdLineLen,
+                         BootConfigLen);
+       }
   }
 
   if ((IsBuildAsSystemRootImage (BootParamlistPtr) &&
@@ -1380,6 +1397,7 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   Param.DtbIdxStr = DtbIdxStr;
   Param.LEVerityCmdLine = LEVerityCmdLine;
   Param.HeaderVersion = HeaderVersion;
+  Param.SystemdSlotEnv = SystemdSlotEnv;
 
   if (EarlyEthEnabled ()) {
     Param.EarlyIPv4CmdLine = IPv4AddrBufCmdLine;

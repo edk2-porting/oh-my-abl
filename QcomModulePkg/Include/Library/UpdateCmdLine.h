@@ -134,6 +134,7 @@ typedef struct UpdateCmdLineParamList {
   CHAR8 *EarlyIPv6CmdLine;
   CHAR8 *EarlyEthMacCmdLine;
   CHAR8 *ResumeCmdLine;
+  CONST CHAR8 *SystemdSlotEnv;
 } UpdateCmdLineParamList;
 
 
