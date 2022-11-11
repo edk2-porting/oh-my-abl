@@ -1962,7 +1962,7 @@ BOOLEAN IsABRetryCountDisabled (VOID)
 }
 #endif
 
-BOOLEAN IsDynamicPartitionSupport (VOID)
+BOOLEAN IsSuperPartitionExist (VOID)
 {
   UINT32 PtnCount;
   INT32 PtnIdx;
@@ -1977,6 +1977,14 @@ BOOLEAN IsDynamicPartitionSupport (VOID)
   } else {
     return FALSE;
   }
+}
+BOOLEAN IsDynamicPartitionSupport (VOID)
+{
+#if SUPPORT_AB_BOOT_LXC
+  return FALSE;
+#else
+  return IsSuperPartitionExist ();
+#endif
 }
 
 #if NAND_SQUASHFS_SUPPORT

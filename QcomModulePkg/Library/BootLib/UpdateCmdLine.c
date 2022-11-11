@@ -866,9 +866,11 @@ BOOLEAN IsAndroidBootParam (CONST CHAR8 *param,
   if (ParamLen < 12) {
     return FALSE;
   }
+#if !SUPPORT_AB_BOOT_LXC
   if (HeaderVersion <= BOOT_HEADER_VERSION_THREE) {
     return FALSE;
   }
+#endif
   if (AsciiStrStr (param, "androidboot.")) {
     return TRUE;
   }
