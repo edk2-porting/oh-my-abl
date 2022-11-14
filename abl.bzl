@@ -2,7 +2,7 @@ load("//build/kernel/kleaf:directory_with_structure.bzl", dws = "directory_with_
 load("//build/kernel/kleaf/impl:common_providers.bzl", "KernelEnvInfo")
 load("//msm-kernel:target_variants.bzl", "get_all_variants")
 load(
-    "//build/bazel_extensions:abl_extensions.bzl",
+    "//build:abl_extensions.bzl",
     "extra_build_configs",
     "extra_function_snippets",
     "extra_post_gen_snippets",
