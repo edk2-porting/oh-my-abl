@@ -94,7 +94,8 @@ typedef enum {
   UNKNOWN,
 } MemCardType;
 
-#define DDR_SHIFT      8
+#define BOOT_DEVICE_SHIFT      16
+#define DDR_SHIFT              8
 
 #define MB             (1024 * 1024UL)
 #define DDR_128MB      (128 * MB)

@@ -768,8 +768,16 @@ STATIC EFI_STATUS GetBoardMatchDtb (DtInfo *CurDtbInfo,
                              "does not match\n"));
     }
 
+    DEBUG ((EFI_D_VERBOSE, "BoardPlatformHlossubtype = %x, DtSubType = %x\n",
+            BoardPlatformHlosSubType (), CurDtbInfo->DtPlatformSubtype));
+
+    if (CurDtbInfo->DtPlatformSubtype == BoardPlatformHlosSubType ()) {
+      CurDtbInfo->DtMatchVal |= BIT (HLOS_SUBTYPE_EXACT_MATCH);
+    }
+
     DEBUG ((EFI_D_VERBOSE, "BoardSubtype = %x, DtSubType = %x\n",
             BoardPlatformSubType (), CurDtbInfo->DtPlatformSubtype));
+
     if ((CurDtbInfo->DtPlatformSubtype & PLATFORM_SUBTYPE_MASK) ==
         BoardPlatformSubType ()) {
       CurDtbInfo->DtMatchVal |= BIT (SUBTYPE_EXACT_MATCH);
