@@ -153,27 +153,19 @@ typedef struct CmdRsp {
 
 
 typedef struct DecryptParam {
-       VOID  *Out;
-       VOID  *AuthCur;
-       INT32 Authsize;
+       UINT32 Authsize;
+       UINT32 AuthCount;
        UINT8 KeyBlob[WRAPPED_KEY_SIZE];
-       UINT8 UnwrappedKey[32];
        UINT8 Iv[12];
        UINT8 Aad[12];
 }DecryptParam;
 
 typedef struct SwsUspHeader {
        CHAR8 Reserved[PAGE_SIZE - 20 - sizeof (SectorT) - sizeof (INT32) -
-               sizeof (Crc) - (3 * sizeof (INT32)) - 24 - WRAPPED_KEY_SIZE];
+               sizeof (Crc)];
        Crc Crc32;
        SectorT Image;
        UINT32 Flags;     /* Flags to pass to the "boot" kernel */
-       INT32 Authsize;
-       INT32 AuthslotStart;
-       INT32 AuthslotCount;
-       UINT8 KeyBlob[WRAPPED_KEY_SIZE];
-       UINT8 Iv[12];
-       UINT8 Aad[12];
        UINT8 OrigSig[10];
        UINT8 Sig[10];
 } ___packed SwsUspHeader;
