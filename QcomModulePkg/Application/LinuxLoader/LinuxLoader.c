@@ -181,6 +181,8 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
 
   UINT32 BootReason = NORMAL_MODE;
   UINT32 KeyPressed = SCAN_NULL;
+  /* SilentMode Boot */
+  CHAR8 SilentBootMode = NON_SILENT_MODE;
   /* MultiSlot Boot */
   BOOLEAN MultiSlotBoot = FALSE;
   /* Flashless Boot */
@@ -296,6 +298,18 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
       goto stack_guard_update_default;
     }
     break;
+  case SILENT_MODE:
+    SilentBootMode = SILENT_MODE;
+    break;
+  case NON_SILENT_MODE:
+    SilentBootMode = NON_SILENT_MODE;
+    break;
+  case FORCED_SILENT:
+    SilentBootMode = FORCED_SILENT;
+    break;
+  case FORCED_NON_SILENT:
+    SilentBootMode = FORCED_NON_SILENT;
+    break;
   default:
     if (BootReason != NORMAL_MODE) {
       DEBUG ((EFI_D_ERROR,
@@ -320,6 +334,7 @@ flashless_boot:
   DEBUG ((EFI_D_INFO, "KeyPress:%u, BootReason:%u\n", KeyPressed, BootReason));
   DEBUG ((EFI_D_INFO, "Fastboot=%d, Recovery:%d\n",
                                           BootIntoFastboot, BootIntoRecovery));
+  DEBUG ((EFI_D_INFO, "SilentBoot Mode:%u\n", SilentBootMode));
   if (!GetVmData ()) {
     DEBUG ((EFI_D_ERROR, "VM Hyp calls not present\n"));
   }
@@ -333,6 +348,7 @@ flashless_boot:
     Info.BootIntoRecovery = BootIntoRecovery;
     Info.BootReasonAlarm = BootReasonAlarm;
     Info.FlashlessBoot = FlashlessBoot;
+    Info.SilentBootMode = SilentBootMode;
   #if HIBERNATION_SUPPORT_NO_AES
     BootIntoHibernationImage (&Info, &SetRotAndBootState);
   #endif

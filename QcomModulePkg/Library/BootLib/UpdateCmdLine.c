@@ -68,6 +68,7 @@
 #include <Library/PartitionTableUpdate.h>
 #include <Library/PrintLib.h>
 #include <Library/FdtRw.h>
+#include <Library/ShutdownServices.h>
 #include <LinuxLoaderLib.h>
 #include <Protocol/EFICardInfo.h>
 #include <Protocol/EFIChargerEx.h>
@@ -105,6 +106,16 @@ STATIC CONST CHAR8 *MdtpActiveFlag = " mdtp";
 STATIC CONST CHAR8 *AlarmBootCmdLine = " androidboot.alarmboot=true";
 STATIC CHAR8 SystemdSlotEnv[] = " systemd.setenv=\"SLOT_SUFFIX=_a\"";
 STATIC CONST CHAR8 *NoPasr = " mem_offline.nopasr=1";
+/*Silent Boot Mode */
+STATIC CHAR8 *SilentBootEnbCmdLine =
+                           " silent_boot.mode=silent";
+STATIC CHAR8 *SilentBootDisCmdLine =
+                           " silent_boot.mode=nonsilent";
+STATIC CHAR8 *SilentBootForCmdLine =
+                           " silent_boot.mode=forcedsilent";
+STATIC CHAR8 *SilentBootNForCmdLine =
+                           " silent_boot.mode=forcednonsilent";
+
 
 /*Send slot suffix in cmdline with which we have booted*/
 STATIC CHAR8 *AndroidSlotSuffix = " androidboot.slot_suffix=";
@@ -787,6 +798,11 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
     AsciiStrCatS (Dst, MaxCmdLineLen, Src);
   }
 
+  if (Param->SilentBootModeCmdLine != NULL) {
+    Src = Param->SilentBootModeCmdLine;
+    AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+  }
+
   return EFI_SUCCESS;
 }
 CHAR8* RemoveSpace (CHAR8* param, UINT32 ParamLen)
@@ -983,7 +999,8 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
                BOOLEAN FlashlessBoot,
                BOOLEAN AlarmBoot,
                CONST CHAR8 *VBCmdLine,
-               UINT32 HeaderVersion)
+               UINT32 HeaderVersion,
+               CHAR8 SilentMode)
 {
   EFI_STATUS Status;
   UINT32 CmdLineLen = 0;
@@ -1347,6 +1364,20 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
     }
   } else {
     Param.MemOffAmt = NULL;
+  }
+
+  if (SilentMode == SILENT_MODE) {
+    CmdLineLen += AsciiStrLen (SilentBootEnbCmdLine);
+    Param.SilentBootModeCmdLine = SilentBootEnbCmdLine;
+  } else if (SilentMode == NON_SILENT_MODE) {
+    CmdLineLen += AsciiStrLen (SilentBootDisCmdLine);
+    Param.SilentBootModeCmdLine = SilentBootDisCmdLine;
+  } else if (SilentMode == FORCED_SILENT) {
+    CmdLineLen += AsciiStrLen (SilentBootForCmdLine);
+    Param.SilentBootModeCmdLine = SilentBootForCmdLine;
+  } else if (SilentMode == FORCED_NON_SILENT) {
+    CmdLineLen += AsciiStrLen (SilentBootNForCmdLine);
+    Param.SilentBootModeCmdLine = SilentBootNForCmdLine;
   }
 
   if (EarlyEthEnabled ()) {
