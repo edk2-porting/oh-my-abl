@@ -526,6 +526,7 @@ EFI_STATUS BoardInit (VOID)
   EFI_STATUS Status;
   EFIChipInfoModemType ModemType;
   UINT32 DdrType;
+  UINT32 BootDeviceType;
 
   Status = GetChipInfo (&platform_board_info, &ModemType);
   if (EFI_ERROR (Status))
@@ -539,7 +540,10 @@ EFI_STATUS BoardInit (VOID)
   if (EFI_ERROR (Status))
     return Status;
 
-  platform_board_info.HlosSubType = (DdrType << DDR_SHIFT);
+  BootDeviceType = CheckRootDeviceType ();
+
+  platform_board_info.HlosSubType = (BootDeviceType << BOOT_DEVICE_SHIFT);
+  platform_board_info.HlosSubType |= (DdrType << DDR_SHIFT);
 
   if (BoardPlatformFusion ()) {
     AsciiSPrint ((CHAR8 *)platform_board_info.ChipBaseBand,
