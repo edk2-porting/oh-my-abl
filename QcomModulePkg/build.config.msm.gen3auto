@@ -10,6 +10,8 @@ TARGET_LINUX_BOOT_CPU_ID=7
 VERIFIED_BOOT_ENABLED=1
 DISABLE_PARALLEL_DOWNLOAD_FLASH=0
 HIBERNATION_SUPPORT_NO_AES=1
+EARLY_ETH_ENABLED=1
+EARLY_ETH_AS_DLKM=1
 ################################################################################
 . ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.common
 . ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.signature_v1

@@ -153,6 +153,9 @@
   !if $(TARGET_BOARD_TYPE_AUTO)
       GCC:*_*_*_CC_FLAGS = -DTARGET_BOARD_TYPE_AUTO
   !endif
+  !if $(EARLY_ETH_AS_DLKM) == 1
+      GCC:*_*_*_CC_FLAGS = -DEARLY_ETH_AS_DLKM
+  !endif
   !if $(VERITY_LE)
       GCC:*_*_*_CC_FLAGS = -DVERITY_LE
   !endif

@@ -26,6 +26,41 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/*
+ *
+ *  Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted (subject to the limitations in the
+ *  disclaimer below) provided that the following conditions are met:
+ *
+ *      * Redistributions of source code must retain the above copyright
+ *        notice, this list of conditions and the following disclaimer.
+ *
+ *      * Redistributions in binary form must reproduce the above
+ *        copyright notice, this list of conditions and the following
+ *        disclaimer in the documentation and/or other materials provided
+ *        with the distribution.
+ *
+ *      * Neither the name of Qualcomm Innovation Center, Inc. nor the names of its
+ *        contributors may be used to endorse or promote products derived
+ *        from this software without specific prior written permission.
+ *
+ *  NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
+ *  GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT
+ *  HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ *  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+ *  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ *  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ *  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ *  GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ *  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+ *  IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ *  OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ *  IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 #include <Uefi.h>
 #include <Library/UefiLib.h>
 #include <Library/PrintLib.h>
@@ -48,14 +83,21 @@ GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf)
   UINT32 DataSize = 0;
   UINT32 Pidx;
   UINT32 Qidx;
+  UINT32 Qcount;
   CHAR8 BootDeviceType[BOOT_DEV_NAME_SIZE_MAX];
 
   memset (ipv4buf, '\0', MAX_IP_ADDR_BUF);
-  AsciiStrnCpyS (ipv4buf, MAX_IP_ADDR_BUF, " eipv4=", 7);
   memset (ipv6buf, '\0', MAX_IP_ADDR_BUF);
-  AsciiStrnCpyS (ipv6buf, MAX_IP_ADDR_BUF, " eipv6=", 7);
   memset (macbuf, '\0', MAX_IP_ADDR_BUF);
+#if EARLY_ETH_AS_DLKM
+  AsciiStrnCpyS (ipv4buf, MAX_IP_ADDR_BUF, " dwmac_qcom_eth.eipv4=", 22);
+  AsciiStrnCpyS (ipv6buf, MAX_IP_ADDR_BUF, " dwmac_qcom_eth.eipv6=", 22);
+  AsciiStrnCpyS (macbuf, MAX_IP_ADDR_BUF, " dwmac_qcom_eth.ermac=", 22);
+#else
+  AsciiStrnCpyS (ipv4buf, MAX_IP_ADDR_BUF, " eipv4=", 7);
+  AsciiStrnCpyS (ipv6buf, MAX_IP_ADDR_BUF, " eipv6=", 7);
   AsciiStrnCpyS (macbuf, MAX_IP_ADDR_BUF, " ermac=", 7);
+#endif
 
   GetRootDeviceType (BootDeviceType, BOOT_DEV_NAME_SIZE_MAX);
 
@@ -87,6 +129,11 @@ GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf)
   rawbuf = (CHAR8 *)Buffer;
 
   /* Extract ipv4 address string */
+#if EARLY_ETH_AS_DLKM
+  Qcount = 22;
+#else
+  Qcount = 7;
+#endif
   Pidx = IP_ADDR_STR_OFFSET;
   Qidx = 0;
   while (((CHAR8)rawbuf[Pidx] !=
@@ -95,7 +142,7 @@ GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf)
     if ((rawbuf[Pidx] == '.') ||
        ((rawbuf[Pidx] > 47) &&
        (rawbuf[Pidx] < 58))) {
-      ipv4buf[Qidx + 7] = rawbuf[Pidx];
+      ipv4buf[Qidx + Qcount] = rawbuf[Pidx];
       Pidx++;
       Qidx++;
     } else {
@@ -120,7 +167,7 @@ GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf)
         (rawbuf[Pidx] < 103)) ||
         ((rawbuf[Pidx] > 64) &&
         (rawbuf[Pidx] < 71))) {
-       ipv6buf[Qidx + 7] = rawbuf[Pidx];
+       ipv6buf[Qidx + Qcount] = rawbuf[Pidx];
        Pidx++;
        Qidx++;
     } else {
@@ -144,7 +191,7 @@ GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf)
        (rawbuf[Pidx] < 103)) ||
        ((rawbuf[Pidx] > 64) &&
        (rawbuf[Pidx] < 71))) {
-       macbuf[Qidx + 7] = rawbuf[Pidx];
+       macbuf[Qidx + Qcount] = rawbuf[Pidx];
        Pidx++;
        Qidx++;
     } else {
