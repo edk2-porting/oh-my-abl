@@ -131,6 +131,12 @@
 #define KERNEL_32BIT_LOAD_OFFSET 0x8000
 #define KERNEL_64BIT_LOAD_OFFSET 0x80000
 
+#ifdef TARGET_LINUX_BOOT_CPU_ID
+#define BootCpuId TARGET_LINUX_BOOT_CPU_ID
+#else
+#define BootCpuId 0
+#endif
+
 typedef enum {
   KERNEL_32BIT = 0,
   KERNEL_64BIT
@@ -287,4 +293,5 @@ BOOLEAN IsEnableDisplayMenuFlagSupported (VOID);
 BOOLEAN IsTargetAuto (VOID);
 BOOLEAN IsHibernationEnabled (VOID);
 BOOLEAN IsLVBootslotEnabled (VOID);
+BOOLEAN BootCpuSelectionEnabled (VOID);
 #endif
