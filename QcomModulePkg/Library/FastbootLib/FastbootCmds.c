@@ -2944,6 +2944,24 @@ is_display_supported ( VOID )
    return 1;
 }
 
+#ifndef TARGET_BOARD_TYPE_AUTO
+STATIC VOID
+RebootDeviceRecovery ( VOID )
+{
+   if (GetAVBVersion () != AVB_LE &&
+      !IsEnableDisplayMenuFlagSupported ()) {
+     RebootDevice (RECOVERY_MODE);
+   }
+
+}
+#else
+STATIC VOID
+RebootDeviceRecovery ( VOID )
+{
+
+}
+#endif
+
 STATIC VOID
 SetDeviceUnlock (UINT32 Type, BOOLEAN State)
 {
@@ -2987,10 +3005,7 @@ SetDeviceUnlock (UINT32 Type, BOOLEAN State)
          return;
     }
     FastbootOkay ("");
-    if (GetAVBVersion () != AVB_LE &&
-       !IsEnableDisplayMenuFlagSupported ()) {
-      RebootDevice (RECOVERY_MODE);
-    }
+    RebootDeviceRecovery ();
   }
 }
 #endif
