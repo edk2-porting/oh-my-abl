@@ -1434,6 +1434,12 @@ LoadImageAndAuthVB2 (BootInfo *Info, BOOLEAN HibernationResume,
 
   RequestedPartition = RequestedPartitionAll;
 
+  /* Get the header from info if boot already stored in it */
+  if (Info->Images[IMG_BOOT].ImageBuffer) {
+    Info->HeaderVersion = ((boot_img_hdr *)
+                          (Info->Images[IMG_BOOT].ImageBuffer))->header_version;
+  }
+
   if ( ( (!Info->MultiSlotBoot) ||
            IsDynamicPartitionSupport ()) &&
            (Info->BootIntoRecovery &&
@@ -1463,11 +1469,14 @@ LoadImageAndAuthVB2 (BootInfo *Info, BOOLEAN HibernationResume,
       Info->BootState = RED;
       goto out;
     }
-    BOOLEAN HeaderVersion = GetHeaderVersion (SlotData);
-    DEBUG ( (EFI_D_VERBOSE, "Recovery HeaderVersion %d \n", HeaderVersion));
 
-    if (HeaderVersion == BOOT_HEADER_VERSION_ZERO ||
-        HeaderVersion >= BOOT_HEADER_VERSION_THREE) {
+    if (!Info->Images[IMG_BOOT].ImageBuffer) {
+      Info->HeaderVersion = GetHeaderVersion (SlotData);
+    }
+    DEBUG ((EFI_D_VERBOSE,
+                    "Recovery HeaderVersion %d \n", Info->HeaderVersion));
+
+    if (Info->HeaderVersion >= BOOT_HEADER_VERSION_THREE) {
        AddRequestedPartition (RequestedPartitionAll, IMG_DTBO);
        NumRequestedPartition += 1;
 
@@ -1486,22 +1495,24 @@ LoadImageAndAuthVB2 (BootInfo *Info, BOOLEAN HibernationResume,
     VOID *ImageHdrBuffer = NULL;
     UINT32 ImageHdrSize = 0;
 
-    Status = LoadBootImageHeader (Info, &ImageHdrBuffer, &ImageHdrSize);
+    if (!Info->Images[IMG_BOOT].ImageBuffer) {
+      Status = LoadBootImageHeader (Info, &ImageHdrBuffer, &ImageHdrSize);
 
-    if (Status != EFI_SUCCESS ||
-        ImageHdrBuffer ==  NULL) {
-      DEBUG ((EFI_D_ERROR, "ERROR: Failed to load image header: %r\n", Status));
-      Info->BootState = RED;
-      goto out;
-    } else if (ImageHdrSize < sizeof (boot_img_hdr)) {
-      DEBUG ((EFI_D_ERROR,
-              "ERROR: Invalid image header size: %u\n", ImageHdrSize));
-      Info->BootState = RED;
-      Status = EFI_BAD_BUFFER_SIZE;
-      goto out;
+      if (Status != EFI_SUCCESS ||
+          ImageHdrBuffer ==  NULL) {
+        DEBUG ((EFI_D_ERROR,
+                       "ERROR: Failed to load image header: %r\n", Status));
+        Info->BootState = RED;
+        goto out;
+      } else if (ImageHdrSize < sizeof (boot_img_hdr)) {
+        DEBUG ((EFI_D_ERROR,
+                "ERROR: Invalid image header size: %u\n", ImageHdrSize));
+        Info->BootState = RED;
+        Status = EFI_BAD_BUFFER_SIZE;
+        goto out;
+      }
+      Info->HeaderVersion = ((boot_img_hdr *)(ImageHdrBuffer))->header_version;
     }
-
-    Info->HeaderVersion = ((boot_img_hdr *)(ImageHdrBuffer))->header_version;
     DEBUG ((EFI_D_VERBOSE, "Header version  %d\n", Info->HeaderVersion));
 
     if (!Info->NumLoadedImages) {
@@ -1524,8 +1535,7 @@ LoadImageAndAuthVB2 (BootInfo *Info, BOOLEAN HibernationResume,
      */
 
     if (IsValidPartition (&CurrentSlot, L"vendor_boot") &&
-       (Info->HeaderVersion >= BOOT_HEADER_VERSION_THREE ||
-        Info->HeaderVersion == BOOT_HEADER_VERSION_ZERO)) {
+       Info->HeaderVersion >= BOOT_HEADER_VERSION_THREE) {
       AddRequestedPartition (RequestedPartitionAll, IMG_VENDOR_BOOT);
       NumRequestedPartition += 1;
     } else {
