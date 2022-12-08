@@ -9,6 +9,7 @@ BUILD_USES_RECOVERY_AS_BOOT=0
 DEVICE_STATUS="DEFAULT_UNLOCK=true"
 INIT_BIN_LE="\"/sbin/init\""
 DISABLE_PARALLEL_DOWNLOAD_FLASH=1
+VERIFIED_BOOT_ENABLED=1
 
 ################################################################################
 . ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.common
