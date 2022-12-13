@@ -509,14 +509,14 @@ ReadCpuPartialGoods (EFI_CHIPINFO_PROTOCOL *pChipInfoProtocol, UINT32 *Value)
   UINT32 CpuCluster = 0;
   EFI_STATUS Status = EFI_SUCCESS;
 
-   /* Ensure to reset the Value before checking CPU part for defect */
+   /* Ensure to reset the Value before checking CPU subset */
   *Value = 0;
 
   Status =
-      pChipInfoProtocol->GetDefectiveCPUs (pChipInfoProtocol, CpuCluster,
+      pChipInfoProtocol->GetSubsetCPUs (pChipInfoProtocol, CpuCluster,
                                            Value);
   if (EFI_ERROR (Status)) {
-    DEBUG ((EFI_D_VERBOSE, "Failed to get CPU defective[%d] part. %r\n",
+    DEBUG ((EFI_D_VERBOSE, "Failed to get subset[%d] CPU. %r\n",
             CpuCluster, Status));
   }
 
@@ -531,22 +531,22 @@ ReadMMPartialGoods (EFI_CHIPINFO_PROTOCOL *pChipInfoProtocol, UINT32 *Value)
 {
   UINT32 i;
   EFI_STATUS Status = EFI_SUCCESS;
-  UINT32 DefectVal;
+  UINT32 SubsetVal;
 
   *Value = 0;
   for (i = 1; i < EFICHIPINFO_NUM_PARTS; i++) {
-    /* Ensure to reset the Value before checking for defect Part*/
-    DefectVal = 0;
+    /* Ensure to reset the Value before checking for Part Subset*/
+    SubsetVal = 0;
 
     Status =
-        pChipInfoProtocol->GetDefectivePart (pChipInfoProtocol, i, &DefectVal);
+        pChipInfoProtocol->GetSubsetPart (pChipInfoProtocol, i, &SubsetVal);
     if (EFI_ERROR (Status)) {
-      DEBUG ((EFI_D_VERBOSE, "Failed to get MM defective[%d] part. %r\n", i,
+      DEBUG ((EFI_D_VERBOSE, "Failed to get MM subset[%d] part. %r\n", i,
               Status));
       continue;
     }
 
-    *Value |= (DefectVal << i);
+    *Value |= (SubsetVal << i);
   }
 
   if (Status == EFI_NOT_FOUND)

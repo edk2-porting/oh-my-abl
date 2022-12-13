@@ -76,7 +76,7 @@ struct SubNodeListNew {
 };
 
 struct PartialGoods {
-  UINT32 Val;                    /* Value for the defect */
+  UINT32 Val;                    /* Value for the subset */
   CONST CHAR8 *ParentNode;       /* Parent Node name*/
   struct SubNodeListNew SubNode; /* Sub node name list*/
 };
