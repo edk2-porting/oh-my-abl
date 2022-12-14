@@ -6,6 +6,9 @@ fi
 
 PREBUILT_PYTHON_PATH=prebuilts/build-tools/path/linux-x86/python3
 
+CLANG_VERSION=r458507
+CLANG_PREBUILT_BIN=prebuilts/clang/host/linux-x86/clang-${CLANG_VERSION}/bin
+
 USER_BUILD_VARIANT=0
 if [ "${TARGET_BUILD_VARIANT}" = "user" ]; then
   USER_BUILD_VARIANT=1
