@@ -95,6 +95,7 @@
 #include <Library/Debug.h>
 #include <Library/MemoryAllocationLib.h>
 #include <Uefi.h>
+#include "BootStats.h"
 
 STATIC AvbIOResult GetHandleInfo(const char *Partition, HandleInfo *HandleInfo)
 {
@@ -173,6 +174,14 @@ AvbIOResult AvbReadFromPartition(AvbOps *Ops, const char *Partition, int64_t Rea
 		goto out;
 	}
 	*OutNumRead = 0;
+
+        if (avb_strncmp ("boot", Partition, 4) == 0) {
+                BootStatsSetTimeStamp (BS_KERNEL_LOAD_BOOT_START);
+        } else if (avb_strncmp ("vendor_boot", Partition, 11) == 0) {
+                BootStatsSetTimeStamp (BS_KERNEL_LOAD_VENDOR_BOOT_START);
+        } else if (avb_strncmp ("init_boot", Partition, 9) == 0) {
+                BootStatsSetTimeStamp (BS_KERNEL_LOAD_INIT_BOOT_START);
+        }
 
         Result = GetHandleInfo (Partition, InfoList);
         if (Result != AVB_IO_RESULT_OK) {
@@ -337,6 +346,14 @@ out:
 	if (Page != NULL) {
 		avb_free(Page);
 	}
+
+        if (avb_strncmp ("boot", Partition, 4) == 0) {
+                BootStatsSetTimeStamp (BS_KERNEL_LOAD_BOOT_END);
+        } else if (avb_strncmp ("vendor_boot", Partition, 11) == 0) {
+                BootStatsSetTimeStamp (BS_KERNEL_LOAD_VENDOR_BOOT_END);
+        } else if (avb_strncmp ("init_boot", Partition, 9) == 0) {
+                BootStatsSetTimeStamp (BS_KERNEL_LOAD_INIT_BOOT_END);
+        }
 
     DEBUG ((EFI_D_INFO, "Load Image %a total time: %lu ms \n",
           Partition, GetTimerCountms () - LoadImageStartTime));

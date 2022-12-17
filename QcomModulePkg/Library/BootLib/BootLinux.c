@@ -1457,7 +1457,7 @@ BootLinux (BootInfo *Info)
                   (VOID *)BootParamlistPtr.DeviceTreeLoadAddr, DT_SIZE_2MB,
                   (VOID *)StackCurrent, (UINTN)StackBase);
 
-  BootStatsSetTimeStamp (BS_KERNEL_ENTRY);
+  BootStatsSetTimeStamp (BS_BL_END);
 
   if (IsVmEnabled ()) {
     DisableHypUartUsageForLogging ();
@@ -1889,9 +1889,9 @@ LoadImage (CHAR16 *Pname, VOID **ImageBuffer,
     return EFI_OUT_OF_RESOURCES;
   }
 
-  BootStatsSetTimeStamp (BS_KERNEL_LOAD_START);
+  BootStatsSetTimeStamp (BS_KERNEL_LOAD_BOOT_START);
   Status = LoadImageFromPartition (*ImageBuffer, &ImageSize, Pname);
-  BootStatsSetTimeStamp (BS_KERNEL_LOAD_DONE);
+  BootStatsSetTimeStamp (BS_KERNEL_LOAD_BOOT_END);
 
   if (Status != EFI_SUCCESS) {
     DEBUG ((EFI_D_ERROR, "Failed Kernel Size   : 0x%x\n", ImageSize));
