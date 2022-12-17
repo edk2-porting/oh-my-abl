@@ -286,4 +286,5 @@ BOOLEAN IsNANDSquashFsSupport (VOID);
 BOOLEAN IsEnableDisplayMenuFlagSupported (VOID);
 BOOLEAN IsTargetAuto (VOID);
 BOOLEAN IsHibernationEnabled (VOID);
+BOOLEAN IsLVBootslotEnabled (VOID);
 #endif
