@@ -78,7 +78,13 @@ BUILD_CFLAGS = -MD -fshort-wchar -fno-strict-aliasing -fwrapv \
 -Wno-unused-result -nostdlib -g
 endif
 BUILD_LFLAGS =
+
 BUILD_CXXFLAGS = -Wno-unused-result
+
+ifeq ($(BUILD_CXX), clang++)
+BUILD_CPPFLAGS += -Wno-error=register
+BUILD_CXXFLAGS += -Wno-error=register
+endif
 
 ifeq ($(HOST_ARCH), IA32)
 #
