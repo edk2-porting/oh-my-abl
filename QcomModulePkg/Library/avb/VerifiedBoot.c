@@ -1854,7 +1854,6 @@ STATIC EFI_STATUS LoadImageAndAuthForLE (BootInfo *Info)
     UINT32 SigSize = 0;
     CHAR8 *SystemPath = NULL;
     UINT32 SystemPathLen = 0;
-    BOOLEAN SecureDevice = FALSE;
     UINT32 PageSize = 0;
     KMRotAndBootStateForLE Data = {0};
     secasn1_data_type Modulus = {NULL};
@@ -1876,12 +1875,6 @@ STATIC EFI_STATUS LoadImageAndAuthForLE (BootInfo *Info)
       GUARD (LoadImageNoAuth (Info));
     }
 
-    Status = IsSecureDevice (&SecureDevice);
-    if (Status != EFI_SUCCESS) {
-        DEBUG ((EFI_D_ERROR, "VB: Failed read device state: %r\n", Status));
-        return Status;
-    }
-
     /* Locate QcomAsn1x509Protocol*/
     Status = gBS->LocateProtocol (&gEfiQcomASN1X509ProtocolGuid, NULL,
                                  (VOID **)&QcomAsn1X509Protocal);
@@ -1898,13 +1891,6 @@ STATIC EFI_STATUS LoadImageAndAuthForLE (BootInfo *Info)
         DEBUG ((EFI_D_ERROR, "VB: Error during "
                       "ASN1X509VerifyOEMCertificate: %r\n", Status));
         return Status;
-    }
-
-    if (!SecureDevice) {
-      if (!TargetBuildVariantUser () ) {
-        DEBUG ((EFI_D_INFO, "VB: verification skipped for debug builds\n"));
-        goto set_rot;
-      }
     }
 
     /* Initialize Verified Boot*/
@@ -1948,7 +1934,6 @@ STATIC EFI_STATUS LoadImageAndAuthForLE (BootInfo *Info)
     }
     DEBUG ((EFI_D_INFO, "VB: LoadImageAndAuthForLE complete!\n"));
 
-set_rot:
     Status = Info->VbIntf->VBIsKeymasterEnabled (Info->VbIntf,
                                                   &KeymasterEnabled);
     if (Status != EFI_SUCCESS) {
