@@ -26,6 +26,13 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ *
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear.
+ */
+
 #ifndef __EARLY_ETHERNET__
 #define __EARLY_ETHERNET__
 
@@ -33,6 +40,9 @@
 #define EARLY_ADDR_TERMINATOR   '#'
 #define IP_ADDR_STR_OFFSET   0
 #define MAC_ADDR_LEN   17
+#define PHY_ADDR_LEN   33
+#define IFACE_LEN      8
+#define SPEED_LEN      6
 
 /**
  *  Reads partition and try to extract IP addresses
@@ -41,7 +51,9 @@
  * @return EFI_STATUS
  */
 EFI_STATUS
-GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf);
+GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf,
+                              CHAR8 *phyaddrbuf, CHAR8 *ifacebuf,
+                              CHAR8 *speedbuf);
 
 BOOLEAN
 EarlyEthEnabled ();
