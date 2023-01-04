@@ -9,6 +9,7 @@ TARGET_BOARD_TYPE_AUTO=0
 BUILD_USES_RECOVERY_AS_BOOT=0
 ENABLE_LE_VARIANT=true
 VERIFIED_BOOT_LE=1
+EARLY_ETH_ENABLED=1
 
 ################################################################################
 . ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.common
