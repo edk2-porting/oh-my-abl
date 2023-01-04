@@ -29,7 +29,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -78,6 +78,8 @@ typedef struct {
   QCOM_QSEECOM_PROTOCOL *QseeComProtocol;
   UINT32 AppId;
 } KMHandle;
+
+STATIC KMHandle Handle = {NULL};
 
 /**
  * KM Commands supported
@@ -216,6 +218,10 @@ KeyMasterStartApp (KMHandle *Handle)
     return EFI_INVALID_PARAMETER;
   }
 
+  if (Handle->QseeComProtocol != NULL) {
+    return Status;
+  }
+
   Status = gBS->LocateProtocol (&gQcomQseecomProtocolGuid, NULL,
                                 (VOID **)&(Handle->QseeComProtocol));
   if (Status != EFI_SUCCESS) {
@@ -257,7 +263,6 @@ KeyMasterSetRotAndBootState (KMRotAndBootState *BootState)
   CHAR8 BootStateOrgangeDigest[AVB_SHA256_DIGEST_SIZE] = {0};
   AvbSHA256Ctx RotCtx;
   AvbSHA256Ctx BootStateCtx;
-  KMHandle Handle = {NULL};
   KMSetRotReq RotReq = {0};
   KMSetRotRsp RotRsp = {0};
   KMSetBootStateReq BootStateReq = {0};
@@ -381,7 +386,6 @@ SetVerifiedBootHash (CONST CHAR8 *Vbh, UINTN VbhSize)
   EFI_STATUS Status = EFI_SUCCESS;
   KMSetVbhReq VbhReq = {0};
   KMSetVbhRsp VbhRsp = {0};
-  KMHandle Handle = {NULL};
 
   if (!Vbh ||
       VbhSize != sizeof (VbhReq.Vbh)) {
@@ -418,7 +422,6 @@ KeyMasterGetDateSupport (BOOLEAN *Supported)
   EFI_STATUS Status = EFI_SUCCESS;
   KMGetDateSupportReq Req = {0};
   KMGetDateSupportRsp Rsp = {0};
-  KMHandle Handle = {NULL};
 
   GUARD (KeyMasterStartApp (&Handle));
   Req.CmdId = KEYMASTER_GET_DATE_SUPPORT;
@@ -449,7 +452,6 @@ KeyMasterSetRotForLE (KMRotAndBootStateForLE *BootState)
   EFI_STATUS Status = EFI_SUCCESS;
   CHAR8 *RotDigest = NULL;
   AvbSHA256Ctx RotCtx;
-  KMHandle Handle = {NULL};
   KMSetRotReq RotReq = {0};
   KMSetRotRsp RotRsp = {0};
 
@@ -502,7 +504,6 @@ EFI_STATUS KeyMasterFbeSetSeed (VOID)
   EFI_STATUS Status = EFI_SUCCESS;
   KMFbeSetSeedReq Req = {0};
   KMFbeSetSeedRsp Rsp = {0};
-  KMHandle Handle = {NULL};
 
   GUARD (KeyMasterStartApp (&Handle));
   Req.CmdId = KEYMASTER_FBE_SET_SEED;
