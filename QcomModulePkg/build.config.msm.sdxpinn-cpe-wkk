@@ -1,5 +1,5 @@
 ################################################################################
-MSM_ARCH=sdxpinn
+MSM_ARCH=sdxpinn-cpe-wkk
 
 ################################################################################
 . ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.sdxpinn.common
