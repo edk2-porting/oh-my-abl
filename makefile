@@ -1,5 +1,24 @@
 UEFI_TOP_DIR := .
 
+export BUILD_NATIVE_AARCH64 := ${BUILD_NATIVE_AARCH64}
+# Standalone boot configuration for native building
+ifeq ($(BUILD_NATIVE_AARCH64),true)
+	export VERIFIED_BOOT := 0
+	export VERIFIED_BOOT_LE := false
+	export ENABLE_LE_VARIANT := false
+	export VERITY_LE := false
+	export DEFAULT_UNLOCK := true
+	export BUILD_SYSTEM_ROOT_IMAGE := false
+	export AB_RETRYCOUNT_DISABLE := false
+	export DISABLE_PARALLEL_DOWNLOAD_FLASH := false
+	export DYNAMIC_PARTITION_SUPPORT := 1
+	export USER_BUILD_VARIANT := false
+	export BOOTLOADER_OUT := $(pwd)/obj/ABL_OBJ
+	export CLANG_BIN := /usr/bin/
+	export CLANG_PREFIX := /usr/bin/aarch64-redhat-linux- 
+	export TARGET_ARCHITECTURE := arm64
+endif
+
 ifndef $(BOOTLOADER_OUT)
 	BOOTLOADER_OUT := $(shell pwd)
 endif
@@ -10,6 +29,13 @@ export WRAPPER := $(PREBUILT_PYTHON_PATH) $(BUILDDIR)/clang-wrapper.py
 export MAKEPATH := $(MAKEPATH)
 
 export CLANG35_BIN := $(CLANG_BIN)
+ifeq ($(BUILD_NATIVE_AARCH64),true)
+	export FUSE_LD := $(CLANG35_BIN)/ld
+	export EXTRA_GCC_ARG := -Wno-error=unused-command-line-argument
+else
+	export FUSE_LD := $(CLANG35_BIN)/ld.lld
+	export EXTRA_GCC_ARG :=
+endif
 export CLANG35_GCC_TOOLCHAIN := $(CLANG35_GCC_TOOLCHAIN)
 export $(BOARD_BOOTLOADER_PRODUCT_NAME)
 
@@ -49,6 +75,71 @@ define edk_tools_generate
   mkdir -p $(TARGET_EDK_TOOLS_BIN)
   cp -rf $(EDK_TOOLS_BIN)/* $(TARGET_EDK_TOOLS_BIN)
   touch $(EDK_TOOLS_PATH_MARK_FILE)
+endef
+
+# Secure signing implementation for standalone native building
+ifeq ($(BUILD_NATIVE_AARCH64),true)
+	SECTOOL_DIR ?= /usr/bin/sectools
+	SECTOOL_PROJ ?= sdm855
+	SIGN_ID ?= abl
+	SOC_HW_VER ?= 0x60030000
+	SOC_VERS ?= 0x6003
+	SECIMAGE_XML ?= secimagev3
+	ABL_SIGNED ?= $(BUILDDIR)/signed_abl
+	USES_SEC_POLICY_MULTIPLE_DEFAULT_SIGN ?= 1
+	USES_SEC_POLICY_DEFAULT_SUBFOLDER_SIGN ?= ""
+	USES_SEC_POLICY_INTEGRITY_CHECK ?= 1
+endif
+
+define sec-image-generate
+	if [ "$(BUILD_NATIVE_AARCH64)" = "true" ]; then \
+		echo "Generating signed appsbl using secimage tool for" ;\
+		if [ ! -d $(ABL_SIGNED) ]; then \
+			mkdir -p $(ABL_SIGNED); \
+		fi ;\
+		if [ ! -d $(ABL_SIGNED)/$(SECTOOL_PROJ) ]; then \
+			mkdir -p $(ABL_SIGNED)/$(SECTOOL_PROJ); \
+		fi ;\
+		SECIMAGE_LOCAL_DIR=$(SECTOOL_DIR) \
+		USES_SEC_POLICY_MULTIPLE_DEFAULT_SIGN=$(USES_SEC_POLICY_MULTIPLE_DEFAULT_SIGN) \
+		USES_SEC_POLICY_DEFAULT_SUBFOLDER_SIGN=$(USES_SEC_POLICY_DEFAULT_SUBFOLDER_SIGN) \
+		USES_SEC_POLICY_INTEGRITY_CHECK=$(USES_SEC_POLICY_INTEGRITY_CHECK) \
+		python3 $(SECTOOL_DIR)/sectools_builder.py \
+		-i $(ABL_FV_ELF) --install_file_name abl.elf \
+		-t $(SECTOOL_DIR)/$(SECTOOL_DIR)/signed \
+		-g $(SIGN_ID) \
+		--soc_hw_version $(SOC_HW_VER) \
+		--soc_vers $(SOC_VERS) \
+		--config=$(SECTOOL_DIR)/config/integration/$(SECIMAGE_XML).xml \
+		--install_base_dir=$(ABL_SIGNED)/$(SECTOOL_PROJ) \
+		> $(ABL_SIGNED)/$(SECTOOL_PROJ)/secimage.log 2>&1 ;\
+		echo Completed secimage signed appsbl \(logs in $(ABL_SIGNED)/$(SECTOOL_PROJ)/secimage.log\) ;\
+		echo -------------------------------------------------------------- ;\
+		echo Signed image: $(ABL_SIGNED)/$(SECTOOL_PROJ)/abl.elf ;\
+		echo -------------------------------------------------------------- ;\
+	fi
+endef
+
+# SRPM Packaging
+PREFIX="abl-1.0"
+TARBALL="${PREFIX}.tar.gz"
+SPECFILE="srpm/abl.spec"
+RPM_DIR=rpmbuild
+RPMBUILDOPTS="-bs"
+GITID=$(shell git log --max-count=1 --pretty=format:%H HEAD)
+XZ_THREADS=$(rpm --eval %{_smp_mflags} | sed -e 's!^-j!--threads !')
+define package-srpm
+	rm -rf $(RPM_DIR) *.src.rpm $(TARBALL)
+	mkdir -p $(RPM_DIR)/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+	git archive --prefix="$(PREFIX)"/ --format=tar "$(GITID)" | gzip -v > $(TARBALL) 
+	cp -f $(SPECFILE) $(RPM_DIR)/SPECS
+	cp -f $(TARBALL) $(RPM_DIR)/SOURCES  
+	rpmbuild --define "_sourcedir $(RPM_DIR)/SOURCES" --define "_builddir $(RPM_DIR)/BUILD" --define "_srcrpmdir $(RPM_DIR)/SRPMS" --define "_rpmdir $(RPM_DIR)/RPMS" --define "_specdir $(RPM_DIR)/SPECS" $(RPMBUILDOPTS) $(RPM_DIR)/SPECS/*.spec
+	mv $(RPM_DIR)/SRPMS/* .
+	rm -rf $(RPM_DIR) $(TARBALL)
+	@echo --------------------------------------------------------------
+	@echo ABL SRPM: abl-1.0-1.src.rpm 
+	@echo --------------------------------------------------------------
 endef
 
 # This function is to check version compatibility, used to control features based on the compiler version. \
@@ -162,9 +253,10 @@ export LLVM_ENABLE_SAFESTACK := $(LLVM_ENABLE_SAFESTACK)
 export LLVM_SAFESTACK_USE_PTR := $(LLVM_SAFESTACK_USE_PTR)
 export LLVM_SAFESTACK_COLORING := $(LLVM_SAFESTACK_COLORING)
 
-.PHONY: all cleanall
+.PHONY: all cleanall srpm
 
 all: ABL_FV_ELF
+	$(call sec-image-generate)
 
 cleanall:
 	@. ./edksetup.sh BaseTools && \
@@ -217,3 +309,6 @@ BASETOOLS_CLEAN: ABL_FV_IMG
 
 ABL_FV_ELF: BASETOOLS_CLEAN $(EDK_TOOLS_GENERATE_CLEAN)
 	python3 $(WORKSPACE)/QcomModulePkg/Tools/image_header.py $(ABL_FV_IMG) $(ABL_FV_ELF) $(LOAD_ADDRESS) elf 32 nohash
+
+srpm:
+	$(call package-srpm)
