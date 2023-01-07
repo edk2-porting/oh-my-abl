@@ -12,6 +12,7 @@ load(
 def _abl_impl(ctx):
     inputs = []
     inputs += ctx.files.srcs
+    inputs += ctx.files.deps
     inputs += ctx.attr.kernel_build[KernelEnvInfo].dependencies
 
     output_files = [ctx.actions.declare_file("{}.tar.gz".format(ctx.label.name))]
@@ -145,6 +146,7 @@ abl = rule(
             mandatory = True,
             allow_files = True,
         ),
+        "deps": attr.label_list(),
         "abl_build_config": attr.string(),
         "extra_function_snippets": attr.string_list(),
         "extra_post_gen_snippets": attr.string_list(),
@@ -163,6 +165,11 @@ def define_abl_targets():
 def define_abl(msm_target, variant):
     target = msm_target + "_" + variant
 
+    if msm_target == "pineapple":
+        extra_deps = ["//prebuilts/clang/host/linux-x86/clang-r458507:binaries"]
+    else:
+        extra_deps = []
+
     abl(
         name = "{}_abl".format(target),
         kernel_build = "//msm-kernel:{}_env".format(target),
@@ -171,5 +178,6 @@ def define_abl(msm_target, variant):
         extra_function_snippets = extra_function_snippets,
         extra_post_gen_snippets = extra_post_gen_snippets,
         extra_build_configs = extra_build_configs,
+        deps = extra_deps,
         visibility = ["//visibility:public"],
     )
