@@ -29,7 +29,7 @@
 /* Changes from Qualcomm Innovation Center are provided under the following
  * license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the
@@ -67,6 +67,7 @@
 
 #include <Protocol/EFIVerifiedBoot.h>
 #include <Uefi.h>
+#include "libavb/libavb.h"
 
 typedef struct {
   BOOLEAN IsUnlocked;
@@ -84,6 +85,36 @@ typedef struct {
   UINT32 PublicKeyExpLength;
   CONST UINT8 *PublicKeyExp;
 } KMRotAndBootStateForLE;
+
+// Request structs for TZ
+typedef struct {
+  UINT32 CmdId;
+  UINT32 RotOffset;
+  UINT32 RotSize;
+  CHAR8 RotDigest[AVB_SHA256_DIGEST_SIZE];
+} __attribute__ ((packed)) KMSetRotReq;
+
+typedef struct {
+  UINT32 IsUnlocked;
+  CHAR8 PublicKey[AVB_SHA256_DIGEST_SIZE];
+  UINT32 Color;
+  UINT32 SystemVersion;
+  UINT32 SystemSecurityLevel;
+} __attribute__ ((packed)) KMBootState;
+
+typedef struct {
+  UINT32 CmdId;
+  UINT32 Version;
+  UINT32 Offset;
+  UINT32 Size;
+  KMBootState BootState;
+} __attribute__ ((packed)) KMSetBootStateReq;
+
+typedef struct
+{
+  UINT32 CmdId;
+  CHAR8 Vbh[AVB_SHA256_DIGEST_SIZE];
+} __attribute__ ((packed)) KMSetVbhReq;
 
 EFI_STATUS
 KeyMasterSetRotAndBootState (KMRotAndBootState *BootState);
