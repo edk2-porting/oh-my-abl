@@ -33,7 +33,7 @@
 /*
   * Changes from Qualcomm Innovation Center are provided under the following
   * license:
-  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+  * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
   *
   * Redistribution and use in source and binary forms, with or without
   * modification, are permitted (subject to the limitations in the disclaimer
@@ -143,7 +143,7 @@ STATIC CHAR8 *AndroidBootDtbIdx = " androidboot.dtb_idx=";
 
 STATIC CHAR8 *AndroidBootForceNormalBoot =
                                       " androidboot.force_normal_boot=";
-CHAR8 *BootForceNormalBoot = "0";
+CHAR8 BootForceNormalBoot = '0';
 STATIC CONST CHAR8 *AndroidBootFstabSuffix =
                                       " androidboot.fstab_suffix=";
 STATIC CHAR8 *FstabSuffixEmmc = "emmc";
@@ -761,12 +761,12 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
       (!Param->MultiSlotBoot &&
        !IsBuildUseRecoveryAsBoot ())) {
     if (Param->HeaderVersion < BOOT_HEADER_VERSION_THREE) {
-      BootForceNormalBoot[0] = '1';
+      BootForceNormalBoot = '1';
     }
-    if (Param->HeaderVersion >= BOOT_HEADER_VERSION_THREE) {
+    if (Param->HeaderVersion <= BOOT_HEADER_VERSION_THREE) {
       Src = AndroidBootForceNormalBoot;
       AsciiStrCatS (Dst, MaxCmdLineLen, Src);
-      Src = BootForceNormalBoot;
+      Src = &BootForceNormalBoot;
       AsciiStrCatS (Dst, MaxCmdLineLen, Src);
     }
   }
@@ -1302,7 +1302,7 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
 
   if (!IsRecoveryHasNoKernel () &&
       !Recovery) {
-    *BootForceNormalBoot = '1';
+    BootForceNormalBoot = '1';
   }
 
   if (((IsBuildUseRecoveryAsBoot () ||
@@ -1317,10 +1317,10 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
     ADD_PARAM_LEN (BootConfigFlag, ParamLen, CmdLineLen,
                                          BootConfigLen);
     AddtoBootConfigList (BootConfigFlag, AndroidBootForceNormalBoot,
-                    BootForceNormalBoot,
+                    &BootForceNormalBoot,
                     BootConfigListHead, ParamLen,
-                    AsciiStrLen (BootForceNormalBoot));
-    ADD_PARAM_LEN (BootConfigFlag, AsciiStrLen (BootForceNormalBoot),
+                    sizeof (BootForceNormalBoot));
+    ADD_PARAM_LEN (BootConfigFlag, sizeof (BootForceNormalBoot),
                    CmdLineLen, BootConfigLen);
   }
 
