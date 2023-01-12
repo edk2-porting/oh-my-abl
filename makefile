@@ -114,6 +114,10 @@ define sec-image-generate
 		--install_base_dir=$(ABL_SIGNED)/$(SECTOOL_PROJ) \
 		> $(ABL_SIGNED)/$(SECTOOL_PROJ)/secimage.log 2>&1 ;\
 		echo Completed secimage signed appsbl \(logs in $(ABL_SIGNED)/$(SECTOOL_PROJ)/secimage.log\) ;\
+		if [ ! -f $(ABL_SIGNED)/$(SECTOOL_PROJ)/abl.elf ]; then \
+			echo "Failed to generate signed image !!"; \
+			exit 1 ; \
+		fi ;\
 		echo -------------------------------------------------------------- ;\
 		echo Signed image: $(ABL_SIGNED)/$(SECTOOL_PROJ)/abl.elf ;\
 		echo -------------------------------------------------------------- ;\
