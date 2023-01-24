@@ -83,6 +83,7 @@
 #include "LECmdLine.h"
 #include "EarlyEthernet.h"
 
+#define BOOT_CPU_PARAM_LEN 13
 #define SIZE_OF_DELIM 2
 #define PARAM_DELIM "\n"
 #define ADD_PARAM_LEN(BootConfigFlag, ParamLen, CmdLineL, BootConfigL) \
@@ -127,6 +128,7 @@ STATIC CHAR8 IPv4AddrBufCmdLine[MAX_IP_ADDR_BUF];
 STATIC CHAR8 IPv6AddrBufCmdLine[MAX_IP_ADDR_BUF];
 STATIC CHAR8 MacEthAddrBufCmdLine[MAX_IP_ADDR_BUF];
 STATIC CHAR8 *ResumeCmdLine = NULL;
+STATIC CHAR8 BootCpuCmdLine[BOOT_CPU_PARAM_LEN];
 
 /* Display command line related structures */
 #define MAX_DISPLAY_CMD_LINE 256
@@ -811,6 +813,11 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
     AsciiStrCatS (Dst, MaxCmdLineLen, Src);
   }
 
+  if (BootCpuSelectionEnabled ()) {
+    Src = Param->BootCpuCmdLine;
+    AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+  }
+
   return EFI_SUCCESS;
 }
 CHAR8* RemoveSpace (CHAR8* param, UINT32 ParamLen)
@@ -1456,6 +1463,19 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
 
   if (IsHibernationEnabled ()) {
     Param.ResumeCmdLine = ResumeCmdLine;
+  }
+
+  if (BootCpuSelectionEnabled ()) {
+    AsciiSPrint (BootCpuCmdLine, sizeof (BootCpuCmdLine), " boot_cpu=%d",
+                 BootCpuId);
+    ParamLen = AsciiStrLen (BootCpuCmdLine);
+    BootConfigFlag = IsAndroidBootParam (BootCpuCmdLine,
+                          ParamLen, HeaderVersion);
+    ADD_PARAM_LEN (BootConfigFlag, ParamLen,
+                 CmdLineLen, BootConfigLen);
+    AddtoBootConfigList (BootConfigFlag, BootCpuCmdLine, NULL,
+                BootConfigListHead, ParamLen, 0);
+    Param.BootCpuCmdLine = BootCpuCmdLine;
   }
 
   Status = UpdateCmdLineParams (&Param, FinalCmdLine, BootParamlistPtr);

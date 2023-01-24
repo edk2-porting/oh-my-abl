@@ -112,16 +112,14 @@ SetLinuxBootCpu (UINT32 BootCpu)
   return;
 }
 
-#ifdef LINUX_BOOT_CPU_SELECTION_ENABLED
-#define BootCpuId TARGET_LINUX_BOOT_CPU_ID
-STATIC BOOLEAN
+#ifdef TARGET_LINUX_BOOT_CPU_ID
+BOOLEAN
 BootCpuSelectionEnabled (VOID)
 {
   return TRUE;
 }
 #else
-#define BootCpuId 0
-STATIC BOOLEAN
+BOOLEAN
 BootCpuSelectionEnabled (VOID)
 {
   return FALSE;
