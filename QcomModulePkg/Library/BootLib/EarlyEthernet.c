@@ -27,8 +27,10 @@
 */
 
 /*
- *
- *  Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  Changes from Qualcomm Innovation Center are provided under the following
+ *  license:
+ *  Copyright (c) 2021 - 2023 Qualcomm Innovation Center, Inc. All rights
+ *  reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -75,7 +77,9 @@
  * ip address string and fill into caller supplied buffer.
  */
 EFI_STATUS
-GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf)
+GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf,
+                              CHAR8 *phyaddrbuf, CHAR8 *ifacebuf,
+                              CHAR8 *speedbuf)
 {
   EFI_STATUS Status;
   VOID *Buffer;
@@ -83,12 +87,15 @@ GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf)
   UINT32 DataSize = 0;
   UINT32 Pidx;
   UINT32 Qidx;
-  UINT32 Qcount;
+  UINT32 Qcount, QPhycount, QIfacecount, QSpeedcount;
   CHAR8 BootDeviceType[BOOT_DEV_NAME_SIZE_MAX];
 
   memset (ipv4buf, '\0', MAX_IP_ADDR_BUF);
   memset (ipv6buf, '\0', MAX_IP_ADDR_BUF);
   memset (macbuf, '\0', MAX_IP_ADDR_BUF);
+  memset (phyaddrbuf, '\0', MAX_IP_ADDR_BUF);
+  memset (ifacebuf, '\0', MAX_IP_ADDR_BUF);
+  memset (speedbuf, '\0', MAX_IP_ADDR_BUF);
 #if EARLY_ETH_AS_DLKM
   AsciiStrnCpyS (ipv4buf, MAX_IP_ADDR_BUF, " dwmac_qcom_eth.eipv4=", 22);
   AsciiStrnCpyS (ipv6buf, MAX_IP_ADDR_BUF, " dwmac_qcom_eth.eipv6=", 22);
@@ -97,6 +104,9 @@ GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf)
   AsciiStrnCpyS (ipv4buf, MAX_IP_ADDR_BUF, " eipv4=", 7);
   AsciiStrnCpyS (ipv6buf, MAX_IP_ADDR_BUF, " eipv6=", 7);
   AsciiStrnCpyS (macbuf, MAX_IP_ADDR_BUF, " ermac=", 7);
+  AsciiStrnCpyS (phyaddrbuf, MAX_IP_ADDR_BUF, " ephyaddr=", 10);
+  AsciiStrnCpyS (ifacebuf, MAX_IP_ADDR_BUF, " eiface=", 8);
+  AsciiStrnCpyS (speedbuf, MAX_IP_ADDR_BUF, " espeed=", 8);
 #endif
 
   GetRootDeviceType (BootDeviceType, BOOT_DEV_NAME_SIZE_MAX);
@@ -134,6 +144,8 @@ GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf)
 #else
   Qcount = 7;
 #endif
+QPhycount = 10;
+QIfacecount = QSpeedcount = 8;
   Pidx = IP_ADDR_STR_OFFSET;
   Qidx = 0;
   while (((CHAR8)rawbuf[Pidx] !=
@@ -200,6 +212,39 @@ GetEarlyEthInfoFromPartition (CHAR8 *ipv4buf, CHAR8 *ipv6buf, CHAR8 *macbuf)
                                                     rawbuf[Pidx], Pidx));
         return EFI_INVALID_PARAMETER;
     }
+  }
+
+  /* Extract phy address string */
+  ++Pidx;
+  Qidx = 0;
+  while (((CHAR8)rawbuf[Pidx] !=
+         EARLY_ADDR_TERMINATOR) &&
+         (Qidx < PHY_ADDR_LEN)) {
+       phyaddrbuf[Qidx + QPhycount] = rawbuf[Pidx];
+       Pidx++;
+       Qidx++;
+  }
+
+  /* Extract iface string */
+  ++Pidx;
+  Qidx = 0;
+  while (((CHAR8)rawbuf[Pidx] !=
+         EARLY_ADDR_TERMINATOR) &&
+         (Qidx < IFACE_LEN)) {
+       ifacebuf[Qidx + QIfacecount] = rawbuf[Pidx];
+       Pidx++;
+       Qidx++;
+  }
+
+  /* Extract speed string */
+  ++Pidx;
+  Qidx = 0;
+  while (((CHAR8)rawbuf[Pidx] !=
+         EARLY_ADDR_TERMINATOR) &&
+         (Qidx < SPEED_LEN)) {
+       speedbuf[Qidx + QSpeedcount] = rawbuf[Pidx];
+       Pidx++;
+       Qidx++;
   }
 
   FreePages (Buffer, 1);
