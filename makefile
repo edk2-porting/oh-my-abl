@@ -1,6 +1,7 @@
 UEFI_TOP_DIR := .
 
 export BUILD_NATIVE_AARCH64 := ${BUILD_NATIVE_AARCH64}
+export SIGN_ABL_IMAGE := ${SIGN_ABL_IMAGE}
 # Standalone boot configuration for native building
 ifeq ($(BUILD_NATIVE_AARCH64),true)
 	export VERIFIED_BOOT := 0
@@ -78,7 +79,7 @@ define edk_tools_generate
 endef
 
 # Secure signing implementation for standalone native building
-ifeq ($(BUILD_NATIVE_AARCH64),true)
+ifeq ($(SIGN_ABL_IMAGE),true)
 	SECTOOL_DIR ?= /usr/bin/sectools
 	SECTOOL_PROJ ?= sdm855
 	SIGN_ID ?= abl
@@ -91,36 +92,46 @@ ifeq ($(BUILD_NATIVE_AARCH64),true)
 	USES_SEC_POLICY_INTEGRITY_CHECK ?= 1
 endif
 
-define sec-image-generate
+# Check if build was success, and try to sign the image, if requested
+define validate-cum-sign
 	if [ "$(BUILD_NATIVE_AARCH64)" = "true" ]; then \
-		echo "Generating signed appsbl using secimage tool for" ;\
-		if [ ! -d $(ABL_SIGNED) ]; then \
-			mkdir -p $(ABL_SIGNED); \
-		fi ;\
-		if [ ! -d $(ABL_SIGNED)/$(SECTOOL_PROJ) ]; then \
-			mkdir -p $(ABL_SIGNED)/$(SECTOOL_PROJ); \
-		fi ;\
-		SECIMAGE_LOCAL_DIR=$(SECTOOL_DIR) \
-		USES_SEC_POLICY_MULTIPLE_DEFAULT_SIGN=$(USES_SEC_POLICY_MULTIPLE_DEFAULT_SIGN) \
-		USES_SEC_POLICY_DEFAULT_SUBFOLDER_SIGN=$(USES_SEC_POLICY_DEFAULT_SUBFOLDER_SIGN) \
-		USES_SEC_POLICY_INTEGRITY_CHECK=$(USES_SEC_POLICY_INTEGRITY_CHECK) \
-		python3 $(SECTOOL_DIR)/sectools_builder.py \
-		-i $(ABL_FV_ELF) --install_file_name abl.elf \
-		-t $(SECTOOL_DIR)/$(SECTOOL_DIR)/signed \
-		-g $(SIGN_ID) \
-		--soc_hw_version $(SOC_HW_VER) \
-		--soc_vers $(SOC_VERS) \
-		--config=$(SECTOOL_DIR)/config/integration/$(SECIMAGE_XML).xml \
-		--install_base_dir=$(ABL_SIGNED)/$(SECTOOL_PROJ) \
-		> $(ABL_SIGNED)/$(SECTOOL_PROJ)/secimage.log 2>&1 ;\
-		echo Completed secimage signed appsbl \(logs in $(ABL_SIGNED)/$(SECTOOL_PROJ)/secimage.log\) ;\
-		if [ ! -f $(ABL_SIGNED)/$(SECTOOL_PROJ)/abl.elf ]; then \
-			echo "Failed to generate signed image !!"; \
-			exit 1 ; \
+		if [ ! -f $(ABL_FV_ELF) ]; then \
+			echo "Failed to generate unsigned ABL image, exiting !!"; \
+			exit 1; \
 		fi ;\
 		echo -------------------------------------------------------------- ;\
-		echo Signed image: $(ABL_SIGNED)/$(SECTOOL_PROJ)/abl.elf ;\
+		echo "Unsigned ABL Image: $(ABL_FV_ELF)"; \
 		echo -------------------------------------------------------------- ;\
+		if [ "$(SIGN_ABL_IMAGE)" = "true" ]; then \
+			echo "Signing requested, will attempt to sign the generated ABL image" ;\
+			if [ ! -d $(ABL_SIGNED) ]; then \
+				mkdir -p $(ABL_SIGNED); \
+			fi ;\
+			if [ ! -d $(ABL_SIGNED)/$(SECTOOL_PROJ) ]; then \
+				mkdir -p $(ABL_SIGNED)/$(SECTOOL_PROJ); \
+			fi ;\
+			SECIMAGE_LOCAL_DIR=$(SECTOOL_DIR) \
+			USES_SEC_POLICY_MULTIPLE_DEFAULT_SIGN=$(USES_SEC_POLICY_MULTIPLE_DEFAULT_SIGN) \
+			USES_SEC_POLICY_DEFAULT_SUBFOLDER_SIGN=$(USES_SEC_POLICY_DEFAULT_SUBFOLDER_SIGN) \
+			USES_SEC_POLICY_INTEGRITY_CHECK=$(USES_SEC_POLICY_INTEGRITY_CHECK) \
+			python3 $(SECTOOL_DIR)/sectools_builder.py \
+			-i $(ABL_FV_ELF) --install_file_name abl.elf \
+			-t $(SECTOOL_DIR)/$(SECTOOL_DIR)/signed \
+			-g $(SIGN_ID) \
+			--soc_hw_version $(SOC_HW_VER) \
+			--soc_vers $(SOC_VERS) \
+			--config=$(SECTOOL_DIR)/config/integration/$(SECIMAGE_XML).xml \
+			--install_base_dir=$(ABL_SIGNED)/$(SECTOOL_PROJ) \
+			> $(ABL_SIGNED)/$(SECTOOL_PROJ)/secimage.log 2>&1 ;\
+			echo Completed secimage signed appsbl \(logs in $(ABL_SIGNED)/$(SECTOOL_PROJ)/secimage.log\) ;\
+			if [ ! -f $(ABL_SIGNED)/$(SECTOOL_PROJ)/abl.elf ]; then \
+				echo "Failed to generate signed ABL Image !!"; \
+				exit 1 ; \
+			fi ;\
+			echo -------------------------------------------------------------- ;\
+			echo Signed ABL Image: $(ABL_SIGNED)/$(SECTOOL_PROJ)/abl.elf ;\
+			echo -------------------------------------------------------------- ;\
+		fi ;\
 	fi
 endef
 
@@ -260,7 +271,7 @@ export LLVM_SAFESTACK_COLORING := $(LLVM_SAFESTACK_COLORING)
 .PHONY: all cleanall srpm
 
 all: ABL_FV_ELF
-	$(call sec-image-generate)
+	$(call validate-cum-sign)
 
 cleanall:
 	@. ./edksetup.sh BaseTools && \

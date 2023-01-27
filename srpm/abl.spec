@@ -16,5 +16,5 @@ The ABL Source, capable of getting built natively on the Qdrive3.0 target
 %setup -q
 
 %build
-make BUILD_NATIVE_AARCH64=true
+make BUILD_NATIVE_AARCH64=true SIGN_ABL_IMAGE=true
 cp -f signed_abl/sdm855/abl.elf /
