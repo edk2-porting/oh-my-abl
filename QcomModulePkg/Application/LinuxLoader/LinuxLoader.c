@@ -33,7 +33,8 @@
 /*
  *  Changes from Qualcomm Innovation Center are provided under the following license:
  *
- *  Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  Copyright (c) 2022 - 2023 Qualcomm Innovation Center, Inc. All rights
+ *  reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -196,6 +197,8 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
          (UINTN)LinuxLoaderEntry & (~ (0xFFF))));
   DEBUG ((EFI_D_VERBOSE, "LinuxLoaderEntry Address: 0x%llx\n",
          (UINTN)LinuxLoaderEntry));
+
+  BootStatsSetInitTimeStamp ();
 
   Status = InitThreadUnsafeStack ();
 

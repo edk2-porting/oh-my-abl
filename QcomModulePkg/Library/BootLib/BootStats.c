@@ -30,7 +30,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 - 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -75,7 +75,27 @@ STATIC UINT64 SharedImemAddress;
 STATIC UINT64 MpmTimerBase;
 STATIC UINT64 BsImemAddress;
 
-void
+VOID
+BootStatsSetInitTimeStamp ()
+{
+  EFI_STATUS Status;
+
+  UINTN DataSize = sizeof (SharedImemAddress);
+
+  if (!SharedImemAddress) {
+    Status =
+        gRT->GetVariable ((CHAR16 *)L"Shared_IMEM_Base", &gQcomTokenSpaceGuid,
+                          NULL, &DataSize, &SharedImemAddress);
+    if (Status != EFI_SUCCESS) {
+      DEBUG ((EFI_D_ERROR, "Failed to get Shared IMEM base, %r\n", Status));
+      return;
+    }
+  }
+    BsImemAddress = SharedImemAddress + BS_INFO_OFFSET;
+    memset ((UINT64 *)BsImemAddress, 0, sizeof (UINT32) * BS_MAX);
+}
+
+VOID
 BootStatsSetTimeStamp (BS_ENTRY BootStatId)
 {
   EFI_STATUS Status;
