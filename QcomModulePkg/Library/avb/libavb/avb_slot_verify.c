@@ -50,6 +50,13 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+/*
+ * Changes from Qualcomm Innovation Center are provided under the following license:
+ *
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #include "avb_slot_verify.h"
 #include "avb_chain_partition_descriptor.h"
 #include "avb_cmdline.h"
@@ -981,6 +988,9 @@ static AvbSlotVerifyResult load_and_verify_vbmeta(
    */
   descriptors =
       avb_descriptor_get_all(vbmeta_buf, vbmeta_num_read, &num_descriptors);
+  if (descriptors == NULL) {
+     goto out;
+  }
   for (n = 0; n < num_descriptors; n++) {
     AvbDescriptor desc;
 

@@ -29,7 +29,7 @@
  /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -474,7 +474,7 @@ LoadBootImageNoAuth (BootInfo *Info, UINT32 *PageSize, BOOLEAN *FastbootPath)
   BOOLEAN BootIntoRecovery = FALSE;
   VOID *RecoveryImageHdrBuffer = NULL;
   UINT32 RecoveryImageHdrSize = 0;
-  BOOLEAN BootImageLoaded;
+  BOOLEAN BootImageLoaded = FALSE;
   /* In case of flashless LE devices images are already loaded and verified
    * by previous bootloaders, so just fill the BootInfo structure with
    * required parameters
