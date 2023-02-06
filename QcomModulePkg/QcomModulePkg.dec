@@ -27,6 +27,11 @@
 # * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #*/
 
+#/*
+# * Changes from Qualcomm Innovation Center are provided under the following license:
+# * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+# * SPDX-License-Identifier: BSD-3-Clause-Clear
+#*/
 
 [Defines]
   DEC_SPECIFICATION              = 0x00010005
@@ -147,6 +152,8 @@
   gEfiDisplayPowerStateProtocolGuid =  { 0xf352021d, 0x9593, 0x4432, { 0xbf, 0x04, 0x67, 0xb9, 0xf3, 0xb7, 0x60, 0x08 } }
   # Multithreading Kernel protocol for UEFI
   gEfiKernelProtocolGuid =             { 0xB5062BE7, 0x170B, 0x4A32, { 0xBE, 0x21, 0x68, 0x92, 0x62, 0xFF, 0x43, 0x99 } }
+  # HS-UART Protocol
+  gQtiHSUartProtocolGuid =             { 0x8c102bba, 0x15a9, 0x4c40, { 0x85, 0x99, 0x6d, 0x0f, 0x56, 0x89, 0xda, 0x5b } }
 
 [PcdsFixedAtBuild.common]
   # LinuxLoaderCommon
