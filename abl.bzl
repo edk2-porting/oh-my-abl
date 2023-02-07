@@ -165,7 +165,7 @@ def define_abl_targets():
 def define_abl(msm_target, variant):
     target = msm_target + "_" + variant
 
-    if msm_target == "pineapple":
+    if msm_target == "pineapple" or msm_target == "pineapple.allyes":
         extra_deps = ["//prebuilts/clang/host/linux-x86/clang-r458507:binaries"]
     else:
         extra_deps = []
