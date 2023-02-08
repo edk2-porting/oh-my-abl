@@ -1248,9 +1248,25 @@ static EFI_STATUS GetOsVerAndSecPactchLevel (AvbSlotVerifyData *SlotData,
   CONST CHAR8 *PropValPtr  = NULL;
   UINTN PropValSize = 0;
   UINT32 OsVersionRaw;
+  size_t Index;
 
-  PropValPtr = avb_property_lookup (SlotData->vbmeta_images[0].vbmeta_data,
-                                    SlotData->vbmeta_images[0].vbmeta_size,
+  /* Check if boot image is chained parttion.
+   */
+
+  for (Index = 1; Index < SlotData->num_vbmeta_images; Index++) {
+    if (avb_strcmp (SlotData->vbmeta_images[Index].partition_name, "boot")
+        == 0 ) {
+        break;
+      }
+  }
+
+  if (Index >= SlotData->num_vbmeta_images) {
+    /* Extract os_version and security_patch from vbmeta instead */
+    Index = 0;
+  }
+
+  PropValPtr = avb_property_lookup (SlotData->vbmeta_images[Index].vbmeta_data,
+                                    SlotData->vbmeta_images[Index].vbmeta_size,
                                     "com.android.build.boot.os_version",
                                     0,
                                     &PropValSize);
@@ -1267,8 +1283,8 @@ static EFI_STATUS GetOsVerAndSecPactchLevel (AvbSlotVerifyData *SlotData,
   }
 
   PropValPtr = NULL;
-  PropValPtr = avb_property_lookup (SlotData->vbmeta_images[0].vbmeta_data,
-                                    SlotData->vbmeta_images[0].vbmeta_size,
+  PropValPtr = avb_property_lookup (SlotData->vbmeta_images[Index].vbmeta_data,
+                                    SlotData->vbmeta_images[Index].vbmeta_size,
                                     "com.android.build.boot.security_patch",
                                     0,
                                     &PropValSize);
