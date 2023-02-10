@@ -222,6 +222,9 @@
   !if $(TARGET_SUPPORTS_EARLY_USB_INIT)
       GCC:*_*_*_PP_FLAGS = -DTARGET_SUPPORTS_EARLY_USB_INIT
   !endif
+  !if $(EXTRA_TARGET_OPTFLAGS) != ""
+      GCC:*_*_*_ARCHCC_FLAGS = $(EXTRA_TARGET_OPTFLAGS)
+  !endif
 
 [PcdsFixedAtBuild.common]
 
