@@ -1,6 +1,7 @@
 load("//build/kernel/kleaf:directory_with_structure.bzl", dws = "directory_with_structure")
 load("//build/kernel/kleaf/impl:common_providers.bzl", "KernelEnvInfo")
 load("//msm-kernel:target_variants.bzl", "get_all_variants")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load(
     "//build:abl_extensions.bzl",
     "extra_build_configs",
@@ -57,6 +58,8 @@ def _abl_impl(ctx):
         exit 1
       fi
 
+      export TARGET_BUILD_VARIANT={target_build_variant}
+
       for extra_config in {extra_build_configs}; do
         source "${{extra_config}}"
       done
@@ -64,8 +67,6 @@ def _abl_impl(ctx):
       source "${{ABL_SRC}}/QcomModulePkg/{build_config}"
 
       [ -z "${{ABL_OUT_DIR}}" ] && ABL_OUT_DIR=${{COMMON_OUT_DIR}}
-
-      [ -z "${{TARGET_BUILD_VARIANT}}" ] && TARGET_BUILD_VARIANT=userdebug
 
       ABL_OUT_DIR=${{ABL_OUT_DIR}}/abl-${{TARGET_BUILD_VARIANT}}
       ABL_IMAGE_NAME=abl_${{TARGET_BUILD_VARIANT}}.elf
@@ -78,6 +79,7 @@ def _abl_impl(ctx):
     """.format(
         extra_build_configs = " ".join(ctx.attr.extra_build_configs),
         build_config = ctx.attr.abl_build_config,
+        target_build_variant = ctx.attr.target_build_variant[BuildSettingInfo].value,
     )
 
     for snippet in ctx.attr.extra_post_gen_snippets:
@@ -148,6 +150,7 @@ abl = rule(
         ),
         "deps": attr.label_list(),
         "abl_build_config": attr.string(),
+        "target_build_variant": attr.label(default = ":target_build_variant"),
         "extra_function_snippets": attr.string_list(),
         "extra_post_gen_snippets": attr.string_list(),
         "extra_build_configs": attr.string_list(),
