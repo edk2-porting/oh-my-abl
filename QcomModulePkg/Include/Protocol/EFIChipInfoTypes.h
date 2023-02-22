@@ -29,7 +29,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -87,7 +87,7 @@
   Maximum length of a processor name string. This can be used
   by clients when declaring space for the
   EFI_DALCHIPINFO_GETPROCESSORNAMESTRING() function. */
-#define EFICHIPINFO_MAX_NAME_LENGTH EFICHIPINFO_MAX_ID_LENGTH
+#define EFICHIPINFO_MAX_NAME_LENGTH 32
 
 /**
   Maximum number of CPU clusters supported by the GetSubsetParts API
@@ -176,6 +176,7 @@ typedef enum
   EFICHIPINFO_FOUNDRYID_IBM     = 4,
   EFICHIPINFO_FOUNDRYID_UMC     = 5,
   EFICHIPINFO_FOUNDRYID_SMIC    = 6,
+  EFICHIPINFO_FOUNDRYID_SAMSUNG_S5 = 7,
 
   EFICHIPINFO_NUM_FOUNDRYIDS,
   EFICHIPINFO_FOUNDRYID_32BITS  = 0x7FFFFFF
@@ -199,6 +200,9 @@ typedef enum
   EFICHIPINFO_PART_NPU          = 10,
   EFICHIPINFO_PART_SPSS         = 11,
   EFICHIPINFO_PART_NAV          = 12,
+  EFICHIPINFO_PART_COMPUTE_1    = 13,
+  EFICHIPINFO_PART_DISPLAY_1    = 14,
+
   /*
    * TODO Add Group E parts
    * once they've been finalized
@@ -207,5 +211,74 @@ typedef enum
   EFICHIPINFO_NUM_PARTS,
   EFICHIPINFO_PART_32BITS = 0x7FFFFFFF
 } EFIChipInfoPartType;
+
+
+/**
+ * Superset of all Feature Codes across all targets.
+ */
+typedef enum
+{
+  EFICHIPINFO_FEATURE_CODE_UNKNOWN = 0,
+
+  EFICHIPINFO_FEATURE_CODE_AA = 0x01,
+  EFICHIPINFO_FEATURE_CODE_AB = 0x02,
+  EFICHIPINFO_FEATURE_CODE_AC = 0x03,
+  EFICHIPINFO_FEATURE_CODE_AD = 0x04,
+  EFICHIPINFO_FEATURE_CODE_AE = 0x05,
+  EFICHIPINFO_FEATURE_CODE_AF = 0x06,
+  EFICHIPINFO_FEATURE_CODE_AG = 0x07,
+  EFICHIPINFO_FEATURE_CODE_AH = 0x08,
+  // Reserved for future use
+
+  EFICHIPINFO_FEATURE_CODE_Y0 = 0xf1,
+  EFICHIPINFO_FEATURE_CODE_Y1 = 0xf2,
+  EFICHIPINFO_FEATURE_CODE_Y2 = 0xf3,
+  EFICHIPINFO_FEATURE_CODE_Y3 = 0xf4,
+  EFICHIPINFO_FEATURE_CODE_Y4 = 0xf5,
+  EFICHIPINFO_FEATURE_CODE_Y5 = 0xf6,
+  EFICHIPINFO_FEATURE_CODE_Y6 = 0xf7,
+  EFICHIPINFO_FEATURE_CODE_Y7 = 0xf8,
+  EFICHIPINFO_FEATURE_CODE_Y8 = 0xf9,
+  EFICHIPINFO_FEATURE_CODE_Y9 = 0xfa,
+  EFICHIPINFO_FEATURE_CODE_YA = 0xfb,
+  EFICHIPINFO_FEATURE_CODE_YB = 0xfc,
+  EFICHIPINFO_FEATURE_CODE_YC = 0xfd,
+  EFICHIPINFO_FEATURE_CODE_YD = 0xfe,
+  EFICHIPINFO_FEATURE_CODE_YE = 0xff,
+  EFICHIPINFO_FEATURE_CODE_YF = 0x100,
+
+  // Reserved for future use
+
+  EFICHIPINFO_FEATURE_CODE_32BITS = 0x7fffffff
+} EFIChipInfoFeatureCodeType;
+
+/**
+ * Superset of all P-Codes supported across all targets.
+ */
+typedef enum
+{
+  EFICHIPINFO_P_CODE_UNKNOWN = 0,
+
+  EFICHIPINFO_P_CODE_0 = 0x1,
+  EFICHIPINFO_P_CODE_1 = 0x2,
+  EFICHIPINFO_P_CODE_2 = 0x3,
+  EFICHIPINFO_P_CODE_3 = 0x4,
+  EFICHIPINFO_P_CODE_4 = 0x5,
+  EFICHIPINFO_P_CODE_5 = 0x6,
+  EFICHIPINFO_P_CODE_6 = 0x7,
+  EFICHIPINFO_P_CODE_7 = 0x8,
+  // Reserved for future use
+
+  EFICHIPINFO_P_CODE_32BITS = 0x7fffffff
+} EFIChipInfoPCodeType;
+
+/**
+ * FeatureCode and P-Code information for the current device.
+ */
+typedef struct
+{
+  EFIChipInfoFeatureCodeType eFeatureCode;
+  EFIChipInfoPCodeType ePCode;
+} EFIChipInfoSKUType;
 
 #endif /* __EFICHIPINFOTYPES_H__ */
