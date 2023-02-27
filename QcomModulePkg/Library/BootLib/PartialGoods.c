@@ -73,6 +73,8 @@
 #include <Uefi/UefiBaseType.h>
 #include <Library/FdtRw.h>
 
+#define SUBSET_PART_CHIPINFO_BASE_REVISION 0x0000000000010002
+
 /* Look up table for cpu partial goods
  *
  * NOTE: Array size of PartialGoodsCpuType0 and
@@ -634,9 +636,16 @@ ReadCpuPartialGoods (EFI_CHIPINFO_PROTOCOL *pChipInfoProtocol, UINT32 *Value)
    /* Ensure to reset the Value before checking CPU subset */
   *Value = 0;
 
-  Status =
-      pChipInfoProtocol->GetSubsetCPUs (pChipInfoProtocol, CpuCluster,
-                                           Value);
+  if (pChipInfoProtocol->Revision >= EFI_CHIPINFO_PROTOCOL_REVISION_5) {
+    DEBUG ((EFI_D_VERBOSE, "Accessing new Partial APIs\n"));
+    Status =
+        pChipInfoProtocol->GetDisabledCPUs (pChipInfoProtocol, CpuCluster,
+                                             Value);
+  } else {
+    Status =
+        pChipInfoProtocol->GetSubsetCPUs (pChipInfoProtocol, CpuCluster,
+                                             Value);
+  }
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_VERBOSE, "Failed to get subset[%d] CPU. %r\n",
             CpuCluster, Status));
@@ -652,16 +661,29 @@ STATIC EFI_STATUS
 ReadMMPartialGoods (EFI_CHIPINFO_PROTOCOL *pChipInfoProtocol, UINT32 *Value)
 {
   UINT32 i;
+  UINT32 SubsetVal = 0;
+  BOOLEAN SubsetBoolVal = FALSE;
   EFI_STATUS Status = EFI_SUCCESS;
-  UINT32 SubsetVal;
 
   *Value = 0;
   for (i = 1; i < EFICHIPINFO_NUM_PARTS; i++) {
-    /* Ensure to reset the Value before checking for Part Subset*/
-    SubsetVal = 0;
 
-    Status =
-        pChipInfoProtocol->GetSubsetPart (pChipInfoProtocol, i, &SubsetVal);
+    if (pChipInfoProtocol->Revision >= EFI_CHIPINFO_PROTOCOL_REVISION_5) {
+      /* Ensure to reset the Value before checking for Part Subset*/
+      SubsetBoolVal = FALSE;
+      Status =
+        pChipInfoProtocol->IsPartDisabled (pChipInfoProtocol,
+                                            i, 0, &SubsetBoolVal);
+      SubsetVal = (UINT32) SubsetBoolVal;
+
+    } else {
+      /* Ensure to reset the Value before checking for Part Subset*/
+      SubsetVal = 0;
+      Status =
+          pChipInfoProtocol->GetSubsetPart (pChipInfoProtocol, i, &SubsetVal);
+
+    }
+
     if (EFI_ERROR (Status)) {
       DEBUG ((EFI_D_VERBOSE, "Failed to get MM subset[%d] part. %r\n", i,
               Status));
@@ -692,8 +714,9 @@ UpdatePartialGoodsNode (VOID *fdt)
   if (EFI_ERROR (Status))
     return Status;
 
-  if (pChipInfoProtocol->Revision < EFI_CHIPINFO_PROTOCOL_REVISION)
+  if (pChipInfoProtocol->Revision < SUBSET_PART_CHIPINFO_BASE_REVISION) {
     return Status;
+  }
 
   /* Read and update Multimedia Partial Goods Nodes */
   Status = ReadMMPartialGoods (pChipInfoProtocol, &PartialGoodsMMValue);

@@ -78,8 +78,9 @@ typedef struct _EFI_CHIPINFO_PROTOCOL EFI_CHIPINFO_PROTOCOL;
 */
 #define EFI_CHIPINFO_PROTOCOL_REVISION_3  0x0000000000010003
 #define EFI_CHIPINFO_PROTOCOL_REVISION_4  0x0000000000010004
+#define EFI_CHIPINFO_PROTOCOL_REVISION_5  0x0000000000010005
 
-#define EFI_CHIPINFO_PROTOCOL_REVISION EFI_CHIPINFO_PROTOCOL_REVISION_4
+#define EFI_CHIPINFO_PROTOCOL_REVISION EFI_CHIPINFO_PROTOCOL_REVISION_5
 /** @} */ /* end_addtogroup efi_chipInfo_constants */
 
 /*  Protocol GUID definition */
@@ -566,6 +567,97 @@ EFI_STATUS
     OUT UINT32 *pnCore
     );
 
+/* ============================================================================
+**  Function : EFI_ChipInfo_GetDisabledFeatures
+** ============================================================================
+*/
+/** @ingroup efi_chipInfo_protocol_apis
+  @par Summary
+  Gets the Part(IP) Specific details from the fuse.
+
+  @param[in]   This     Pointer to the EFI_CHIPINFO_PROTOCOL instance.
+  @param[in]   ePart    The EFIChipInfoPartType to check
+  @param[in]   nIdx     Hardware instance of the selected part
+  @param[out]  pnMask   Used to store the part specific details read from the
+                        QTV/PTE region. The bit level interpretation of pnMask
+                        is specific to client and client needs to decode
+                        accordingly.
+
+  @return
+  EFI_SUCCESS         -- Function completed successfully. \n
+  EFI_NOT_FOUND       -- The specified part is out of range
+  EFI_PROTOCOL_ERROR  -- Error occurred during the operation.
+*/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_CHIPINFO_GETDISABLEDFEATURES)(
+   IN EFI_CHIPINFO_PROTOCOL *This,
+   IN EFIChipInfoPartType ePart,
+   IN UINT32 nIdx,
+   OUT UINT32 *pnMask
+   );
+
+/* ============================================================================
+**  Function : EFI_ChipInfo_IsPartDisabled
+** ============================================================================
+*/
+/** @ingroup efi_chipInfo_protocol_apis
+  @par Summary
+  Check if the specified Part is enabled or Disabled
+
+  @param[in]   This     Pointer to the EFI_CHIPINFO_PROTOCOL instance.
+  @param[in]   ePart    The EFIChipInfoPartType to check
+  @param[in]   nIdx     Hardware instance of the selected part
+  @param[out]  pnMask   Pointer to boolean used to store the status of the
+                        selected part. A non-zero mask implies that the part is
+                        Disabled completely. FALSE => part is either completely
+                        enabled or partially enabled,
+                        TRUE => Disabled completely.
+                        Clients can make use of ChipInfo_GetDisabledFeatures API
+                        to obtain disabled features info.
+
+  @return
+  EFI_SUCCESS         -- Function completed successfully. \n
+  EFI_NOT_FOUND       -- The specified part is out of range
+  EFI_PROTOCOL_ERROR  -- Error occurred during the operation.
+*/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_CHIPINFO_ISPARTDISABLED)(
+   IN EFI_CHIPINFO_PROTOCOL *This,
+   IN EFIChipInfoPartType ePart,
+   IN UINT32 nIdx,
+   OUT BOOLEAN *pnMask
+   );
+
+/* ============================================================================
+** Function : EFI_ChipInfo_GetDisabledCPUs
+** ============================================================================
+*/
+/** @ingroup efi_chipInfo_protocol_apis
+ * @par Summary
+ * Gets the cores within the selected cluster which are marked "disabled"
+ * in PTE fuses
+ *
+ * @param[in]   This     Pointer to the EFI_CHIPINFO_PROTOCOL instance
+ * @param[in]  nCPUCluster  The cluster whose disabled cores
+                            need to be retrieved
+ * @param[out] pnMask       Mask of disabled cores in this cluster.
+ *
+ * @return
+ * EFI_SUCCESS    -- Function completed successfully
+ * EFI_NOT_FOUND   -- The provided nCPUCluster is outside the range of supported
+                      clusters
+ * EFI_PROTOCOL_ERROR -- Other error occured during the operation
+ */
+typedef
+EFI_STATUS
+(EFIAPI *EFI_CHIPINFO_GETDISABLEDCPUS)(
+  IN EFI_CHIPINFO_PROTOCOL *This,
+  IN UINT32 nCPUCluster,
+  OUT UINT32 *pnMask
+  );
+
 /*===========================================================================
   PROTOCOL INTERFACE
 ===========================================================================*/
@@ -597,6 +689,9 @@ struct _EFI_CHIPINFO_PROTOCOL {
   EFI_DALCHIPINFO_GETSKU GetSKU;
   EFI_CHIPINFO_GETNUMFUNCTIONALCLUSTERS GetNumFunctionalClusters;
   EFI_CHIPINFO_GETBOOTCLUSTERANDCORE GetBootClusterAndCore;
+  EFI_CHIPINFO_GETDISABLEDFEATURES GetDisabledFeatures;
+  EFI_CHIPINFO_ISPARTDISABLED IsPartDisabled;
+  EFI_CHIPINFO_GETDISABLEDCPUS GetDisabledCPUs;
 };
 
 #endif /* __EFICHIPINFO_H__ */
