@@ -137,6 +137,46 @@ EnableChargingScreen (BOOLEAN IsEnabled)
 }
 
 EFI_STATUS
+StoreAudioFrameWork (CONST CHAR8 *CmdLine, UINT32 CmdLineLen)
+{
+  EFI_STATUS Status = EFI_SUCCESS;
+
+  if (CmdLineLen > ARRAY_SIZE (DevInfo.AudioFramework)) {
+    DEBUG ((EFI_D_ERROR, "Audio framework is invalid, size too large!\n"));
+    return EFI_OUT_OF_RESOURCES;
+  }
+
+  gBS->SetMem (DevInfo.AudioFramework, sizeof (DevInfo.AudioFramework), 0);
+  gBS->CopyMem (DevInfo.AudioFramework, (CHAR8 *) CmdLine, CmdLineLen);
+
+  Status =
+      ReadWriteDeviceInfo (WRITE_CONFIG, (VOID *)&DevInfo, sizeof (DevInfo));
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "Unable to store audio framework: %r\n", Status));
+    return Status;
+  }
+  return Status;
+}
+
+EFI_STATUS
+ReadAudioFrameWork (CHAR8 **CmdLine, UINT32 *CmdLineLen)
+{
+  EFI_STATUS Status = EFI_SUCCESS;
+
+  Status =
+      ReadWriteDeviceInfo (READ_CONFIG, (VOID *)&DevInfo, sizeof (DevInfo));
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "Unable to read audio framework: %r\n", Status));
+    return Status;
+  }
+
+  *CmdLine = DevInfo.AudioFramework;
+  *CmdLineLen = ARRAY_SIZE (DevInfo.AudioFramework);
+
+  return Status;
+}
+
+EFI_STATUS
 EnableEnforcingMode (BOOLEAN IsEnabled)
 {
   EFI_STATUS Status = EFI_SUCCESS;
