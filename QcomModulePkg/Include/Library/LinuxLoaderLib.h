@@ -29,7 +29,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -239,4 +239,17 @@ WriteBlockToPartition (EFI_BLOCK_IO_PROTOCOL *BlockIo,
                    IN UINT64 Offset,
                    IN UINT64 Size,
                    IN VOID *Image);
+
+#ifdef AUDIO_FRAMEWORK
+STATIC inline CHAR8* GetAudioFw (VOID)
+{
+ return AUDIO_FRAMEWORK;
+}
+#else
+STATIC inline CHAR8* GetAudioFw (VOID)
+{
+ return "\0";
+}
+#endif
+
 #endif

@@ -151,13 +151,11 @@ SetDefaultAudioFw ()
 {
  CHAR8 AudioFW[MAX_AUDIO_FW_LENGTH];
  STATIC CHAR8* Src;
-#ifdef AUDIO_FRAMEWORK
- STATIC CHAR8* AUDIOFRAMEWORK = AUDIO_FRAMEWORK;
-#else
- STATIC CHAR8* AUDIOFRAMEWORK = "elite";
-#endif
+ STATIC CHAR8* AUDIOFRAMEWORK;
  STATIC UINT32 Length;
  EFI_STATUS Status;
+
+ AUDIOFRAMEWORK = GetAudioFw ();
  Status = ReadAudioFrameWork (&Src, &Length);
  if (Status == EFI_SUCCESS) {
   if (AsciiStrLen (Src) == 0) {
