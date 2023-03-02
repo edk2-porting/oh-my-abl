@@ -29,7 +29,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -195,6 +195,12 @@ UpdateDeviceStatus (OPTION_MENU_INFO *MsgInfo, INTN Reason)
       WriteToPartition (&Ptype, FfbmPageBuffer, sizeof (FfbmPageBuffer));
     }
     RebootDevice (NORMAL_MODE);
+    break;
+  case ALTERNATESLOT:
+    /* Force to boot from alternate slot */
+    Status = HandleActiveSlotUnbootable (TRUE);
+    DEBUG ((EFI_D_WARN,
+          "Reset unbootable slots failed enter fastboot mode\n"));
     break;
   }
 }

@@ -1768,7 +1768,7 @@ out:
     }
     Info->BootState = RED;
     if (Info->MultiSlotBoot) {
-      HandleActiveSlotUnbootable ();
+      HandleActiveSlotUnbootable (FALSE);
       /* HandleActiveSlotUnbootable should have swapped slots and
        * reboot the device. If no bootable slot found, enter fastboot
        */
