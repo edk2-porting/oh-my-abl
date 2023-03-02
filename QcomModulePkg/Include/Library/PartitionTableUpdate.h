@@ -256,7 +256,7 @@ IsSuffixEmpty (Slot *CheckSlot);
 EFI_STATUS
 SetActiveSlot (Slot *NewSlot, BOOLEAN ResetSuccessBit);
 BOOLEAN IsCurrentSlotBootable (VOID);
-EFI_STATUS HandleActiveSlotUnbootable (VOID);
+EFI_STATUS HandleActiveSlotUnbootable (BOOLEAN ForceBootAlternateSlot);
 EFI_STATUS ClearUnbootable (VOID);
 BOOLEAN IsABRetryCountUpdateRequired (VOID);
 UINT32 PartitionVerifyMibibImage (UINT8 *Image);

@@ -1602,7 +1602,7 @@ SetActiveSlot (Slot *NewSlot, BOOLEAN ResetSuccessBit)
   return EFI_SUCCESS;
 }
 
-EFI_STATUS HandleActiveSlotUnbootable (VOID)
+EFI_STATUS HandleActiveSlotUnbootable (BOOLEAN ForceBootAlternateSlot)
 {
   EFI_STATUS Status = EFI_SUCCESS;
   struct PartitionEntry *BootEntry = NULL;
@@ -1652,7 +1652,9 @@ EFI_STATUS HandleActiveSlotUnbootable (VOID)
   BootSuccess = (BootEntry->PartEntry.Attributes & PART_ATT_SUCCESSFUL_VAL) >>
                 PART_ATT_SUCCESS_BIT;
 
-  if (Unbootable == 0 && BootSuccess == 1) {
+  if ((Unbootable == 0 &&
+       BootSuccess == 1) ||
+       ForceBootAlternateSlot) {
     DEBUG (
         (EFI_D_INFO, "Alternate Slot %s is bootable\n", AlternateSlot->Suffix));
     GUARD (SetActiveSlot (AlternateSlot, FALSE));
@@ -1808,7 +1810,7 @@ FindBootableSlot (Slot *BootableSlot)
   } else {
     DEBUG ((EFI_D_INFO, "Slot %s is unbootable, trying alternate slot\n",
             BootableSlot->Suffix));
-    GUARD_OUT (HandleActiveSlotUnbootable ());
+    GUARD_OUT (HandleActiveSlotUnbootable (FALSE));
   }
 
   /* Validate slot suffix and partition guids */
