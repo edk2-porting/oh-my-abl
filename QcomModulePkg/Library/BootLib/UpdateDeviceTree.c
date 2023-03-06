@@ -29,7 +29,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -110,11 +110,10 @@ PrintSplashMemInfo (CONST CHAR8 *data, INT32 datalen)
 }
 
 STATIC EFI_STATUS
-GetDDRInfo (struct ddr_details_entry_info *DdrInfo)
+GetDDRInfo (struct ddr_details_entry_info *DdrInfo,  UINT64 *Revision)
 {
   EFI_DDRGETINFO_PROTOCOL *DdrInfoIf;
   EFI_STATUS Status;
-  UINT64 Revision;
 
   Status = gBS->LocateProtocol (&gEfiDDRGetInfoProtocolGuid, NULL,
                                 (VOID **)&DdrInfoIf);
@@ -131,14 +130,9 @@ GetDDRInfo (struct ddr_details_entry_info *DdrInfo)
     return Status;
   }
 
-  Revision = DdrInfoIf->Revision;
-  DEBUG ((EFI_D_VERBOSE, "DDR Header Revision =0x%x\n", Revision));
+  *Revision = DdrInfoIf->Revision;
+  DEBUG ((EFI_D_VERBOSE, "DDR Header Revision =0x%x\n", *Revision));
 
-  if (Revision < EFI_DDRGETINFO_PROTOCOL_REVISION) {
-    DEBUG ((EFI_D_VERBOSE,
-            "ddr_device_rank, HBB not supported in Revision=0x%x\n", Revision));
-    return EFI_UNSUPPORTED;
-  }
   return Status;
 }
 
@@ -1016,6 +1010,7 @@ UpdateDeviceTree (VOID *fdt,
   /* Single spaces reserved for chan(0-9), rank(0-9) */
   CHAR8 FdtHbbProp[] = "ddr_device_hbb_ch _rank ";
   struct ddr_details_entry_info *DdrInfo;
+  UINT64 Revision;
   EFI_STATUS Status;
   EFI_RAMPARTITION_PROTOCOL *EfiRamPartProt;
   UINT8 NumRank = 0;
@@ -1064,7 +1059,7 @@ UpdateDeviceTree (VOID *fdt,
     DEBUG ((EFI_D_ERROR, "DDR Info Buffer: Out of resources\n"));
     return EFI_OUT_OF_RESOURCES;
   }
-  Status = GetDDRInfo (DdrInfo);
+  Status = GetDDRInfo (DdrInfo, &Revision);
   if (Status == EFI_SUCCESS) {
     DdrDeviceType = DdrInfo->device_type;
     DEBUG ((EFI_D_VERBOSE, "DDR deviceType:%d\n", DdrDeviceType));
@@ -1079,58 +1074,64 @@ UpdateDeviceTree (VOID *fdt,
       DEBUG ((EFI_D_VERBOSE, "ddr_device_type is added to memory node\n"));
     }
 
-    if (!FixedPcdGetBool (EnableUpdateRankChannel)) {
-      DEBUG ((EFI_D_VERBOSE, "DDR rank is not enabled\n"));
-      goto OutofUpdateRankChannel;
-    }
-
-    Status = gBS->LocateProtocol (&gEfiRamPartitionProtocolGuid, NULL,
-                    (VOID **)&EfiRamPartProt);
-
-    if (EFI_ERROR (Status)) {
-      DEBUG ((EFI_D_ERROR,
-              "Failed to get RamPartition Protocol: %d\n", Status));
-      goto OutofUpdateRankChannel;
-    }
-
-    Status = EfiRamPartProt->GetHighestBankBit (EfiRamPartProt, &Hbb);
-
-    if (EFI_ERROR (Status)) {
-      DEBUG ((EFI_D_ERROR, "Failed to get Highest Bank Bit: %d\n", Status));
-      goto OutofUpdateRankChannel;
-    }
-
-    NumRank = GetDDRNumRank ();
-    DEBUG ((EFI_D_VERBOSE, "DdrInfo->num_channels:%d, NumRank:%d\n",
-            DdrInfo->num_channels, NumRank));
-    for (UINT8 Chan = 0; Chan < DdrInfo->num_channels; Chan++) {
-      AsciiSPrint (FdtRankProp, sizeof (FdtRankProp),
-                   "ddr_device_rank_ch%d", Chan);
-      FdtPropUpdateFunc (fdt, offset, (CONST char *)FdtRankProp,
-                         NumRank, fdt_appendprop_u32, ret);
-      if (ret) {
-        DEBUG ((EFI_D_ERROR,
-                "ERROR: Cannot update memory node ddr_device_rank_ch%d:0x%x\n",
-                Chan, ret));
-      } else {
-        DEBUG ((EFI_D_VERBOSE, "ddr_device_rank_ch%d added to memory node\n",
-                Chan));
+    if (Revision < EFI_DDRGETINFO_PROTOCOL_REVISION) {
+      DEBUG ((EFI_D_VERBOSE,
+              "ddr_device_rank, HBB not supported in Revision=0x%x\n",
+              Revision));
+    } else {
+      if (!FixedPcdGetBool (EnableUpdateRankChannel)) {
+        DEBUG ((EFI_D_VERBOSE, "DDR rank is not enabled\n"));
+        goto OutofUpdateRankChannel;
       }
-      for (UINT8 Rank = 0; Rank < NumRank; Rank++) {
-        DEBUG ((EFI_D_VERBOSE, "ddr_device_hbb_ch%d_rank%d:%d\n",
-                Chan, Rank, Hbb));
-        AsciiSPrint (FdtHbbProp, sizeof (FdtHbbProp),
-                     "ddr_device_hbb_ch%d_rank%d", Chan, Rank);
-        FdtPropUpdateFunc (fdt, offset, (CONST char *)FdtHbbProp,
-                           Hbb, fdt_appendprop_u32, ret);
+
+      Status = gBS->LocateProtocol (&gEfiRamPartitionProtocolGuid, NULL,
+                      (VOID **)&EfiRamPartProt);
+
+      if (EFI_ERROR (Status)) {
+        DEBUG ((EFI_D_ERROR,
+                "Failed to get RamPartition Protocol: %d\n", Status));
+        goto OutofUpdateRankChannel;
+      }
+
+      Status = EfiRamPartProt->GetHighestBankBit (EfiRamPartProt, &Hbb);
+
+      if (EFI_ERROR (Status)) {
+        DEBUG ((EFI_D_ERROR, "Failed to get Highest Bank Bit: %d\n", Status));
+        goto OutofUpdateRankChannel;
+      }
+
+      NumRank = GetDDRNumRank ();
+      DEBUG ((EFI_D_VERBOSE, "DdrInfo->num_channels:%d, NumRank:%d\n",
+              DdrInfo->num_channels, NumRank));
+      for (UINT8 Chan = 0; Chan < DdrInfo->num_channels; Chan++) {
+        AsciiSPrint (FdtRankProp, sizeof (FdtRankProp),
+                     "ddr_device_rank_ch%d", Chan);
+        FdtPropUpdateFunc (fdt, offset, (CONST char *)FdtRankProp,
+                           NumRank, fdt_appendprop_u32, ret);
         if (ret) {
           DEBUG ((EFI_D_ERROR,
-                  "ERROR: Cannot update memory node"
-                  " ddr_device_hbb_ch%d_rank%d:0x%x\n", Chan, Rank, ret));
+                "ERROR: Cannot update memory node ddr_device_rank_ch%d:0x%x\n",
+                Chan, ret));
         } else {
-          DEBUG ((EFI_D_VERBOSE,
-                  "ddr_device_hbb_ch%d_rank%d added to memory node\n",
-                  Chan, Rank));
+          DEBUG ((EFI_D_VERBOSE, "ddr_device_rank_ch%d added to memory node\n",
+                  Chan));
+        }
+        for (UINT8 Rank = 0; Rank < NumRank; Rank++) {
+          DEBUG ((EFI_D_VERBOSE, "ddr_device_hbb_ch%d_rank%d:%d\n",
+                  Chan, Rank, Hbb));
+          AsciiSPrint (FdtHbbProp, sizeof (FdtHbbProp),
+                       "ddr_device_hbb_ch%d_rank%d", Chan, Rank);
+          FdtPropUpdateFunc (fdt, offset, (CONST char *)FdtHbbProp,
+                             Hbb, fdt_appendprop_u32, ret);
+          if (ret) {
+            DEBUG ((EFI_D_ERROR,
+                    "ERROR: Cannot update memory node"
+                    " ddr_device_hbb_ch%d_rank%d:0x%x\n", Chan, Rank, ret));
+          } else {
+            DEBUG ((EFI_D_VERBOSE,
+                    "ddr_device_hbb_ch%d_rank%d added to memory node\n",
+                    Chan, Rank));
+          }
         }
       }
     }
