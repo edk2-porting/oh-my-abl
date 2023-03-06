@@ -10,6 +10,7 @@ TARGET_BOARD_TYPE_AUTO=0
 BUILD_USES_RECOVERY_AS_BOOT=0
 ENABLE_LE_VARIANT=true
 HIBERNATION_SUPPORT_NO_AES=1
+HIBERNATION_PARTITION_NAME="hibernation"
 ################################################################################
 . ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.common
 . ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.signature_v2
