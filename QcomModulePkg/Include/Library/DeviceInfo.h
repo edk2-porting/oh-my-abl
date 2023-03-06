@@ -79,7 +79,11 @@
 #define MAX_ENTRY_SIZE     8
 #define MAX_AUDIO_FW_LENGTH 16
 
+#ifdef HIBERNATION_SWAP_PARTITION_NAME
+#define SWAP_PARTITION_NAME     HIBERNATION_SWAP_PARTITION_NAME
+#else
 #define SWAP_PARTITION_NAME     L"swap_a"
+#endif
 
 enum unlock_type {
   UNLOCK = 0,
