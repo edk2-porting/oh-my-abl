@@ -2151,7 +2151,7 @@ BOOLEAN IsHibernationEnabled (VOID)
 
   GetPartitionCount (&PtnCount);
 
-  PtnIdx = GetPartitionIndex ((CHAR16 *)L"swap_a");
+  PtnIdx = GetPartitionIndex ((CHAR16 *)SWAP_PARTITION_NAME);
 
   if (PtnIdx < PtnCount &&
       PtnIdx != INVALID_PTN) {

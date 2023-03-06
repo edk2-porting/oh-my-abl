@@ -209,8 +209,6 @@ UINT64 RelocateAddress;
 #define SWAP_INFO_OFFSET        (SwsuspHeader->Image + 1)
 #define FIRST_PFN_INDEX_OFFSET  (SWAP_INFO_OFFSET + 1)
 
-#define SWAP_PARTITION_NAME     L"swap_a"
-
 /*
  * target_addr  : address where page allocation is needed
  *

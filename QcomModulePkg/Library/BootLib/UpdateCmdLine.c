@@ -541,9 +541,9 @@ GetResumeCmdLine (CHAR8 **ResumeCmdLine, CHAR16 *ReqPartition)
   BOOLEAN MultiSlotBoot;
   UINT32 Len = 0;
 
-  MultiSlotBoot = PartitionHasMultiSlot ((CONST CHAR16 *)L"swap_a");
+  MultiSlotBoot = PartitionHasMultiSlot ((CONST CHAR16 *)SWAP_PARTITION_NAME);
   Len = GetSystemPath (ResumeCmdLine, MultiSlotBoot, FALSE,
-                (CHAR16 *)L"swap_a", (CHAR8 *)"resume", FALSE);
+                (CHAR16 *)SWAP_PARTITION_NAME, (CHAR8 *)"resume", FALSE);
   if (Len == 0) {
      DEBUG ((EFI_D_ERROR, "GetSystemPath failed\n"));
      return 0;
@@ -1622,7 +1622,8 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   CmdLineLen += 1;
 
   if (IsHibernationEnabled ()) {
-    CmdLineLen += GetResumeCmdLine (&ResumeCmdLine, (CHAR16 *)L"swap_a");
+    CmdLineLen += GetResumeCmdLine (&ResumeCmdLine, 
+                    (CHAR16 *)SWAP_PARTITION_NAME);
   }
 
   Param.Recovery = Recovery;
