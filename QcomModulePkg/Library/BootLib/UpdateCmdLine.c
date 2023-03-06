@@ -432,7 +432,8 @@ GetAudioFrameWork (CHAR8 *FrameWork, UINT32* Length)
  */
 UINT32
 GetSystemPath (CHAR8 **SysPath, BOOLEAN MultiSlotBoot, BOOLEAN BootIntoRecovery,
-                CHAR16 *ReqPartition, CHAR8 *Key, BOOLEAN FlashlessBoot)
+                CHAR16 *ReqPartition, CHAR8 *Key, BOOLEAN FlashlessBoot,
+                BOOLEAN NetworkBoot)
 {
   INT32 Index;
   UINT32 Lun;
@@ -447,10 +448,11 @@ GetSystemPath (CHAR8 **SysPath, BOOLEAN MultiSlotBoot, BOOLEAN BootIntoRecovery,
     return 0;
   }
 
-  if (FlashlessBoot) {
-     AsciiSPrint (*SysPath, MAX_PATH_SIZE,
-                     " rootfstype=squashfs root=/dev/ram0");
-     return AsciiStrLen (*SysPath);
+  if (FlashlessBoot ||
+      NetworkBoot) {
+    AsciiSPrint (*SysPath, MAX_PATH_SIZE,
+                 " rootfstype=squashfs root=/dev/ram0");
+    return AsciiStrLen (*SysPath);
   }
 
   if (ReqPartition == NULL ||
@@ -543,7 +545,7 @@ GetResumeCmdLine (CHAR8 **ResumeCmdLine, CHAR16 *ReqPartition)
 
   MultiSlotBoot = PartitionHasMultiSlot ((CONST CHAR16 *)SWAP_PARTITION_NAME);
   Len = GetSystemPath (ResumeCmdLine, MultiSlotBoot, FALSE,
-                (CHAR16 *)SWAP_PARTITION_NAME, (CHAR8 *)"resume", FALSE);
+                (CHAR16 *)SWAP_PARTITION_NAME, (CHAR8 *)"resume", FALSE, FALSE);
   if (Len == 0) {
      DEBUG ((EFI_D_ERROR, "GetSystemPath failed\n"));
      return 0;
@@ -738,6 +740,11 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
   if (Param->FlashlessBoot) {
     Src = WarmResetArgs;
     AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+  } else if (Param->NetworkBoot) {
+    Src = WarmResetArgs;
+    AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+    AsciiStrCatS (Dst, MaxCmdLineLen,
+                  " androidboot.fstab_suffix=network_boot");
   }
 
   if ((Param->BootDevBuf) &&
@@ -1168,6 +1175,7 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
                CHAR8 *FfbmStr,
                BOOLEAN Recovery,
                BOOLEAN FlashlessBoot,
+               BOOLEAN NetworkBoot,
                BOOLEAN AlarmBoot,
                CONST CHAR8 *VBCmdLine,
                UINT32 HeaderVersion,
@@ -1639,6 +1647,7 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   Param.AlarmBoot = AlarmBoot;
   Param.MdtpActive = MdtpActive;
   Param.FlashlessBoot = FlashlessBoot;
+  Param.NetworkBoot = NetworkBoot;
   Param.CmdLineLen = CmdLineLen;
   Param.HaveCmdLine = HaveCmdLine;
   Param.PauseAtBootUp = PauseAtBootUp;

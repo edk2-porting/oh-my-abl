@@ -96,6 +96,7 @@ STATIC BOOLEAN BootReasonAlarm = FALSE;
 STATIC BOOLEAN BootIntoFastboot = FALSE;
 STATIC BOOLEAN BootIntoRecovery = FALSE;
 UINT64 FlashlessBootImageAddr = 0;
+UINT64 NetworkBootImageAddr = 0;
 STATIC DeviceInfo DevInfo;
 
 // This function is used to Deactivate MDTP by entering recovery UI
@@ -208,6 +209,25 @@ BOOLEAN IsABRetryCountUpdateRequired (VOID)
 }
 
 /**
+  This function is used to check for boot type:
+    Flashless boot, Network boot, Fastboot.
+ **/
+
+UINT8 GetBootDeviceType ()
+{
+  UINT32 Val = 0;
+  UINTN  DataSize = sizeof (Val);
+  EFI_STATUS Status = EFI_SUCCESS;
+
+  Status = gRT->GetVariable (L"SharedImemBootCfgVal",
+               &gQcomTokenSpaceGuid, NULL, &DataSize, &Val);
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "Failed to get boot device type, %r\n", Status));
+  }
+  return Val;
+}
+
+/**
   Linux Loader Application EntryPoint
 
   @param[in] ImageHandle    The firmware allocated handle for the EFI image.
@@ -222,7 +242,7 @@ EFI_STATUS EFIAPI  __attribute__ ( (no_sanitize ("safe-stack")))
 LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
 {
   EFI_STATUS Status;
-
+  UINT8 Val = 0;
   UINT32 BootReason = NORMAL_MODE;
   UINT32 KeyPressed = SCAN_NULL;
   /* SilentMode Boot */
@@ -231,7 +251,8 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
   BOOLEAN MultiSlotBoot = FALSE;
   /* Flashless Boot */
   BOOLEAN FlashlessBoot = FALSE;
-  EFI_MEM_CARDINFO_PROTOCOL *CardInfo = NULL;
+  /* Network Boot */
+  BOOLEAN NetworkBoot = FALSE;
   /* set ROT and BootSatte only once per boot*/
   BOOLEAN SetRotAndBootState = FALSE;
 
@@ -255,14 +276,21 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
 
   BootStatsSetTimeStamp (BS_BL_START);
 
-  /* Check if memory card is present; goto flashless if not */
-  Status = gBS->LocateProtocol (&gEfiMemCardInfoProtocolGuid, NULL,
-                                  (VOID **)&CardInfo);
-  if (EFI_ERROR (Status)) {
+  /* check if it is NetworkBoot, FlashlessBoot or Fastboot */
+  Val = GetBootDeviceType ();
+  if (Val == EFI_EMMC_NETWORK_FLASH_TYPE) {
+    NetworkBootImageAddr = BASE_ADDRESS;
+    NetworkBoot = TRUE;
+    /* In Network boot avoid all access to secondary storage during boot */
+    goto flashless_boot;
+  } else if (Val == EFI_PCIE_FLASH_TYPE) {
     FlashlessBootImageAddr = BASE_ADDRESS;
     FlashlessBoot = TRUE;
     /* In flashless boot avoid all access to secondary storage during boot */
     goto flashless_boot;
+  } else if (Val == 0) {
+    DEBUG ((EFI_D_ERROR, "Failed to get boot device type\n"));
+    goto stack_guard_update_default;
   }
 
   // Initialize verified boot & Read Device Info
@@ -388,7 +416,7 @@ flashless_boot:
   }
 
   if (BootIntoFastboot) {
-      goto fastboot;
+    goto fastboot;
   }
   else {
     BootInfo Info = {0};
@@ -396,6 +424,7 @@ flashless_boot:
     Info.BootIntoRecovery = BootIntoRecovery;
     Info.BootReasonAlarm = BootReasonAlarm;
     Info.FlashlessBoot = FlashlessBoot;
+    Info.NetworkBoot = NetworkBoot;
     Info.SilentBootMode = SilentBootMode;
   #if HIBERNATION_SUPPORT_NO_AES
     BootIntoHibernationImage (&Info, &SetRotAndBootState);
@@ -410,7 +439,8 @@ flashless_boot:
   }
 
 fastboot:
-  if (FlashlessBoot) {
+  if (FlashlessBoot ||
+      NetworkBoot) {
     DEBUG ((EFI_D_ERROR, "No fastboot support for flashless chipsets,"
                                " Infinte loop\n"));
     while (1);

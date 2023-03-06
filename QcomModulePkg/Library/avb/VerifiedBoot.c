@@ -79,6 +79,7 @@ STATIC CONST CHAR8 *DmVerityCmd = " root=/dev/dm-0 dm=\"system none ro,0 1 "
                                     "android-verity";
 STATIC CONST CHAR8 *Space = " ";
 extern UINT64 FlashlessBootImageAddr;
+extern UINT64 NetworkBootImageAddr;
 
 STATIC BOOLEAN KeymasterEnabled = TRUE;
 
@@ -354,7 +355,11 @@ LocateImageNoAuth (BootInfo *Info, UINT32 *PageSize)
   EFI_STATUS Status = EFI_SUCCESS;
   UINT32 ImageHdrSize = BOOT_IMG_MAX_PAGE_SIZE;
 
-  Info->Images[0].ImageBuffer = (VOID *)FlashlessBootImageAddr;
+  if (Info->FlashlessBoot) {
+    Info->Images[0].ImageBuffer = (VOID *)FlashlessBootImageAddr;
+  } else if (Info->NetworkBoot) {
+    Info->Images[0].ImageBuffer = (VOID *)NetworkBootImageAddr;
+  }
   Status = CheckImageHeader (Info->Images[0].ImageBuffer, ImageHdrSize,
                              NULL, 0, (UINT32 *)&(Info->Images[0].ImageSize),
                              PageSize, FALSE, NULL);
@@ -479,7 +484,8 @@ LoadBootImageNoAuth (BootInfo *Info, UINT32 *PageSize, BOOLEAN *FastbootPath)
    * by previous bootloaders, so just fill the BootInfo structure with
    * required parameters
    */
-  if (Info->FlashlessBoot) {
+  if (Info->FlashlessBoot ||
+      Info->NetworkBoot) {
     GUARD (LocateImageNoAuth (Info, PageSize));
     goto SkipImageVerification;
   }
@@ -737,7 +743,8 @@ LoadImageNoAuthWrapper (BootInfo *Info)
                                    Info->BootIntoRecovery,
                                    (CHAR16 *)L"system",
                                    (CHAR8 *)"root",
-                                   Info->FlashlessBoot);
+                                   Info->FlashlessBoot,
+                                   Info->NetworkBoot);
     if (SystemPathLen == 0 || SystemPath == NULL) {
       DEBUG ((EFI_D_ERROR, "GetSystemPath failed!\n"));
       return EFI_LOAD_ERROR;
@@ -805,7 +812,8 @@ LoadImageAndAuthVB1 (BootInfo *Info)
                                    Info->BootIntoRecovery,
                                    (CHAR16 *)L"system",
                                    (CHAR8 *)"root",
-                                   Info->FlashlessBoot);
+                                   Info->FlashlessBoot,
+                                   Info->NetworkBoot);
     if (SystemPathLen == 0 || SystemPath == NULL) {
       DEBUG ((EFI_D_ERROR, "GetSystemPath failed!\n"));
       return EFI_LOAD_ERROR;
@@ -1891,7 +1899,8 @@ STATIC EFI_STATUS LoadImageAndAuthForLE (BootInfo *Info)
      * by previous bootloaders, so just fill the BootInfo structure with
      * required parameters
      */
-    if (Info->FlashlessBoot) {
+    if (Info->FlashlessBoot ||
+        Info->NetworkBoot) {
       GUARD (LocateImageNoAuth (Info, &PageSize));
       goto skip_verification;
     } else {
@@ -2008,7 +2017,8 @@ skip_verification:
                                        Info->BootIntoRecovery,
                                        (CHAR16 *)L"system",
                                        (CHAR8 *)"root",
-                                       Info->FlashlessBoot);
+                                       Info->FlashlessBoot,
+                                       Info->NetworkBoot);
         if (SystemPathLen == 0 ||
             SystemPath == NULL) {
             return EFI_LOAD_ERROR;
@@ -2038,7 +2048,8 @@ LoadImageAndAuth (BootInfo *Info, BOOLEAN HibernationResume,
     return EFI_INVALID_PARAMETER;
   }
 
-  if (Info->FlashlessBoot) {
+  if (Info->FlashlessBoot ||
+      Info->NetworkBoot) {
     goto get_ptn_name;
   }
 

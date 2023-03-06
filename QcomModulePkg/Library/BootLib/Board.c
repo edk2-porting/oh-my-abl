@@ -30,7 +30,7 @@
 /*
  *  Changes from Qualcomm Innovation Center are provided under the following license:
  *
- *  Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *  Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -398,6 +398,13 @@ CheckRootDeviceType (VOID)
   STATIC MemCardType Type = UNKNOWN;
   MEM_CARD_INFO CardInfoData;
   EFI_MEM_CARDINFO_PROTOCOL *CardInfo;
+  /*For network boot, avoid uefi call to get the root device type
+  and return UNKNOWN. */
+  UINT8 Val = GetBootDeviceType ();
+
+  if (Val == EFI_EMMC_NETWORK_FLASH_TYPE) {
+    return Type;
+  }
 
   if (Type == UNKNOWN) {
     Status = gBS->LocateProtocol (&gEfiMemCardInfoProtocolGuid, NULL,
