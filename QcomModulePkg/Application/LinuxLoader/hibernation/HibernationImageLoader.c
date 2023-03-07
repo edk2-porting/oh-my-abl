@@ -96,7 +96,9 @@ typedef struct FreeRanges {
 #if HIBERNATION_SUPPORT_AES
 static struct DecryptParam Dp;
 static CHAR8 *Authtags;
-
+static VOID *AuthCur;
+static VOID *TempOut;
+static UINT8 UnwrappedKey[32];
 #define QSEECOM_ALIGN_SIZE      0x40
 #define QSEECOM_ALIGN_MASK      (QSEECOM_ALIGN_SIZE - 1)
 #define QSEECOM_ALIGN(x)        \
@@ -193,6 +195,7 @@ typedef struct Secs2dTaHandle {
         QCOM_QSEECOM_PROTOCOL *QseeComProtocol;
         UINT32 AppId;
 }Secs2dTaHandle;
+static INT32 InitAesDecrypt (VOID);
 #endif
 
 struct BounceTableIterator TableIterator;
@@ -604,38 +607,42 @@ static INT32 DecryptPage (VOID *EncryptData)
         ioVecOut.size = 1;
         ioVecOut.iov = &IovecOut;
         ioVecOut.iov[0].dwLen = PAGE_SIZE;
-        ioVecOut.iov[0].pvBase = Dp.Out;
+        ioVecOut.iov[0].pvBase = TempOut;
 
         if (SW_Cipher_Init (SW_CIPHER_ALG_AES256)) {
                 return -1;
         }
         if (SW_Cipher_SetParam (SW_CIPHER_PARAM_DIRECTION, &Dir,
-                sizeof (SW_CipherEncryptDir)))
+                sizeof (SW_CipherEncryptDir))) {
                 return -1;
+        }
         if (SW_Cipher_SetParam (SW_CIPHER_PARAM_MODE, &Mode, sizeof (Mode))) {
                 return -1;
         }
-        if (SW_Cipher_SetParam (SW_CIPHER_PARAM_KEY, Dp.UnwrappedKey,
-                sizeof (Dp.UnwrappedKey)))
+        if (SW_Cipher_SetParam (SW_CIPHER_PARAM_KEY, UnwrappedKey,
+                sizeof (UnwrappedKey))) {
                 return -1;
+        }
         if (SW_Cipher_SetParam (SW_CIPHER_PARAM_IV, Dp.Iv, sizeof (Dp.Iv))) {
                 return -1;
         }
         if (SW_Cipher_SetParam (SW_CIPHER_PARAM_AAD, (VOID *)Dp.Aad,
-                sizeof (Dp.Aad)))
+                sizeof (Dp.Aad))) {
                 return -1;
+        }
         if (SW_CipherData (ioVecIn, &ioVecOut)) {
                 return -1;
         }
-        if (SW_Cipher_GetParam (SW_CIPHER_PARAM_TAG, (VOID*)(Dp.AuthCur),
-                Dp.Authsize))
+        if (SW_Cipher_GetParam (SW_CIPHER_PARAM_TAG, (VOID*)(AuthCur),
+                Dp.Authsize)) {
                 return -1;
-        if (MemCmp (Dp.AuthCur, Authtags, Dp.Authsize)) {
+        }
+        if (MemCmp (AuthCur, Authtags, Dp.Authsize)) {
                 printf ("Auth Comparsion failed\n");
                 return -1;
         }
 
-        gBS->CopyMem ((VOID *)(EncryptData), (VOID *)(Dp.Out), PAGE_SIZE);
+        gBS->CopyMem ((VOID *)(EncryptData), (VOID *)(TempOut), PAGE_SIZE);
         SW_Cipher_DeInit ();
         Authtags = Authtags + Dp.Authsize;
         return 0;
@@ -662,10 +669,6 @@ static INT32 ReadSwapInfoStruct (VOID)
         if (ReadImage (SWAP_INFO_OFFSET, Info, 1)) {
                 printf ("Failed to read Line %d\n", __LINE__);
                 FreePages (Info, 1);
-                return -1;
-        }
-        if (DecryptPage (Info)) {
-                printf ("Decryption of swsusp_info failed\n");
                 return -1;
         }
         ResumeHdr = (struct ArchHibernateHdr *)Info;
@@ -1140,6 +1143,11 @@ static INT32 RestoreSnapshotImage (VOID)
                 return Ret;
         }
 
+        if (InitAesDecrypt ()) {
+                printf ("AES initialization failed\n");
+                return -1;
+        }
+
         KernelPfnIndexes = ReadKernelImagePfnIndexes (&Offset);
         if (!KernelPfnIndexes) {
                 return -1;
@@ -1397,32 +1405,23 @@ static INT32 InitTaAndGetKey (struct Secs2dTaHandle *TaHandle)
                 printf ("Error in conversion wrappeded key to unwrapped key\n");
                 return -1;
         }
-        gBS->CopyMem ((VOID *)Dp.UnwrappedKey,
+        gBS->CopyMem ((VOID *)UnwrappedKey,
                         (VOID *)Rsp.UnwrapkeyRsp.KeyBuffer, 32);
         return 0;
 }
 
-
-static VOID *memset (VOID *Destination, INT32 Value, INT32 Count)
-{
-  CHAR8 *Ptr = Destination;
-  while (Count--) {
-        *Ptr++ = Value;
-  }
-
-  return Destination;
-}
-
 static INT32 InitAesDecrypt (VOID)
 {
-        INT32 AuthslotStart;
+        UINT32 AuthslotStart;
         INT32 AuthslotCount;
         Secs2dTaHandle TaHandle = {0};
 
-        memset (&Dp, 0, sizeof (Dp));
-        AuthslotStart = SwsuspHeader->AuthslotStart;
-        AuthslotCount = SwsuspHeader->AuthslotCount;
+        AuthslotStart = (NrMetaPages * 2) + NrCopyPages + 9;
+        if (ReadImage (AuthslotStart - 1, &Dp, sizeof (struct DecryptParam))) {
+                return -1;
+        }
 
+        AuthslotCount = Dp.AuthCount;
         Authtags = AllocatePages (AuthslotCount);
         if (!Authtags) {
                 return -1;
@@ -1430,21 +1429,12 @@ static INT32 InitAesDecrypt (VOID)
         if (ReadImage (AuthslotStart, Authtags, AuthslotCount)) {
                 return -1;
         }
-
-        Dp.Authsize = SwsuspHeader->Authsize;
-        gBS->CopyMem ((VOID *)(&Dp.KeyBlob), (VOID *)(SwsuspHeader->KeyBlob),
-                        sizeof (SwsuspHeader->KeyBlob));
-        gBS->CopyMem ((VOID *)(&Dp.Iv), (VOID *)(SwsuspHeader->Iv),
-                        sizeof (SwsuspHeader->Iv));
-        gBS->CopyMem ((VOID *)(&Dp.Aad), (VOID *)(SwsuspHeader->Aad),
-                        sizeof (SwsuspHeader->Aad));
-
-        Dp.Out = AllocatePages (1);
-        if (!Dp.Out) {
+        TempOut = AllocatePages (1);
+        if (!TempOut) {
                 return -1;
         }
-        Dp.AuthCur = AllocateZeroPool (Dp.Authsize);
-        if (!Dp.AuthCur) {
+        AuthCur = AllocateZeroPool (Dp.Authsize);
+        if (!AuthCur) {
                 return -1;
         }
         if (InitTaAndGetKey (&TaHandle)) {
@@ -1469,11 +1459,6 @@ VOID BootIntoHibernationImage (BootInfo *Info, BOOLEAN *SetRotAndBootState)
         printf ("Entrying Hibernation restore\n");
 
         if (CheckForValidHeader () < 0) {
-                return;
-        }
-
-        if (InitAesDecrypt ()) {
-                printf ("AES initialization failed\n");
                 return;
         }
 
