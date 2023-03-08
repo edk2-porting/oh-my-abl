@@ -32,7 +32,7 @@
  /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -75,8 +75,6 @@
 #include <Protocol/EFIMdtp.h>
 #include <Protocol/EFIScmModeSwitch.h>
 #include <libufdt_sysdeps.h>
-#include <Protocol/EFIKernelInterface.h>
-
 #include "AutoGen.h"
 #include "BootImage.h"
 #include "BootLinux.h"
@@ -85,6 +83,10 @@
 #include "libfdt.h"
 #include "Bootconfig.h"
 #include <ufdt_overlay.h>
+
+#ifndef DISABLE_KERNEL_PROTOCOL
+#include <Protocol/EFIKernelInterface.h>
+#endif
 
 STATIC QCOM_SCM_MODE_SWITCH_PROTOCOL *pQcomScmModeSwitchProtocol = NULL;
 STATIC BOOLEAN BootDevImage;
@@ -1212,8 +1214,6 @@ BootLinux (BootInfo *Info)
   LINUX_KERNEL32 LinuxKernel32;
   UINT32 RamdiskSizeActual = 0;
   UINT32 SecondSizeActual = 0;
-  UINT64 KernelSizeReserved = 0;
-  UINTN DataSize;
 
   /*Boot Image header information variables*/
   CHAR8 FfbmStr[FFBM_MODE_BUF_SIZE] = {'\0'};
@@ -1221,10 +1221,14 @@ BootLinux (BootInfo *Info)
 
   BootParamlist BootParamlistPtr = {0};
 
+#ifndef DISABLE_KERNEL_PROTOCOL
+  UINT64 KernelSizeReserved = 0;
+  UINTN DataSize;
   EFI_KERNEL_PROTOCOL *KernIntf = NULL;
   Thread *ThreadNum;
   VOID *StackBase;
   VOID **StackCurrent;
+#endif
 
   if (Info == NULL) {
     DEBUG ((EFI_D_ERROR, "BootLinux: invalid parameter Info\n"));
@@ -1457,6 +1461,7 @@ BootLinux (BootInfo *Info)
       IsModeSwitch = TRUE;
   }
 
+#ifndef DISABLE_KERNEL_PROTOCOL
   Status = gBS->LocateProtocol (&gEfiKernelProtocolGuid, NULL,
         (VOID **)&KernIntf);
 
@@ -1481,6 +1486,8 @@ BootLinux (BootInfo *Info)
     DEBUG ((EFI_D_INFO, "Failed to get size of kernel region\n"));
     return Status;
   }
+#endif
+
   if (BootCpuSelectionEnabled ()) {
     SetLinuxBootCpu (BootCpuId);
   }
@@ -1496,13 +1503,17 @@ BootLinux (BootInfo *Info)
     goto Exit;
   }
 
+
+#ifdef DISABLE_KERNEL_PROTOCOL
+  PreparePlatformHardware ();
+#else
   PreparePlatformHardware (KernIntf, (VOID *)BootParamlistPtr.KernelLoadAddr,
                   (UINTN)KernelSizeReserved,
                   (VOID *)BootParamlistPtr.RamdiskLoadAddr,
                   (UINTN)RamdiskSizeActual,
                   (VOID *)BootParamlistPtr.DeviceTreeLoadAddr, DT_SIZE_2MB,
                   (VOID *)StackCurrent, (UINTN)StackBase);
-
+#endif
   BootStatsSetTimeStamp (BS_BL_END);
 
   if (IsVmEnabled ()) {

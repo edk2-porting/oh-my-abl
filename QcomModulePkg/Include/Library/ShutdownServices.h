@@ -46,7 +46,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -140,11 +140,16 @@ typedef struct {
 EFI_STATUS
 ShutdownUefiBootServices (VOID);
 
+#ifdef DISABLE_KERNEL_PROTOCOL
+EFI_STATUS
+PreparePlatformHardware (VOID);
+#else
 EFI_STATUS
 PreparePlatformHardware (EFI_KERNEL_PROTOCOL *KernIntf, VOID *KernelLoadAddr,
     UINTN KernelSizeActual, VOID *RamdiskLoadAddr, UINTN RamdiskSizeActual,
     VOID *DeviceTreeLoadAddr, UINTN DeviceTreeSizeActual,
     VOID *CallerStackCurrent, UINTN CallerStackBase);
+#endif
 
 VOID
 RebootDevice (UINT8 RebootReason);
