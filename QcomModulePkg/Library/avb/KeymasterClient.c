@@ -29,7 +29,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -64,7 +64,6 @@
 
 #include "KeymasterClient.h"
 #include "VerifiedBoot.h"
-#include "libavb/libavb.h"
 #include <Library/BaseMemoryLib.h>
 #include <Library/DebugLib.h>
 #include <Library/Debug.h>
@@ -73,6 +72,7 @@
 #include <Protocol/EFIQseecom.h>
 #include <Protocol/LoadedImage.h>
 #include <Protocol/scm_sip_interface.h>
+#include <Protocol/EFISPSS.h>
 
 typedef struct {
   QCOM_QSEECOM_PROTOCOL *QseeComProtocol;
@@ -80,6 +80,7 @@ typedef struct {
 } KMHandle;
 
 STATIC KMHandle Handle = {NULL};
+STATIC KeymintSharedInfoStruct SPUKeymintSharedInfo;
 
 /**
  * KM Commands supported
@@ -137,31 +138,8 @@ typedef enum {
 } KeyMasterError;
 
 typedef struct {
-  UINT32 CmdId;
-  UINT32 RotOffset;
-  UINT32 RotSize;
-  CHAR8 RotDigest[AVB_SHA256_DIGEST_SIZE];
-} __attribute__ ((packed)) KMSetRotReq;
-
-typedef struct {
   INT32 Status;
 } __attribute__ ((packed)) KMSetRotRsp;
-
-typedef struct {
-  UINT32 IsUnlocked;
-  CHAR8 PublicKey[AVB_SHA256_DIGEST_SIZE];
-  UINT32 Color;
-  UINT32 SystemVersion;
-  UINT32 SystemSecurityLevel;
-} __attribute__ ((packed)) KMBootState;
-
-typedef struct {
-  UINT32 CmdId;
-  UINT32 Version;
-  UINT32 Offset;
-  UINT32 Size;
-  KMBootState BootState;
-} __attribute__ ((packed)) KMSetBootStateReq;
 
 typedef struct {
   INT32 Status;
@@ -178,12 +156,6 @@ typedef struct {
   UINT32 AppMajor;
   UINT32 AppMinor;
 } __attribute__ ((packed)) KMGetVersionRsp;
-
-typedef struct
-{
-  UINT32 CmdId;
-  CHAR8 Vbh[AVB_SHA256_DIGEST_SIZE];
-} __attribute__ ((packed)) KMSetVbhReq;
 
 typedef struct
 {
@@ -205,6 +177,8 @@ typedef struct {
 typedef struct {
   INT32 Status;
 } __attribute__ ((packed)) KMFbeSetSeedRsp;
+
+STATIC EFI_STATUS ShareKeyMintInfoWithSPU (VOID);
 
 EFI_STATUS
 KeyMasterStartApp (KMHandle *Handle)
@@ -324,6 +298,7 @@ KeyMasterSetRotAndBootState (KMRotAndBootState *BootState)
   RotReq.RotOffset = (UINT8 *)&RotReq.RotDigest - (UINT8 *)&RotReq;
   RotReq.RotSize = sizeof (RotReq.RotDigest);
   CopyMem (RotReq.RotDigest, RotDigest, AVB_SHA256_DIGEST_SIZE);
+  SPUKeymintSharedInfo.RootOfTrust = RotReq;
 
   Status = Handle.QseeComProtocol->QseecomSendCmd (
       Handle.QseeComProtocol, Handle.AppId, (UINT8 *)&RotReq, sizeof (RotReq),
@@ -347,6 +322,7 @@ KeyMasterSetRotAndBootState (KMRotAndBootState *BootState)
   BootStateReq.BootState.SystemVersion = BootState->SystemVersion;
   CopyMem (BootStateReq.BootState.PublicKey, BootStateDigest,
            AVB_SHA256_DIGEST_SIZE);
+  SPUKeymintSharedInfo.BootInfo = BootStateReq;
 
   Status = Handle.QseeComProtocol->QseecomSendCmd (
       Handle.QseeComProtocol, Handle.AppId, (UINT8 *)&BootStateReq,
@@ -376,6 +352,7 @@ KeyMasterSetRotAndBootState (KMRotAndBootState *BootState)
       }
     }
   }
+
   DEBUG ((EFI_D_VERBOSE, "KeyMasterSetRotAndBootState success\n"));
   return Status;
 }
@@ -397,6 +374,7 @@ SetVerifiedBootHash (CONST CHAR8 *Vbh, UINTN VbhSize)
   GUARD (KeyMasterStartApp (&Handle));
   VbhReq.CmdId = KEYMASTER_SET_VBH;
   CopyMem (VbhReq.Vbh, Vbh, VbhSize);
+  SPUKeymintSharedInfo.Vbh = VbhReq;
 
   Status = Handle.QseeComProtocol->QseecomSendCmd (
       Handle.QseeComProtocol, Handle.AppId, (UINT8 *)&VbhReq,
@@ -413,6 +391,14 @@ SetVerifiedBootHash (CONST CHAR8 *Vbh, UINTN VbhSize)
     }
     return EFI_LOAD_ERROR;
   }
+
+  Status = ShareKeyMintInfoWithSPU ();
+
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "ShareKeyMintInfoWithSPU failed: %r\n", Status));
+    return Status;
+  }
+
   return EFI_SUCCESS;
 }
 
@@ -517,6 +503,28 @@ EFI_STATUS KeyMasterFbeSetSeed (VOID)
             Status, Rsp.Status));
     return EFI_LOAD_ERROR;
   }
+
+  return Status;
+}
+
+STATIC EFI_STATUS ShareKeyMintInfoWithSPU (VOID)
+{
+  SpssProtocol* SPSSProtocol;
+  EFI_STATUS Status = gBS->LocateProtocol (&gEfiSPSSProtocolGuid, NULL,
+                                (VOID **)&(SPSSProtocol));
+
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "Unable to locate SPSS protocol: %r\n", Status));
+    return Status;
+  }
+
+  Status = SPSSProtocol->SPSSDxe_ShareKeyMintInfo (&SPUKeymintSharedInfo);
+  if (Status != EFI_SUCCESS) {
+    DEBUG ((EFI_D_ERROR, "SPSSDxe_ShareKeyMintInfo failed: %r\n", Status));
+  }
+
+  // Clear data from memory
+  SetMem ( (VOID*) (&SPUKeymintSharedInfo), sizeof (SPUKeymintSharedInfo), 0);
 
   return Status;
 }
