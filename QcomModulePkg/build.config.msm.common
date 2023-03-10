@@ -6,7 +6,7 @@ fi
 
 PREBUILT_PYTHON_PATH=prebuilts/build-tools/path/linux-x86/python3
 
-if [ "${MSM_ARCH}" = "pineapple" ]; then
+if [ "${MSM_ARCH}" = "pineapple" ] || [ "${MSM_ARCH}" = "gen3auto" ]; then
 CLANG_VERSION=r458507
 CLANG_PREBUILT_BIN=prebuilts/clang/host/linux-x86/clang-${CLANG_VERSION}/bin
 fi
