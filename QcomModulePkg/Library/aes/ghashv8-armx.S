@@ -183,7 +183,7 @@ gcm_gmult_v8:
 
 	ret
 .size	gcm_gmult_v8,.-gcm_gmult_v8
-.protected	gcm_ghash_v8
+.global	gcm_ghash_v8
 .type	gcm_ghash_v8,%function
 .align	4
 gcm_ghash_v8:
