@@ -526,6 +526,9 @@ static struct PartialGoods PartialGoodsMmType[] = {
     {BIT (EFICHIPINFO_PART_NPU),
      "/soc",
      {"qcom,npu", "status", "ok", "no"}},
+    {BIT (EFICHIPINFO_PART_NSP),
+     "/soc",
+     {"remoteproc-cdsp", "status", "ok", "no"}},
 };
 
 STATIC EFI_STATUS
