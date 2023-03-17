@@ -168,7 +168,7 @@ def define_abl_targets():
 def define_abl(msm_target, variant):
     target = msm_target + "_" + variant
 
-    if msm_target == "pineapple" or msm_target == "pineapple.allyes" or msm_target == "gen3auto":
+    if msm_target == "pineapple" or msm_target == "pineapple-allyes" or msm_target == "gen3auto":
         extra_deps = ["//prebuilts/clang/host/linux-x86/clang-r458507:binaries"]
     else:
         extra_deps = []
@@ -176,7 +176,7 @@ def define_abl(msm_target, variant):
     abl(
         name = "{}_abl".format(target),
         kernel_build = "//msm-kernel:{}_env".format(target),
-        abl_build_config = "build.config.msm.{}".format(msm_target),
+        abl_build_config = "build.config.msm.{}".format(msm_target.replace("-", ".")),
         srcs = native.glob(["**"]) + extra_srcs,
         extra_function_snippets = extra_function_snippets,
         extra_post_gen_snippets = extra_post_gen_snippets,
