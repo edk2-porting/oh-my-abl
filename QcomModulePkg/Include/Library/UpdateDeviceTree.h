@@ -30,7 +30,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -108,6 +108,11 @@ struct FstabNode {
   CONST CHAR8 *DevicePathId;
 };
 
+struct CarveoutMemRegion {
+  UINT64 StartAddr;
+  UINT64 Size;
+};
+
 struct DisplaySplashBufferInfo {
   /* Version number used to track changes to the structure */
   UINT32 uVersion;
@@ -154,4 +159,14 @@ UpdateFstabNode (VOID *fdt);
 
 UINT32
 fdt_check_header_ext (VOID *fdt);
+
+EFI_STATUS
+GetUpdatedRamPartitions (VOID *Fdt,
+                         RamPartitionEntry *RamPartitions,
+                         UINT32 NumPartitions,
+                         RamPartitionEntry *UpdatedRamPartitions,
+                         UINT32 *NumUpdPartitions);
+
+BOOLEAN
+IsCarveoutRemovalEnabled (VOID *Fdt);
 #endif

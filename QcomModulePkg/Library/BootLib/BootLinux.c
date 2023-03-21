@@ -32,7 +32,7 @@
  /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -89,6 +89,9 @@
 STATIC QCOM_SCM_MODE_SWITCH_PROTOCOL *pQcomScmModeSwitchProtocol = NULL;
 STATIC BOOLEAN BootDevImage;
 STATIC BOOLEAN RecoveryHasNoKernel = FALSE;
+RamPartitionEntry UpdatedRamPartitions[NUM_NOMAP_REGIONS];
+UINT32 NumUpdPartitions;
+BOOLEAN UpdRamPartitionsAvail = FALSE;
 
 STATIC VOID
 SetLinuxBootCpu (UINT32 BootCpu)
@@ -1226,6 +1229,9 @@ BootLinux (BootInfo *Info)
   VOID *StackBase;
   VOID **StackCurrent;
 
+  RamPartitionEntry *RamPartitions = NULL;
+  UINT32 NumPartitions = 0;
+
   if (Info == NULL) {
     DEBUG ((EFI_D_ERROR, "BootLinux: invalid parameter Info\n"));
     return EFI_INVALID_PARAMETER;
@@ -1424,6 +1430,26 @@ BootLinux (BootInfo *Info)
    * by QRKS service later.
    */
   GetQrksKernelStartAddress ();
+
+  if (IsCarveoutRemovalEnabled ((VOID *)BootParamlistPtr.DeviceTreeLoadAddr)) {
+    Status = ReadRamPartitions (&RamPartitions, &NumPartitions);
+    if (EFI_ERROR (Status)) {
+      DEBUG ((EFI_D_ERROR, "Error returned from ReadRamPartitions %r\n",
+              Status));
+      return Status;
+    }
+
+    Status = GetUpdatedRamPartitions (
+                            (VOID *)BootParamlistPtr.DeviceTreeLoadAddr,
+                            RamPartitions, NumPartitions,
+                            UpdatedRamPartitions, &NumUpdPartitions);
+    if (Status == EFI_SUCCESS) {
+      UpdRamPartitionsAvail = TRUE;
+    } else {
+      DEBUG ((EFI_D_ERROR, "Failed to update RAM Partitions Status:%r\r\n",
+              Status));
+    }
+  }
 
   /* Updates the command line from boot image, appends device serial no.,
    * baseband information, etc.

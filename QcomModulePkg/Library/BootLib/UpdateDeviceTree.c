@@ -625,6 +625,330 @@ QueryMemoryCellSize (IN VOID *Fdt, OUT UINT32 *MemoryCellLen)
   return EFI_SUCCESS;
 }
 
+BOOLEAN IsCarveoutRemovalEnabled (VOID *Fdt)
+{
+  INT32 ResMemOffset = 0;
+  CONST struct fdt_property *Prop = NULL;
+  INT32 PropLen = 0;
+
+  ResMemOffset = FdtPathOffset (Fdt, "/reserved-memory");
+  if (ResMemOffset < 0) {
+    DEBUG ((EFI_D_ERROR, "reserved-memory node not found in device tree\n"));
+    return FALSE;
+  } else {
+    Prop = fdt_get_property (Fdt, ResMemOffset, "removes_carveout_region",
+                             &PropLen);
+    if (!Prop) {
+      return FALSE;
+    }
+  }
+
+  return TRUE;
+}
+
+STATIC
+EFI_STATUS
+GetNoMapRegions (VOID *Fdt,
+                 struct CarveoutMemRegion *NoMapRegs,
+                 UINT32 *NumNoMapReg)
+{
+  INT32 ResMemOffset = 0;
+  INT32 SubNodeOffset = 0;
+  INT32 NumReg = 0;
+  CONST UINT64  *RegProp;
+  CONST struct fdt_property *Prop = NULL;
+  INT32 PropLen = 0;
+  CONST CHAR8 *status = NULL;
+
+  ResMemOffset = FdtPathOffset (Fdt, "/reserved-memory");
+  if (ResMemOffset < 0) {
+    DEBUG ((EFI_D_ERROR, "reserved-memory node not found in device tree\n"));
+    return EFI_NOT_FOUND;
+  }
+
+  for (SubNodeOffset = fdt_first_subnode (Fdt, ResMemOffset);
+       SubNodeOffset >= 0;
+       SubNodeOffset = fdt_next_subnode (Fdt, SubNodeOffset)) {
+    Prop = fdt_get_property (Fdt, SubNodeOffset, "no-map", &PropLen);
+    if (Prop) {
+      status = fdt_getprop (Fdt, SubNodeOffset, "status", &PropLen);
+      if (status &&
+          (AsciiStrnCmp (status, "disabled", PropLen) == 0)) {
+        continue;
+      }
+      RegProp = fdt_getprop (Fdt, SubNodeOffset, "reg", &PropLen);
+      if (RegProp) {
+        if (NumReg >= NUM_NOMAP_REGIONS) {
+          return EFI_OUT_OF_RESOURCES;
+        }
+        NoMapRegs[NumReg].StartAddr = fdt64_to_cpu (ReadUnaligned64 (RegProp));
+        NoMapRegs[NumReg].Size = fdt64_to_cpu (ReadUnaligned64 (RegProp + 1));
+        NumReg++;
+      }
+    }
+  }
+
+  *NumNoMapReg = NumReg;
+  return EFI_SUCCESS;
+}
+
+STATIC
+VOID
+SortNoMapRegions (struct CarveoutMemRegion *NoMapRegions, UINT32 NumNoMapReg)
+{
+  UINT32 i = 0, j = 0;
+  struct CarveoutMemRegion TempMemoryMap;
+  BOOLEAN IsSorted = TRUE;
+
+  for (i = 0; i < (NumNoMapReg - 1); i++) {
+    for (j = 0; j < (NumNoMapReg - i - 1); j++) {
+      if (NoMapRegions[j].StartAddr > NoMapRegions[j + 1].StartAddr) {
+        IsSorted = FALSE;
+        CopyMem (&TempMemoryMap, &NoMapRegions[j],
+                 sizeof (struct CarveoutMemRegion));
+        CopyMem (&NoMapRegions[j], &NoMapRegions[j + 1],
+                 sizeof (struct CarveoutMemRegion));
+        CopyMem (&NoMapRegions[j + 1], &TempMemoryMap,
+                 sizeof (struct CarveoutMemRegion));
+      }
+    }
+    if (IsSorted) {
+      break;
+    }
+  }
+  return;
+}
+
+STATIC
+EFI_STATUS
+CombineNoMapRegions (struct CarveoutMemRegion *NoMapRegions,
+                     UINT32 NumNoMapReg,
+                     struct CarveoutMemRegion *CombNoMapRegions,
+                     UINT32 *NumCombNoMapReg)
+{
+  UINT64 Start, End;
+  UINT32 i = 0;
+  INT32 NumReg = 0;
+
+  Start = NoMapRegions[0].StartAddr;
+  End = NoMapRegions[0].StartAddr + NoMapRegions[0].Size;
+  CombNoMapRegions[NumReg].StartAddr = Start;
+  CombNoMapRegions[NumReg].Size = End - Start;
+
+  for (i = 0; i < (NumNoMapReg - 1); i++) {
+    if (NoMapRegions[i + 1].StartAddr ==
+        (NoMapRegions[i].StartAddr + (NoMapRegions[i].Size))) {
+      End = NoMapRegions[i + 1].StartAddr + NoMapRegions[i + 1].Size;
+      CombNoMapRegions[NumReg].Size = End - Start;
+    } else if (NoMapRegions[i + 1].StartAddr >
+        (NoMapRegions[i].StartAddr + (NoMapRegions[i].Size))) {
+      Start = NoMapRegions[i + 1].StartAddr;
+      End = NoMapRegions[i + 1].StartAddr + NoMapRegions[i + 1].Size;
+      NumReg++;
+      if (NumReg > NUM_NOMAP_REGIONS) {
+        return EFI_OUT_OF_RESOURCES;
+      }
+      CombNoMapRegions[NumReg].StartAddr = Start;
+      CombNoMapRegions[NumReg].Size = End - Start;
+    } else if (NoMapRegions[i + 1].StartAddr <
+        (NoMapRegions[i].StartAddr + (NoMapRegions[i].Size))) {
+      DEBUG ((EFI_D_WARN, "Overlapping memory regions detected\n"));
+      DEBUG ((EFI_D_WARN,
+              "0x%016lx - 0x%016lx overlaps with 0x%016lx - 0x%016lx\n",
+              NoMapRegions[i].StartAddr,
+              NoMapRegions[i].StartAddr + NoMapRegions[i].Size,
+              NoMapRegions[i + 1].StartAddr,
+              NoMapRegions[i + 1].StartAddr + NoMapRegions[i + 1].Size));
+      End = NoMapRegions[i + 1].StartAddr + NoMapRegions[i + 1].Size;
+      CombNoMapRegions[NumReg].Size = End - Start;
+    }
+  }
+
+  *NumCombNoMapReg = NumReg + 1;
+  return EFI_SUCCESS;
+}
+
+STATIC
+EFI_STATUS
+UpdateRamPartitions (RamPartitionEntry *RamPartitionsList,
+                     UINT32 NumPartitions,
+                     struct CarveoutMemRegion *CombNoMapRegions,
+                     UINT32 NumCombNoMapReg,
+                     RamPartitionEntry *UpdatedRamPartitions,
+                     UINT32 *NumUpdRamPartitions)
+{
+  UINT32 i = 0, j = 0;
+  UINT32 NumModRamPartitions = 0;
+  BOOLEAN  PtnChecked;
+  RamPartitionEntry *RamPartitions = NULL;
+
+  RamPartitions = AllocateZeroPool (
+                        NumPartitions * sizeof (RamPartitionEntry));
+  CopyMem (RamPartitions, RamPartitionsList,
+           NumPartitions * sizeof (RamPartitionEntry));
+
+  for (i = 0; i < NumPartitions; i++) {
+    if (RamPartitions[i].AvailableLength == 0) {
+      UpdatedRamPartitions[NumModRamPartitions].Base = RamPartitions[i].Base;
+      UpdatedRamPartitions[NumModRamPartitions].AvailableLength =
+          RamPartitions[i].AvailableLength;
+      NumModRamPartitions++;
+      continue;
+    }
+
+    PtnChecked = FALSE;
+
+    for (j = 0; j < NumCombNoMapReg; j++) {
+      if ((CombNoMapRegions[j].StartAddr <= RamPartitions[i].Base) &&
+          ((CombNoMapRegions[j].StartAddr + CombNoMapRegions[j].Size) >=
+          (RamPartitions[i].Base + RamPartitions[i].AvailableLength))) {
+        PtnChecked = TRUE;
+        break;
+      } else if (CombNoMapRegions[j].StartAddr >
+          (RamPartitions[i].Base + RamPartitions[i].AvailableLength)) {
+        break;
+      } else if ((CombNoMapRegions[j].StartAddr + CombNoMapRegions[j].Size) <
+         RamPartitions[i].Base) {
+        continue;
+      } else if ((CombNoMapRegions[j].StartAddr >= RamPartitions[i].Base) &&
+          ((CombNoMapRegions[j].StartAddr + CombNoMapRegions[j].Size) <=
+          (RamPartitions[i].Base + RamPartitions[i].AvailableLength))) {
+        if (CombNoMapRegions[j].StartAddr > RamPartitions[i].Base) {
+          UpdatedRamPartitions[NumModRamPartitions].Base =
+              RamPartitions[i].Base;
+          UpdatedRamPartitions[NumModRamPartitions].AvailableLength =
+              CombNoMapRegions[j].StartAddr - RamPartitions[i].Base;
+          RamPartitions[i].AvailableLength =
+              (RamPartitions[i].Base + RamPartitions[i].AvailableLength) -
+              (CombNoMapRegions[j].StartAddr + CombNoMapRegions[j].Size);
+          RamPartitions[i].Base =
+              CombNoMapRegions[j].StartAddr + CombNoMapRegions[j].Size;
+          NumModRamPartitions++;
+          PtnChecked = TRUE;
+        } else if (CombNoMapRegions[j].StartAddr == RamPartitions[i].Base) {
+          RamPartitions[i].Base =
+              CombNoMapRegions[j].StartAddr + CombNoMapRegions[j].Size;
+          RamPartitions[i].AvailableLength =
+              RamPartitions[i].AvailableLength - CombNoMapRegions[j].Size;
+          PtnChecked = TRUE;
+        }
+
+        if (RamPartitions[i].AvailableLength == 0) {
+          break;
+        }
+
+        if ((CombNoMapRegions[j].StartAddr + CombNoMapRegions[j].Size) <
+            (RamPartitions[i].Base + RamPartitions[i].AvailableLength)) {
+          PtnChecked = FALSE;
+        }
+      } else if ((CombNoMapRegions[j].StartAddr > RamPartitions[i].Base) &&
+                 ((CombNoMapRegions[j].StartAddr + CombNoMapRegions[j].Size) >
+                 (RamPartitions[i].Base + RamPartitions[i].AvailableLength))) {
+        UpdatedRamPartitions[NumModRamPartitions].Base =
+            RamPartitions[i].Base;
+        UpdatedRamPartitions[NumModRamPartitions].AvailableLength =
+            CombNoMapRegions[j].StartAddr - RamPartitions[i].Base;
+        NumModRamPartitions++;
+        PtnChecked = TRUE;
+        break;
+      } else if ((CombNoMapRegions[j].StartAddr < RamPartitions[i].Base) &&
+                 ((CombNoMapRegions[j].StartAddr + CombNoMapRegions[j].Size) <
+                 (RamPartitions[i].Base + RamPartitions[i].AvailableLength))) {
+        RamPartitions[i].AvailableLength =
+            (RamPartitions[i].Base + RamPartitions[i].AvailableLength) -
+            (CombNoMapRegions[j].StartAddr + CombNoMapRegions[j].Size);
+        RamPartitions[i].Base =
+            CombNoMapRegions[j].StartAddr + CombNoMapRegions[j].Size;
+      }
+    }
+
+    if (!PtnChecked) {
+      UpdatedRamPartitions[NumModRamPartitions].Base = RamPartitions[i].Base;
+      UpdatedRamPartitions[NumModRamPartitions].AvailableLength =
+          RamPartitions[i].AvailableLength;
+      NumModRamPartitions++;
+    }
+
+    if (NumModRamPartitions >= NUM_RAM_PARTITIONS) {
+      return EFI_OUT_OF_RESOURCES;
+    }
+  }
+
+  *NumUpdRamPartitions = NumModRamPartitions;
+  FreePool (RamPartitions);
+  RamPartitions  = NULL;
+
+  return EFI_SUCCESS;
+}
+
+EFI_STATUS
+GetUpdatedRamPartitions (VOID *Fdt,
+                         RamPartitionEntry *RamPartitions,
+                         UINT32 NumPartitions,
+                         RamPartitionEntry *UpdatedRamPartitions,
+                         UINT32 *NumUpdPartitions)
+{
+  EFI_STATUS Status = EFI_SUCCESS;
+  UINT32 i = 0, NumNoMapReg = 0, NumCombNoMapReg = 0, NumModPartitions = 0;
+  struct CarveoutMemRegion NoMapRegions[NUM_NOMAP_REGIONS];
+  struct CarveoutMemRegion CombinedNoMapRegions[NUM_NOMAP_REGIONS];
+
+  if ((!RamPartitions) ||
+      (!UpdatedRamPartitions) ||
+      (!NumUpdPartitions)) {
+    return EFI_INVALID_PARAMETER;
+  }
+
+  /* Reading No-Map regions from FDT */
+  Status = GetNoMapRegions (Fdt, NoMapRegions, &NumNoMapReg);
+  if (Status != EFI_SUCCESS) {
+    return Status;
+  }
+  DEBUG ((EFI_D_VERBOSE, "NoMap Regions\r\n"));
+  for (i = 0; i < NumNoMapReg; i++) {
+    DEBUG ((EFI_D_VERBOSE, "Base: 0x%016lx Size: 0x%016lx \n",
+            NoMapRegions[i].StartAddr, NoMapRegions[i].Size));
+  }
+
+  /* Sort the No-Map regions */
+  SortNoMapRegions (NoMapRegions, NumNoMapReg);
+  DEBUG ((EFI_D_VERBOSE, "Sorted NoMap Regions\r\n"));
+  for (i = 0; i < NumNoMapReg; i++) {
+    DEBUG ((EFI_D_VERBOSE, "Base: 0x%016lx Size: 0x%016lx \n",
+            NoMapRegions[i].StartAddr, NoMapRegions[i].Size));
+  }
+
+  /* Combine No-Map regions */
+  Status = CombineNoMapRegions (NoMapRegions, NumNoMapReg,
+                            CombinedNoMapRegions, &NumCombNoMapReg);
+  if (Status != EFI_SUCCESS) {
+    return Status;
+  }
+
+  DEBUG ((EFI_D_VERBOSE, "Combined NoMap Regions\r\n"));
+  for (i = 0; i < NumCombNoMapReg; i++) {
+    DEBUG ((EFI_D_VERBOSE, "Base:0x%016lx Size:0x%016lx\n",
+            CombinedNoMapRegions[i].StartAddr, CombinedNoMapRegions[i].Size));
+  }
+
+  /* Remove combined No-Map regions from RAM Partitions */
+  Status = UpdateRamPartitions (RamPartitions, NumPartitions,
+                            CombinedNoMapRegions, NumCombNoMapReg,
+                            UpdatedRamPartitions, &NumModPartitions);
+  if (Status != EFI_SUCCESS) {
+    return Status;
+  }
+  DEBUG ((EFI_D_VERBOSE, "Updated RAM Partitions\r\n"));
+  for (i = 0; i < NumModPartitions; i++) {
+    DEBUG ((EFI_D_VERBOSE, "Add Base: 0x%016lx Available Length: 0x%016lx \n",
+            UpdatedRamPartitions[i].Base,
+            UpdatedRamPartitions[i].AvailableLength));
+  }
+
+  *NumUpdPartitions = NumModPartitions;
+  return Status;
+}
+
 STATIC
 EFI_STATUS
 AddMemMap (VOID *Fdt, UINT32 MemNodeOffset, BOOLEAN BootWith32Bit)
@@ -632,7 +956,8 @@ AddMemMap (VOID *Fdt, UINT32 MemNodeOffset, BOOLEAN BootWith32Bit)
   EFI_STATUS Status = EFI_NOT_FOUND;
   INT32 ret = 0;
   RamPartitionEntry *RamPartitions = NULL;
-  UINT32 NumPartitions = 0;
+  RamPartitionEntry *FinalRamPartitions = NULL;
+  UINT32 NumPartitions = 0, NumFinalPartitions = 0;
   UINT32 i = 0;
   UINT32 MemoryCellLen = 0;
 
@@ -642,33 +967,49 @@ AddMemMap (VOID *Fdt, UINT32 MemNodeOffset, BOOLEAN BootWith32Bit)
     return Status;
   }
 
-  Status = ReadRamPartitions (&RamPartitions, &NumPartitions);
-  if (EFI_ERROR (Status)) {
-    DEBUG ((EFI_D_ERROR, "Error returned from ReadRamPartitions %r\n", Status));
-    return Status;
+  if (UpdRamPartitionsAvail) {
+    FinalRamPartitions = UpdatedRamPartitions;
+    NumFinalPartitions = NumUpdPartitions;
+  } else {
+    Status = ReadRamPartitions (&RamPartitions, &NumPartitions);
+    if (EFI_ERROR (Status)) {
+      DEBUG ((EFI_D_ERROR, "Error returned from ReadRamPartitions %r\n",
+              Status));
+      return Status;
+    }
+    DEBUG ((EFI_D_VERBOSE, "RAM Partitions\r\n"));
+    for (i = 0; i < NumPartitions; i++) {
+      DEBUG ((EFI_D_VERBOSE, "Add Base: 0x%016lx Available Length: 0x%016lx \n",
+              RamPartitions[i].Base, RamPartitions[i].AvailableLength));
+    }
+    FinalRamPartitions = RamPartitions;
+    NumFinalPartitions = NumPartitions;
   }
 
-  DEBUG ((EFI_D_INFO, "RAM Partitions\r\n"));
-  for (i = 0; i < NumPartitions; i++) {
+  DEBUG ((EFI_D_INFO, "Final RAM Partitions\r\n"));
+  for (i = 0; i < NumFinalPartitions; i++) {
     DEBUG ((EFI_D_INFO, "Add Base: 0x%016lx Available Length: 0x%016lx \n",
-            RamPartitions[i].Base, RamPartitions[i].AvailableLength));
-
+            FinalRamPartitions[i].Base, FinalRamPartitions[i].AvailableLength));
     if (MemoryCellLen == 1) {
-      ret = dev_tree_add_mem_info (Fdt, MemNodeOffset, RamPartitions[i].Base,
-                                    RamPartitions[i].AvailableLength);
+      ret = dev_tree_add_mem_info (Fdt, MemNodeOffset,
+                                   FinalRamPartitions[i].Base,
+                                   FinalRamPartitions[i].AvailableLength);
     } else {
       ret = dev_tree_add_mem_infoV64 (Fdt, MemNodeOffset,
-                                        RamPartitions[i].Base,
-                                        RamPartitions[i].AvailableLength);
+                                      FinalRamPartitions[i].Base,
+                                      FinalRamPartitions[i].AvailableLength);
     }
 
     if (ret) {
       DEBUG ((EFI_D_ERROR, "Add Base: 0x%016lx Length: 0x%016lx Fail\n",
-              RamPartitions[i].Base, RamPartitions[i].AvailableLength));
+              FinalRamPartitions[i].Base,
+              FinalRamPartitions[i].AvailableLength));
     }
   }
 
-  FreePool (RamPartitions);
+  if (RamPartitions) {
+    FreePool (RamPartitions);
+  }
   RamPartitions = NULL;
   RamPartitionEntries = NULL;
 
