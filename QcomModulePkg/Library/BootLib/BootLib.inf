@@ -108,6 +108,7 @@
 	DisplayCtrl.c
         Bootconfig.c
 	EarlyEthernet.c
+	EarlyUsbInit.c
 
 [Packages]
 	ArmPkg/ArmPkg.dec

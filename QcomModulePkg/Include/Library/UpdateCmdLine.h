@@ -137,6 +137,7 @@ typedef struct UpdateCmdLineParamList {
   CHAR8 *EarlyPhyAddrCmdLine;
   CHAR8 *EarlyIFaceCmdLine;
   CHAR8 *EarlySpeedCmdLine;
+  CHAR8 *UsbCompCmdLine;
   CHAR8 *ResumeCmdLine;
   CONST CHAR8 *SystemdSlotEnv;
   CHAR8 *SilentBootModeCmdLine;

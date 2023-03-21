@@ -10,6 +10,7 @@ BUILD_USES_RECOVERY_AS_BOOT=0
 ENABLE_LE_VARIANT=true
 VERIFIED_BOOT_LE=1
 EARLY_ETH_ENABLED=1
+TARGET_SUPPORTS_EARLY_USB_INIT=1
 NAND_UBI_VOLUME_FLASHING_ENABLED=1
 
 ################################################################################
