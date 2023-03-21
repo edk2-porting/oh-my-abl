@@ -27,7 +27,7 @@
  *
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the
@@ -1129,6 +1129,48 @@ static UINT64 CopyPageTables ()
         return NewTtbr0;
 }
 
+#if HIBERNATION_SUPPORT_AES
+static INT32 InitAesDecrypt (VOID)
+{
+        UINT32 AuthslotStart;
+        INT32 AuthslotCount;
+        Secs2dTaHandle TaHandle = {0};
+
+        AuthslotStart = (NrMetaPages * 2) + NrCopyPages + 9;
+        if (ReadImage (AuthslotStart - 1, &Dp, sizeof (struct DecryptParam))) {
+                return -1;
+        }
+
+        AuthslotCount = Dp.AuthCount;
+        Authtags = AllocatePages (AuthslotCount);
+        if (!Authtags) {
+                return -1;
+        }
+        if (ReadImage (AuthslotStart, Authtags, AuthslotCount)) {
+                return -1;
+        }
+        TempOut = AllocatePages (1);
+        if (!TempOut) {
+                return -1;
+        }
+        AuthCur = AllocateZeroPool (Dp.Authsize);
+        if (!AuthCur) {
+                return -1;
+        }
+        if (InitTaAndGetKey (&TaHandle)) {
+                return -1;
+        }
+
+        printf ("Hibernation: AES init done\n");
+        return 0;
+}
+#else
+static INT32 InitAesDecrypt (VOID)
+{
+        return 0;
+}
+#endif
+
 static INT32 RestoreSnapshotImage (VOID)
 {
         INT32 Ret;
@@ -1407,47 +1449,6 @@ static INT32 InitTaAndGetKey (struct Secs2dTaHandle *TaHandle)
         }
         gBS->CopyMem ((VOID *)UnwrappedKey,
                         (VOID *)Rsp.UnwrapkeyRsp.KeyBuffer, 32);
-        return 0;
-}
-
-static INT32 InitAesDecrypt (VOID)
-{
-        UINT32 AuthslotStart;
-        INT32 AuthslotCount;
-        Secs2dTaHandle TaHandle = {0};
-
-        AuthslotStart = (NrMetaPages * 2) + NrCopyPages + 9;
-        if (ReadImage (AuthslotStart - 1, &Dp, sizeof (struct DecryptParam))) {
-                return -1;
-        }
-
-        AuthslotCount = Dp.AuthCount;
-        Authtags = AllocatePages (AuthslotCount);
-        if (!Authtags) {
-                return -1;
-        }
-        if (ReadImage (AuthslotStart, Authtags, AuthslotCount)) {
-                return -1;
-        }
-        TempOut = AllocatePages (1);
-        if (!TempOut) {
-                return -1;
-        }
-        AuthCur = AllocateZeroPool (Dp.Authsize);
-        if (!AuthCur) {
-                return -1;
-        }
-        if (InitTaAndGetKey (&TaHandle)) {
-                return -1;
-        }
-
-        printf ("Hibernation: AES init done\n");
-        return 0;
-}
-#else
-
-static INT32 InitAesDecrypt (VOID)
-{
         return 0;
 }
 #endif
