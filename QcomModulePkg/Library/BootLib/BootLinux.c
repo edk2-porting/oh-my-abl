@@ -1207,7 +1207,7 @@ BootLinux (BootInfo *Info)
   CHAR16 *PartitionName = NULL;
   BOOLEAN Recovery = FALSE;
   BOOLEAN AlarmBoot = FALSE;
-  BOOLEAN FlashlessBoot = Info->FlashlessBoot;
+  BOOLEAN FlashlessBoot;
   CHAR8 SilentBootMode;
 
   LINUX_KERNEL LinuxKernel;
@@ -1226,14 +1226,16 @@ BootLinux (BootInfo *Info)
   UINTN DataSize;
   EFI_KERNEL_PROTOCOL *KernIntf = NULL;
   Thread *ThreadNum;
-  VOID *StackBase;
-  VOID **StackCurrent;
 #endif
+  VOID *StackBase = NULL;
+  VOID **StackCurrent = NULL;
 
   if (Info == NULL) {
     DEBUG ((EFI_D_ERROR, "BootLinux: invalid parameter Info\n"));
     return EFI_INVALID_PARAMETER;
   }
+
+  FlashlessBoot = Info->FlashlessBoot;
 
   if (IsVmEnabled ()) {
     Status = CheckAndSetVmData (&BootParamlistPtr);
@@ -1587,7 +1589,7 @@ CheckImageHeader (VOID *ImageHdrBuffer,
   boot_img_hdr_v3 *RecoveryImgHdrV3 = NULL;
   boot_img_hdr_v4 *BootImgHdrV4;
   vendor_boot_img_hdr_v4 *VendorBootImgHdrV4;
-  boot_img_hdr_v4 *RecoveryImgHdrV4;
+  boot_img_hdr_v4 *RecoveryImgHdrV4 = NULL;
 
   UINT32 KernelSizeActual = 0;
   UINT32 DtSizeActual = 0;

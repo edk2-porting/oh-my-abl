@@ -1027,6 +1027,9 @@ AddtoBootConfigList (BOOLEAN BootConfigFlag,
   NewNode = (struct BootConfigParamNode *)
                AllocateBootConfigNode (ParamKeyLen + SIZE_OF_DELIM +
                SIZE_OF_DELIM + ParamValueLen);
+  if (!NewNode) {
+    return;
+  }
   gBS->CopyMem (NewNode->param, (CHAR8*)ParamKey, ParamKeyLen);
   if (ParamValue) {
     gBS->CopyMem (&NewNode->param[ParamKeyLen], (CHAR8*)ParamValue,
