@@ -2561,12 +2561,33 @@ VOID InitMultiThreadEnv ()
           "InitMultiThreadEnv successfully, will use thread to flash \n"));
 }
 
+STATIC VOID GetBufferSize (UINT64 *MaxBufferSize, UINT64 *MinBufferSize)
+{
+  EFI_STATUS Status;
+  UINT64 DdrSize = 0;
+
+  Status = GetDdrSize (&DdrSize);
+  if (EFI_ERROR (Status)) {
+    DEBUG ((EFI_D_ERROR, "Error getting DDR Type %r\n", Status));
+    return;
+  }
+
+  if (DdrSize <= DDR_128MB) {
+    /* 35MB */
+    *MaxBufferSize = 36700160;
+    /* 16MB */
+    *MinBufferSize = 16777216;
+  }
+}
+
 EFI_STATUS
 FastbootCmdsInit (VOID)
 {
   EFI_STATUS Status;
   EFI_EVENT mFatalSendErrorEvent;
   CHAR8 *FastBootBuffer;
+  UINT64 MaxBufferSize = MAX_BUFFER_SIZE;
+  UINT64 MinBufferSize = MIN_BUFFER_SIZE;
 
   mDataBuffer = NULL;
   mUsbDataBuffer = NULL;
@@ -2590,6 +2611,9 @@ FastbootCmdsInit (VOID)
     return Status;
   }
 
+  /* Get the Max/Min download size for low memory */
+  GetBufferSize (&MaxBufferSize, &MinBufferSize);
+
   /* Allocate buffer used to store images passed by the download command */
   GetMaxAllocatableMemory (&MaxDownLoadSize);
   if (!MaxDownLoadSize) {
@@ -2601,7 +2625,7 @@ FastbootCmdsInit (VOID)
     // Try allocating 3/4th of free memory available.
     MaxDownLoadSize = EFI_FREE_MEM_DIVISOR (MaxDownLoadSize);
     MaxDownLoadSize = LOCAL_ROUND_TO_PAGE (MaxDownLoadSize, EFI_PAGE_SIZE);
-    if (MaxDownLoadSize < MIN_BUFFER_SIZE) {
+    if (MaxDownLoadSize < MinBufferSize) {
       DEBUG ((EFI_D_ERROR,
         "ERROR: Allocation fail for minimim buffer for fastboot\n"));
       return EFI_OUT_OF_RESOURCES;
@@ -2609,8 +2633,8 @@ FastbootCmdsInit (VOID)
 
     /* If available buffer on target is more than max buffer size,
        we limit this to max buffer buffer size we support */
-    if (MaxDownLoadSize > MAX_BUFFER_SIZE) {
-      MaxDownLoadSize = MAX_BUFFER_SIZE;
+    if (MaxDownLoadSize > MaxBufferSize) {
+      MaxDownLoadSize = MaxBufferSize;
     }
 
     Status =
