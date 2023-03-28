@@ -27,7 +27,7 @@
  *
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the
@@ -94,7 +94,6 @@ JumpToKernel:
 	ldr	x18, [x0]			// load address of next table
 	cbnz	x19, JumpToKernel      		// loop until bounce_count equals 0
 	bl	_PreparePlatformHardware	// call PreparePlatformHardware
-	br	x21				// jump to kernel
 
 /*
  * copy pages
@@ -140,7 +139,7 @@ _PreparePlatformHardware:
 	bl     	_ArmInvalidateTlb
 	mov     x0, xzr
 	ldr     x30, [sp],#16
-	ret
+	br      x21			//jump to kernel
 
 _ArmDisableBranchPrediction:
         ret
