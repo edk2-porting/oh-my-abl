@@ -203,6 +203,7 @@ typedef enum
   EFICHIPINFO_PART_COMPUTE_1    = 13,
   EFICHIPINFO_PART_DISPLAY_1    = 14,
   EFICHIPINFO_PART_NSP          = 15,
+  EFICHIPINFO_PART_EVA          = 16,
 
   /*
    * TODO Add Group E parts
