@@ -29,7 +29,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -821,7 +821,7 @@ EFI_STATUS
 GetBootDevice (CHAR8 *BootDevBuf, UINT32 Len)
 {
   EFI_STATUS Status = EFI_SUCCESS;
-  UINTN BootDevAddr;
+  UINT64 BootDevAddr;
   UINTN DataSize = sizeof (BootDevAddr);
   CHAR8 BootDeviceType[BOOT_DEV_NAME_SIZE_MAX];
 
