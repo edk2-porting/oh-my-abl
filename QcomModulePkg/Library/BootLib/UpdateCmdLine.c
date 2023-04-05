@@ -643,6 +643,7 @@ GetMemoryLimit (VOID *fdt, CHAR8 *MemOffAmt)
   UINT64 *MemTable;
   INT32 PropLen;
   EFI_STATUS Status;
+  UINT64 UpdRamPartitionSize = 0;
 
   if (IsLEVariant ()) {
     goto Unsupported;
@@ -652,6 +653,13 @@ GetMemoryLimit (VOID *fdt, CHAR8 *MemOffAmt)
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "Error getting DDR size %r\n", Status));
     return Status;
+  }
+
+  if (UpdRamPartitionsAvail) {
+    for (i =0; i < NumUpdPartitions; i++) {
+      UpdRamPartitionSize += UpdatedRamPartitions[i].AvailableLength;
+    }
+    DdrSize = UpdRamPartitionSize;
   }
 
   MemLimit = DdrSize;

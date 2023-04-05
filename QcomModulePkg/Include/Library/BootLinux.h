@@ -29,7 +29,7 @@
  /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -130,6 +130,9 @@
 
 #define KERNEL_32BIT_LOAD_OFFSET 0x8000
 #define KERNEL_64BIT_LOAD_OFFSET 0x80000
+
+#define NUM_NOMAP_REGIONS 40
+#define NUM_RAM_PARTITIONS 30
 
 #ifdef TARGET_LINUX_BOOT_CPU_ID
 #define BootCpuId TARGET_LINUX_BOOT_CPU_ID
@@ -250,6 +253,9 @@ typedef struct BootLinuxParamlist {
   VOID *RamdiskBuffer;
 } BootParamlist;
 
+extern RamPartitionEntry UpdatedRamPartitions[NUM_NOMAP_REGIONS];
+extern UINT32 NumUpdPartitions;
+extern BOOLEAN UpdRamPartitionsAvail;
 EFI_STATUS
 BootLinux (BootInfo *Info);
 EFI_STATUS

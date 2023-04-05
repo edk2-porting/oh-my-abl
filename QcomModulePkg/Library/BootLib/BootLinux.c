@@ -92,6 +92,9 @@
 STATIC QCOM_SCM_MODE_SWITCH_PROTOCOL *pQcomScmModeSwitchProtocol = NULL;
 STATIC BOOLEAN BootDevImage;
 STATIC BOOLEAN RecoveryHasNoKernel = FALSE;
+RamPartitionEntry UpdatedRamPartitions[NUM_NOMAP_REGIONS];
+UINT32 NumUpdPartitions;
+BOOLEAN UpdRamPartitionsAvail = FALSE;
 
 STATIC VOID
 SetLinuxBootCpu (UINT32 BootCpu)
@@ -1231,6 +1234,9 @@ BootLinux (BootInfo *Info)
   VOID *StackBase = NULL;
   VOID **StackCurrent = NULL;
 
+  RamPartitionEntry *RamPartitions = NULL;
+  UINT32 NumPartitions = 0;
+
   if (Info == NULL) {
     DEBUG ((EFI_D_ERROR, "BootLinux: invalid parameter Info\n"));
     return EFI_INVALID_PARAMETER;
@@ -1431,6 +1437,26 @@ BootLinux (BootInfo *Info)
    * by QRKS service later.
    */
   GetQrksKernelStartAddress ();
+
+  if (IsCarveoutRemovalEnabled ((VOID *)BootParamlistPtr.DeviceTreeLoadAddr)) {
+    Status = ReadRamPartitions (&RamPartitions, &NumPartitions);
+    if (EFI_ERROR (Status)) {
+      DEBUG ((EFI_D_ERROR, "Error returned from ReadRamPartitions %r\n",
+              Status));
+      return Status;
+    }
+
+    Status = GetUpdatedRamPartitions (
+                            (VOID *)BootParamlistPtr.DeviceTreeLoadAddr,
+                            RamPartitions, NumPartitions,
+                            UpdatedRamPartitions, &NumUpdPartitions);
+    if (Status == EFI_SUCCESS) {
+      UpdRamPartitionsAvail = TRUE;
+    } else {
+      DEBUG ((EFI_D_ERROR, "Failed to update RAM Partitions Status:%r\r\n",
+              Status));
+    }
+  }
 
   /* Updates the command line from boot image, appends device serial no.,
    * baseband information, etc.
