@@ -891,12 +891,12 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
     AsciiStrCatS (Dst, MaxCmdLineLen, Src);
   }
 
-  if (((IsBuildUseRecoveryAsBoot () ||
-      IsRecoveryHasNoKernel ()) &&
-      IsDynamicPartitionSupport () &&
-      !Param->Recovery) ||
-      (!Param->MultiSlotBoot &&
-       !IsBuildUseRecoveryAsBoot ())) {
+  if (!Param->Recovery &&
+      (((IsBuildUseRecoveryAsBoot () ||
+         IsRecoveryHasNoKernel ()) &&
+         IsDynamicPartitionSupport ()) ||
+         (!Param->MultiSlotBoot &&
+         !IsBuildUseRecoveryAsBoot ()))) {
     if (Param->HeaderVersion < BOOT_HEADER_VERSION_THREE) {
       BootForceNormalBoot = '1';
     }
