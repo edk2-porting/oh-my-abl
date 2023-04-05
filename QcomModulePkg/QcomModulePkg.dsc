@@ -163,6 +163,9 @@
   !if $(EARLY_ETH_AS_DLKM) == 1
       GCC:*_*_*_CC_FLAGS = -DEARLY_ETH_AS_DLKM
   !endif
+  !if $(BOOTIMAGE_LOAD_VERIFY_IN_PARALLEL) == 1
+      GCC:*_*_*_CC_FLAGS = -DBOOTIMAGE_LOAD_VERIFY_IN_PARALLEL
+  !endif
   !if $(VERITY_LE)
       GCC:*_*_*_CC_FLAGS = -DVERITY_LE
   !endif
