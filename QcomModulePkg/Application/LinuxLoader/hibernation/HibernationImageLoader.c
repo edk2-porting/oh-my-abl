@@ -1128,6 +1128,54 @@ static UINT64 CopyPageTables ()
 }
 
 #if HIBERNATION_SUPPORT_AES
+static INT32 InitTaAndGetKey (struct Secs2dTaHandle *TaHandle)
+{
+        INT32 Status;
+        CmdReq Req = {0};
+        CmdRsp Rsp = {0};
+        UINT32 ReqLen, RspLen;
+
+        Status = gBS->LocateProtocol (&gQcomQseecomProtocolGuid, NULL,
+                (VOID **)&(TaHandle->QseeComProtocol));
+        if (Status) {
+                printf ("Error in locating Qseecom protocol Guid\n");
+                return -1;
+        }
+        Status = TaHandle->QseeComProtocol->QseecomStartApp (
+                TaHandle->QseeComProtocol, "secs2d_a", &(TaHandle->AppId));
+        if (Status) {
+                printf ("Error in secs2d app loading\n");
+                return -1;
+        }
+
+        ReqLen = sizeof (CmdReq);
+        if (ReqLen & QSEECOM_ALIGN_MASK) {
+                ReqLen = QSEECOM_ALIGN (ReqLen);
+        }
+
+        RspLen = sizeof (CmdRsp);
+        if (RspLen & QSEECOM_ALIGN_MASK) {
+                RspLen = QSEECOM_ALIGN (RspLen);
+        }
+
+        Req.Cmd = UNWRAP_KEY_CMD;
+        Req.UnwrapkeyReq.WrappedKeySize = WRAPPED_KEY_SIZE;
+        gBS->CopyMem ((VOID *)Req.UnwrapkeyReq.WrappedKeyBuffer,
+                        (VOID *)Dp.KeyBlob, sizeof (Dp.KeyBlob));
+        Req.UnwrapkeyReq.CurrTime.Hour = 4;
+        Status = TaHandle->QseeComProtocol->QseecomSendCmd (
+                TaHandle->QseeComProtocol, TaHandle->AppId,
+                        (UINT8 *)&Req, ReqLen,
+                        (UINT8 *)&Rsp, RspLen);
+        if (Status) {
+                printf ("Error in conversion wrappeded key to unwrapped key\n");
+                return -1;
+        }
+        gBS->CopyMem ((VOID *)UnwrappedKey,
+                        (VOID *)Rsp.UnwrapkeyRsp.KeyBuffer, 32);
+        return 0;
+}
+
 static INT32 InitAesDecrypt (VOID)
 {
         UINT32 AuthslotStart;
@@ -1400,56 +1448,6 @@ static VOID EraseSwapSignature (VOID)
                 printf ("Failed to erase swap signature\n");
         }
 }
-
-#if HIBERNATION_SUPPORT_AES
-static INT32 InitTaAndGetKey (struct Secs2dTaHandle *TaHandle)
-{
-        INT32 Status;
-        CmdReq Req = {0};
-        CmdRsp Rsp = {0};
-        UINT32 ReqLen, RspLen;
-
-        Status = gBS->LocateProtocol (&gQcomQseecomProtocolGuid, NULL,
-                (VOID **)&(TaHandle->QseeComProtocol));
-        if (Status) {
-                printf ("Error in locating Qseecom protocol Guid\n");
-                return -1;
-        }
-        Status = TaHandle->QseeComProtocol->QseecomStartApp (
-                TaHandle->QseeComProtocol, "secs2d_a", &(TaHandle->AppId));
-        if (Status) {
-                printf ("Error in secs2d app loading\n");
-                return -1;
-        }
-
-        ReqLen = sizeof (CmdReq);
-        if (ReqLen & QSEECOM_ALIGN_MASK) {
-                ReqLen = QSEECOM_ALIGN (ReqLen);
-        }
-
-        RspLen = sizeof (CmdRsp);
-        if (RspLen & QSEECOM_ALIGN_MASK) {
-                RspLen = QSEECOM_ALIGN (RspLen);
-        }
-
-        Req.Cmd = UNWRAP_KEY_CMD;
-        Req.UnwrapkeyReq.WrappedKeySize = WRAPPED_KEY_SIZE;
-        gBS->CopyMem ((VOID *)Req.UnwrapkeyReq.WrappedKeyBuffer,
-                        (VOID *)Dp.KeyBlob, sizeof (Dp.KeyBlob));
-        Req.UnwrapkeyReq.CurrTime.Hour = 4;
-        Status = TaHandle->QseeComProtocol->QseecomSendCmd (
-                TaHandle->QseeComProtocol, TaHandle->AppId,
-                        (UINT8 *)&Req, ReqLen,
-                        (UINT8 *)&Rsp, RspLen);
-        if (Status) {
-                printf ("Error in conversion wrappeded key to unwrapped key\n");
-                return -1;
-        }
-        gBS->CopyMem ((VOID *)UnwrappedKey,
-                        (VOID *)Rsp.UnwrapkeyRsp.KeyBuffer, 32);
-        return 0;
-}
-#endif
 
 VOID BootIntoHibernationImage (BootInfo *Info, BOOLEAN *SetRotAndBootState)
 {
