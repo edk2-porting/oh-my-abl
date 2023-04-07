@@ -1899,10 +1899,11 @@ STATIC EFI_STATUS LoadImageAndAuthForLE (BootInfo *Info)
      * by previous bootloaders, so just fill the BootInfo structure with
      * required parameters
      */
-    if (Info->FlashlessBoot ||
-        Info->NetworkBoot) {
+    if (Info->FlashlessBoot) {
       GUARD (LocateImageNoAuth (Info, &PageSize));
       goto skip_verification;
+    } else if (Info->NetworkBoot) {
+      GUARD (LocateImageNoAuth (Info, &PageSize));
     } else {
       GUARD (LoadImageNoAuth (Info));
     }
