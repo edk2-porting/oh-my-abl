@@ -29,7 +29,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -76,7 +76,11 @@ typedef struct _EFI_CHIPINFO_PROTOCOL EFI_CHIPINFO_PROTOCOL;
 /**
   Protocol version.
 */
-#define EFI_CHIPINFO_PROTOCOL_REVISION 0x0000000000010002
+#define EFI_CHIPINFO_PROTOCOL_REVISION_3  0x0000000000010003
+#define EFI_CHIPINFO_PROTOCOL_REVISION_4  0x0000000000010004
+#define EFI_CHIPINFO_PROTOCOL_REVISION_5  0x0000000000010005
+
+#define EFI_CHIPINFO_PROTOCOL_REVISION EFI_CHIPINFO_PROTOCOL_REVISION_5
 /** @} */ /* end_addtogroup efi_chipInfo_constants */
 
 /*  Protocol GUID definition */
@@ -484,6 +488,175 @@ typedef EFI_STATUS (EFIAPI *EFI_DALCHIPINFO_GETSUBSETCPUS) (
     IN EFI_CHIPINFO_PROTOCOL *This,
     IN UINT32 nCPUCluster,
     OUT UINT32 *pnMask);
+/* ============================================================================
+**  Function : EFI_DalChipInfo_GetSKU
+** ============================================================================
+*/
+/** @ingroup efi_chipInfo_protocol_apis
+ * @par Summary
+ * Get SKU and Product Code information for the current device
+ *
+ * @param[in]   This          Pointer to the EFI_CHIPINFO_PROTOCOL instance
+ * @param[out]  pInfo         pointer to a caller-allocated buffer where SKU
+ *                            information will be stored
+ *
+ * @return
+ * EFI_SUCCESS            -- SKU information was stored in pInfo successfully \n
+ * EFI_INVALID_PARAMETER  -- pInfo was invalid \n
+ * EFI_UNSUPPORTED        -- SKU information is not available \n
+ * EFI_PROTOCOL_ERROR     -- Other errors
+ */
+typedef
+EFI_STATUS
+(EFIAPI *EFI_DALCHIPINFO_GETSKU)(
+    IN EFI_CHIPINFO_PROTOCOL *This,
+    OUT EFIChipInfoSKUType *pInfo
+    );
+
+/* ============================================================================
+**  Function : EFI_ChipInfo_GetNumFunctionalClusters
+** ============================================================================
+*/
+/** @ingroup efi_chipInfo_protocol_apis
+ * Get the number of functional clusters.
+ *
+ * This is the total number of functional clusters based on partial
+ * binning and SKUing. A cluster is deemed functional if it has at least
+ * one functional core. There will always be at least 1 functional
+ * cluster: the one that's running this code.
+ *
+ * @param[in]  This             Pointer to the EFI_CHIPINFO_PROTOCOL instance
+ * @param[out] pnNumClusters    buffer to store the number of clusters
+ *
+ * @return
+ * EFI_SUCCESS            -- the number of clusters was successfully retrieved\n
+ *                            and stored in pnNumClusters; \n
+ * EFI_INVALID_PARAMETER  -- pnNumClusters is invalid; \n
+ * EFI_NOT_READY          -- this function was called before EFIChipInfo has \n
+ *                            initialized. *pnNumClusters will not be updated.
+ */
+typedef
+EFI_STATUS
+(EFIAPI *EFI_CHIPINFO_GETNUMFUNCTIONALCLUSTERS)(
+    IN EFI_CHIPINFO_PROTOCOL *This,
+    OUT UINT32 *pnNumClusters
+    );
+
+/* ============================================================================
+**  Function : EFI_ChipInfo_GetBootClusterAndCore
+** ============================================================================
+*/
+/** @ingroup efi_chipInfo_protocol_apis
+ * Get the boot cluster and core.
+ *
+ * @param[in]   This          Pointer to the EFI_CHIPINFO_PROTOCOL instance
+ * @param[out] pnCluster buffer to store the boot cluster index (zero-indexed).
+ * @param[out] pnCore      buffer to store the boot core index (zero-indexed).
+ *
+ * @return
+ * EFI_SUCCESS            -- both pointers were filled correctly; \n
+ * EFI_INVALID_PARAMETER  -- either pointer is invalid; \n
+ * EFI_NOT_READY          -- this function was called before EFIChipInfo has \n
+ *                          initialized. Neither pointer will be updated.
+ */
+typedef
+EFI_STATUS
+(EFIAPI *EFI_CHIPINFO_GETBOOTCLUSTERANDCORE)(
+    IN EFI_CHIPINFO_PROTOCOL *This,
+    OUT UINT32 *pnCluster,
+    OUT UINT32 *pnCore
+    );
+
+/* ============================================================================
+**  Function : EFI_ChipInfo_GetDisabledFeatures
+** ============================================================================
+*/
+/** @ingroup efi_chipInfo_protocol_apis
+  @par Summary
+  Gets the Part(IP) Specific details from the fuse.
+
+  @param[in]   This     Pointer to the EFI_CHIPINFO_PROTOCOL instance.
+  @param[in]   ePart    The EFIChipInfoPartType to check
+  @param[in]   nIdx     Hardware instance of the selected part
+  @param[out]  pnMask   Used to store the part specific details read from the
+                        QTV/PTE region. The bit level interpretation of pnMask
+                        is specific to client and client needs to decode
+                        accordingly.
+
+  @return
+  EFI_SUCCESS         -- Function completed successfully. \n
+  EFI_NOT_FOUND       -- The specified part is out of range
+  EFI_PROTOCOL_ERROR  -- Error occurred during the operation.
+*/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_CHIPINFO_GETDISABLEDFEATURES)(
+   IN EFI_CHIPINFO_PROTOCOL *This,
+   IN EFIChipInfoPartType ePart,
+   IN UINT32 nIdx,
+   OUT UINT32 *pnMask
+   );
+
+/* ============================================================================
+**  Function : EFI_ChipInfo_IsPartDisabled
+** ============================================================================
+*/
+/** @ingroup efi_chipInfo_protocol_apis
+  @par Summary
+  Check if the specified Part is enabled or Disabled
+
+  @param[in]   This     Pointer to the EFI_CHIPINFO_PROTOCOL instance.
+  @param[in]   ePart    The EFIChipInfoPartType to check
+  @param[in]   nIdx     Hardware instance of the selected part
+  @param[out]  pnMask   Pointer to boolean used to store the status of the
+                        selected part. A non-zero mask implies that the part is
+                        Disabled completely. FALSE => part is either completely
+                        enabled or partially enabled,
+                        TRUE => Disabled completely.
+                        Clients can make use of ChipInfo_GetDisabledFeatures API
+                        to obtain disabled features info.
+
+  @return
+  EFI_SUCCESS         -- Function completed successfully. \n
+  EFI_NOT_FOUND       -- The specified part is out of range
+  EFI_PROTOCOL_ERROR  -- Error occurred during the operation.
+*/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_CHIPINFO_ISPARTDISABLED)(
+   IN EFI_CHIPINFO_PROTOCOL *This,
+   IN EFIChipInfoPartType ePart,
+   IN UINT32 nIdx,
+   OUT BOOLEAN *pnMask
+   );
+
+/* ============================================================================
+** Function : EFI_ChipInfo_GetDisabledCPUs
+** ============================================================================
+*/
+/** @ingroup efi_chipInfo_protocol_apis
+ * @par Summary
+ * Gets the cores within the selected cluster which are marked "disabled"
+ * in PTE fuses
+ *
+ * @param[in]   This     Pointer to the EFI_CHIPINFO_PROTOCOL instance
+ * @param[in]  nCPUCluster  The cluster whose disabled cores
+                            need to be retrieved
+ * @param[out] pnMask       Mask of disabled cores in this cluster.
+ *
+ * @return
+ * EFI_SUCCESS    -- Function completed successfully
+ * EFI_NOT_FOUND   -- The provided nCPUCluster is outside the range of supported
+                      clusters
+ * EFI_PROTOCOL_ERROR -- Other error occured during the operation
+ */
+typedef
+EFI_STATUS
+(EFIAPI *EFI_CHIPINFO_GETDISABLEDCPUS)(
+  IN EFI_CHIPINFO_PROTOCOL *This,
+  IN UINT32 nCPUCluster,
+  OUT UINT32 *pnMask
+  );
 
 /*===========================================================================
   PROTOCOL INTERFACE
@@ -513,6 +686,12 @@ struct _EFI_CHIPINFO_PROTOCOL {
   EFI_DALCHIPINFO_GETMARKETINGNAMESTRING GetMarketingNameString;
   EFI_DALCHIPINFO_GETSUBSETPART GetSubsetPart;
   EFI_DALCHIPINFO_GETSUBSETCPUS GetSubsetCPUs;
+  EFI_DALCHIPINFO_GETSKU GetSKU;
+  EFI_CHIPINFO_GETNUMFUNCTIONALCLUSTERS GetNumFunctionalClusters;
+  EFI_CHIPINFO_GETBOOTCLUSTERANDCORE GetBootClusterAndCore;
+  EFI_CHIPINFO_GETDISABLEDFEATURES GetDisabledFeatures;
+  EFI_CHIPINFO_ISPARTDISABLED IsPartDisabled;
+  EFI_CHIPINFO_GETDISABLEDCPUS GetDisabledCPUs;
 };
 
 #endif /* __EFICHIPINFO_H__ */
