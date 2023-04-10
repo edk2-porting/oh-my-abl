@@ -1230,9 +1230,9 @@ BootLinux (BootInfo *Info)
   UINTN DataSize;
   EFI_KERNEL_PROTOCOL *KernIntf = NULL;
   Thread *ThreadNum;
-#endif
   VOID *StackBase = NULL;
   VOID **StackCurrent = NULL;
+#endif
 
   RamPartitionEntry *RamPartitions = NULL;
   UINT32 NumPartitions = 0;
