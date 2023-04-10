@@ -513,7 +513,11 @@ STATIC EFI_STATUS ShareKeyMintInfoWithSPU (VOID)
   EFI_STATUS Status = gBS->LocateProtocol (&gEfiSPSSProtocolGuid, NULL,
                                 (VOID **)&(SPSSProtocol));
 
-  if (Status != EFI_SUCCESS) {
+  if (Status == EFI_NOT_FOUND) {
+    /* This chipset doesn't have support for sharing keymint info */
+    DEBUG ((EFI_D_VERBOSE, "No SPSS EFI protocol, not sharing keymint info\n"));
+    return EFI_SUCCESS;
+  } else if (Status != EFI_SUCCESS) {
     DEBUG ((EFI_D_ERROR, "Unable to locate SPSS protocol: %r\n", Status));
     return Status;
   }
