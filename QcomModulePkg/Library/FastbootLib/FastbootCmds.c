@@ -123,6 +123,7 @@ found at
 #include "MetaFormat.h"
 #include "SparseFormat.h"
 #include "Recovery.h"
+#include "RecoveryInfo.h"
 
 STATIC struct GetVarPartitionInfo part_info[] = {
     {"system", "partition-size:", "partition-type:", "", "ext4"},
