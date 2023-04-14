@@ -3035,13 +3035,7 @@ is_display_supported ( VOID )
    return 1;
 }
 
-#if TARGET_BOARD_TYPE_AUTO
-STATIC VOID
-RebootDeviceRecovery ( VOID )
-{
-
-}
-#else
+#ifndef TARGET_BOARD_TYPE_AUTO
 STATIC VOID
 RebootDeviceRecovery ( VOID )
 {
@@ -3049,6 +3043,12 @@ RebootDeviceRecovery ( VOID )
       !IsEnableDisplayMenuFlagSupported ()) {
      RebootDevice (RECOVERY_MODE);
    }
+
+}
+#else
+STATIC VOID
+RebootDeviceRecovery ( VOID )
+{
 
 }
 #endif
