@@ -4008,7 +4008,10 @@ FastbootCommandSetup (IN VOID *Base, IN UINT64 Size)
      *CurrenSlot, these can modified using fastboot set_active command
      */
     FindPtnActiveSlot ();
-    PopulateMultislotMetadata ();
+    /* This metadata is not available for RecoveryInfo case */
+    if (!IsRecoveryInfo ()) {
+      PopulateMultislotMetadata ();
+    }
     DEBUG ((EFI_D_VERBOSE, "Multi Slot boot is supported\n"));
   }
 
