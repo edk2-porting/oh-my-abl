@@ -6,6 +6,8 @@
 #ifndef __RECOVERYINFO_H__
 #define __RECOVERYINFO_H__
 
-BOOLEAN IsRecoveryInfo ();
+#include "PartitionTableUpdate.h"
 
+BOOLEAN IsRecoveryInfo ();
+EFI_STATUS RI_GetActiveSlot (Slot *);
 #endif

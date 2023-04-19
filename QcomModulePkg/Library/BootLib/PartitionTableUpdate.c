@@ -1467,6 +1467,12 @@ GetActiveSlot (Slot *ActiveSlot)
     return GetAtomicABActiveSlot (ActiveSlot);
   }
 
+  if ((IsSuffixEmpty (ActiveSlot) == TRUE) &&
+      (IsRecoveryInfo ())) {
+    Status = RI_GetActiveSlot (ActiveSlot);
+    return Status;
+  }
+
   if (IsSuffixEmpty (ActiveSlot) == TRUE) {
     /* Check for first boot and set default slot */
     /* For First boot all A/B attributes for the slot would be 0 */
@@ -1791,6 +1797,10 @@ FindBootableSlot (Slot *BootableSlot)
                          "for slot %s\n",
             BootableSlot->Suffix));
     return EFI_NOT_FOUND;
+  }
+  /* Rely on uefi that returned bootset is */
+  if (IsRecoveryInfo ()) {
+    goto out;
   }
 
   Unbootable = (BootEntry->PartEntry.Attributes & PART_ATT_UNBOOTABLE_VAL) >>
