@@ -221,8 +221,12 @@ NoAVBLoadReqImage (BootInfo *Info, VOID **DtboImage,
 
   if (Info->MultiSlotBoot) {
       CurrentSlot = GetCurrentSlotSuffix ();
-      GUARD ( StrnCatS (Pname, MAX_GPT_NAME_SIZE,
+      /* Fixup suffix in case of recoveryinfo */
+      if (!IsRecoveryInfo () ||
+          (StrCmp (CurrentSlot.Suffix, L"_a"))) {
+        GUARD ( StrnCatS (Pname, MAX_GPT_NAME_SIZE,
                   CurrentSlot.Suffix, StrLen (CurrentSlot.Suffix)));
+      }
   }
   if (GetPartitionIndex (Pname) == INVALID_PTN) {
     Status = EFI_NO_MEDIA;
