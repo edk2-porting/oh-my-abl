@@ -287,6 +287,11 @@ NoAVBLoadReqImage (BootInfo *Info, VOID **DtboImage,
   }
   Status = LoadImageFromPartition (*DtboImage, DtboSize, Pname);
 
+  if (Status != EFI_SUCCESS &&
+      IsRecoveryInfo ()) {
+    RI_HandleFailedSlot (CurrentSlot);
+    /*No return*/
+  }
 out:
   if (Ops != NULL) {
     AvbOpsFree (Ops);
@@ -2074,6 +2079,7 @@ LoadImageAndAuth (BootInfo *Info, BOOLEAN HibernationResume,
   UINT32 RecoveryHdrSz = 0;
   VOID *InitBootHdr = NULL;
   UINT32 InitBootHdrSz = 0;
+  Slot CurrentSlot = {{0}};
 
   WaitForFlashFinished ();
 
@@ -2149,7 +2155,7 @@ get_ptn_name:
                 StrLen (L"boot"));
     }
   } else {
-    Slot CurrentSlot = {{0}};
+
 
     GUARD (FindBootableSlot (&CurrentSlot));
     if (IsSuffixEmpty (&CurrentSlot)) {
@@ -2226,6 +2232,12 @@ get_ptn_name:
 
   if (HibernationResume) {
     return Status;
+  }
+
+  if ((Status != EFI_SUCCESS) &&
+      IsRecoveryInfo ()) {
+    RI_HandleFailedSlot (CurrentSlot);
+    /*No Return*/
   }
 
   // if MDTP is active Display Recovery UI
