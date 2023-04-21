@@ -29,7 +29,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -79,6 +79,17 @@ struct PartialGoods {
   UINT32 Val;                    /* Value for the subset */
   CONST CHAR8 *ParentNode;       /* Parent Node name*/
   struct SubNodeListNew SubNode; /* Sub node name list*/
+};
+
+struct LabelStruct {
+  CONST CHAR8 *LabelName;  /* Label name */
+  CONST CHAR8 *PropertyName; /* Property name */
+  CONST CHAR8 *ReplaceStr;   /* Replace string */
+};
+
+struct PartialGoodsWithLabel {
+  UINT32 Val;                    /* Value for the subset */
+  struct LabelStruct LabelRef; /* Labels list */
 };
 
 EFI_STATUS
