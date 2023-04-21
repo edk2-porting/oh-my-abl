@@ -176,6 +176,7 @@ typedef struct {
 typedef struct BootInfo {
   BOOLEAN MultiSlotBoot;
   BOOLEAN FlashlessBoot;
+  BOOLEAN NetworkBoot;
   BOOLEAN BootIntoRecovery;
   BOOLEAN BootReasonAlarm;
   CHAR8 SilentBootMode;

@@ -1212,6 +1212,7 @@ BootLinux (BootInfo *Info)
   BOOLEAN Recovery = FALSE;
   BOOLEAN AlarmBoot = FALSE;
   BOOLEAN FlashlessBoot;
+  BOOLEAN NetworkBoot;
   CHAR8 SilentBootMode;
 
   LINUX_KERNEL LinuxKernel;
@@ -1242,7 +1243,6 @@ BootLinux (BootInfo *Info)
     return EFI_INVALID_PARAMETER;
   }
 
-  FlashlessBoot = Info->FlashlessBoot;
 
   if (IsVmEnabled ()) {
     Status = CheckAndSetVmData (&BootParamlistPtr);
@@ -1256,12 +1256,15 @@ BootLinux (BootInfo *Info)
   Recovery = Info->BootIntoRecovery;
   AlarmBoot = Info->BootReasonAlarm;
   SilentBootMode = Info->SilentBootMode;
+  FlashlessBoot = Info->FlashlessBoot;
+  NetworkBoot = Info->NetworkBoot;
 
   if (SilentBootMode) {
     DEBUG ((EFI_D_INFO, "Silent Mode value: %d\n", SilentBootMode));
   }
 
-  if (!FlashlessBoot) {
+  if (!FlashlessBoot &&
+      !NetworkBoot) {
     if (!StrnCmp (PartitionName, (CONST CHAR16 *)L"boot",
                   StrLen ((CONST CHAR16 *)L"boot"))) {
       Status = GetFfbmCommand (FfbmStr, FFBM_MODE_BUF_SIZE);
@@ -1464,8 +1467,8 @@ BootLinux (BootInfo *Info)
    * functions
    */
   Status = UpdateCmdLine (&BootParamlistPtr, FfbmStr, Recovery, FlashlessBoot,
-                    AlarmBoot, Info->VBCmdLine, Info->HeaderVersion,
-                    SilentBootMode);
+                          NetworkBoot, AlarmBoot, Info->VBCmdLine,
+                          Info->HeaderVersion, SilentBootMode);
   if (EFI_ERROR (Status)) {
     DEBUG ((EFI_D_ERROR, "Error updating cmdline. Device Error %r\n", Status));
     return Status;
