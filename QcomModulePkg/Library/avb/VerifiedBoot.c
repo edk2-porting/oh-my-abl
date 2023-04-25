@@ -86,6 +86,9 @@ STATIC BOOLEAN KeymasterEnabled = TRUE;
 #define MAX_NUM_REQ_PARTITION    8
 #define MAX_PROPERTY_SIZE        10
 
+#define DUMMY_PUBLIC_KEY_MOD_LEN 256
+#define DUMMY_PUBLIC_KEY_EXP_LEN 1
+
 static CHAR8 *avb_verify_partition_name[] = {
      "boot",
      "dtbo",
@@ -1916,6 +1919,15 @@ STATIC EFI_STATUS LoadImageAndAuthForLE (BootInfo *Info)
         return Status;
     }
 
+    /* Check if LoadKeymasterFlag is enabled or not */
+    Status = Info->VbIntf->VBIsKeymasterEnabled (Info->VbIntf,
+                                                  &KeymasterEnabled);
+    if (Status != EFI_SUCCESS) {
+      DEBUG ((EFI_D_ERROR, "Checking Keymaster Enablement failed %r\n",
+                                                                  Status));
+      return Status;
+    }
+
     /* Read OEM certificate from the embedded header file */
     Status = QcomAsn1X509Protocal->ASN1X509VerifyOEMCertificate
                 (QcomAsn1X509Protocal, OemCertFile, OemCertFileLen, &OemCert);
@@ -1966,27 +1978,35 @@ STATIC EFI_STATUS LoadImageAndAuthForLE (BootInfo *Info)
         /* There are build variants where boot image is not signed.
          * Below check allows the device to bootup even if the
          * authentication fails on a Non-secure device.
-         * Note: Root of Trust cannnot be set if image authentication fails
-         * or boot image is not signed.
+         * Note: Dummy Root of Trust will be set if image
+         * authentication fails or boot image is not signed.
          */
          if (!SecureDevice) {
             if (!TargetBuildVariantUser () ) {
                 DEBUG ((EFI_D_ERROR, "VB: Verification skipped for "
                                                     "debug builds\n"));
+                if (KeymasterEnabled) {
+                    Data.PublicKeyModLength = DUMMY_PUBLIC_KEY_MOD_LEN;
+                    Data.PublicKeyMod = avb_calloc (DUMMY_PUBLIC_KEY_MOD_LEN);
+                    Data.PublicKeyExpLength = DUMMY_PUBLIC_KEY_EXP_LEN;
+                    Data.PublicKeyExp = avb_calloc (DUMMY_PUBLIC_KEY_EXP_LEN);
+                    if (Data.PublicKeyMod != NULL &&
+                            Data.PublicKeyExp != NULL) {
+                        Status = KeyMasterSetRotForLE (&Data);
+                        if (Status != EFI_SUCCESS) {
+                            DEBUG ((EFI_D_ERROR, "KeyMasterSetRotForLE failed "
+                                                            "%r\n", Status));
+                            return Status;
+                        }
+                        DEBUG ((EFI_D_INFO, "VB: Dummy ROT set\n"));
+                    }
+                }
                 goto skip_verification;
             }
         }
         return Status;
     }
     DEBUG ((EFI_D_INFO, "VB: LoadImageAndAuthForLE complete!\n"));
-
-    Status = Info->VbIntf->VBIsKeymasterEnabled (Info->VbIntf,
-                                                  &KeymasterEnabled);
-    if (Status != EFI_SUCCESS) {
-      DEBUG ((EFI_D_ERROR, "Checking Keymaster Enablement failed %r\n",
-                                                                  Status));
-      return Status;
-    }
 
     if (KeymasterEnabled) {
       /* Set Rot & Boot State*/
