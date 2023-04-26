@@ -1897,6 +1897,9 @@ STATIC EFI_STATUS LoadImageAndAuthForLE (BootInfo *Info)
     secasn1_data_type Modulus = {NULL};
     secasn1_data_type PublicExp = {NULL};
     UINT32 PaddingType = 0;
+#ifdef CMDLINE_SHOW_SECURE_BOOT_STATUS
+    CHAR8 *SecureCmdline = NULL;
+#endif /* CMDLINE_SHOW_SECURE_BOOT_STATUS */
 
     /*Load image*/
     GUARD (VBAllocateCmdLine (Info));
@@ -1907,6 +1910,15 @@ STATIC EFI_STATUS LoadImageAndAuthForLE (BootInfo *Info)
         DEBUG ((EFI_D_ERROR, "VB: Failed read device state: %r\n", Status));
         return Status;
     }
+
+    /* If secure device,append cmdline */
+#ifdef CMDLINE_SHOW_SECURE_BOOT_STATUS
+    if (SecureDevice == TRUE) {
+        DEBUG ((EFI_D_ERROR, "VB: Secure Boot enabled: %r\n", Status));
+        SecureCmdline = " secure=1";
+        GUARD (AppendVBCmdLine (Info, SecureCmdline));
+    }
+#endif /* CMDLINE_SHOW_SECURE_BOOT_STATUS */
 
     /* In case of flashless LE devices images are already loaded and verified
      * by previous bootloaders, so just fill the BootInfo structure with
@@ -2056,6 +2068,7 @@ skip_verification:
         }
         GUARD (AppendVBCmdLine (Info, SystemPath));
     }
+
     return Status;
 }
 
