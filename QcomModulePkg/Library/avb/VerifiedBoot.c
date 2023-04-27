@@ -2033,6 +2033,14 @@ LoadImageAndAuth (BootInfo *Info, BOOLEAN HibernationResume,
                         BOOLEAN SetRotAndBootState)
 {
   EFI_STATUS Status = EFI_SUCCESS;
+
+#if HIBERNATION_SUPPORT_NO_AES
+  if ((AVB_LE == GetAVBVersion ()) &&
+       HibernationResume) {
+      return Status;
+  }
+#endif
+
   BOOLEAN MdtpActive = FALSE;
   QCOM_MDTP_PROTOCOL *MdtpProtocol;
   UINT32 AVBVersion = NO_AVB;
