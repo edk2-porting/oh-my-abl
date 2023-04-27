@@ -1108,7 +1108,8 @@ UpdateBootConfigParams (LIST_ENTRY *BootConfigListHead,
   }
   Link = GetFirstNode (BootConfigListHead);
   if (!Link) {
-    DEBUG ((EFI_D_INFO, "Error in Node entry \n"));
+    DEBUG ((EFI_D_ERROR, "Error in Node entry \n"));
+    return EFI_D_ERROR;
   }
 
   gBS->CopyMem (Dst, "\n", SIZE_OF_DELIM);
@@ -1144,7 +1145,8 @@ ClearBootConfigList (LIST_ENTRY* BootConfigListHead)
 
   Link = GetFirstNode (BootConfigListHead);
   if (!Link) {
-    DEBUG ((EFI_D_INFO, "Error in Node entry \n"));
+    DEBUG ((EFI_D_ERROR, "Error in Node entry \n"));
+    return;
   }
 
   while (!IsNull (BootConfigListHead, Link)) {
@@ -1216,6 +1218,10 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   VOID *fdt = (VOID *)BootParamlistPtr->DeviceTreeLoadAddr;
 
   BootConfigListHead = (LIST_ENTRY*) AllocateZeroPool (sizeof (LIST_ENTRY));
+  if (BootConfigListHead == NULL) {
+    DEBUG ((EFI_D_ERROR, "BootConfigListHead: Out of resources\n"));
+    return EFI_OUT_OF_RESOURCES;
+  }
   InitializeListHead (BootConfigListHead);
   CHAR8 *ModemPathStr = NULL;
 

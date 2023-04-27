@@ -29,7 +29,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -102,9 +102,7 @@ static BOOLEAN IsTrailerPresent (UINT64 BootconfigEndAddr)
     (CHAR8*) (BootconfigEndAddr - V4_BOOTCONFIG_MAGIC_SIZE),
     V4_BOOTCONFIG_MAGIC_SIZE);
 
-  if ( TrailMagicBuffer[V4_BOOTCONFIG_MAGIC_SIZE + 1] != '\0') {
-    TrailMagicBuffer[V4_BOOTCONFIG_MAGIC_SIZE + 1] = '\0';
-  }
+  TrailMagicBuffer[V4_BOOTCONFIG_MAGIC_SIZE] = '\0';
   return !AsciiStrnCmp ((CHAR8*)(TrailMagicBuffer),
             Magic, V4_BOOTCONFIG_MAGIC_SIZE);
 }
