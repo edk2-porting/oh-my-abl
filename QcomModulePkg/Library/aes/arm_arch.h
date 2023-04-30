@@ -53,8 +53,10 @@
 #   else
 #    error "unsupported ARM architecture"
 #   endif
-#  endif
-# endif
+#  endif //__CC_ARM
+# endif //__ARM_ARCH__
+
+# define __ARM_ARCH__ 8
 
 # if !defined(__ARM_MAX_ARCH__)
 #  define __ARM_MAX_ARCH__ __ARM_ARCH__
