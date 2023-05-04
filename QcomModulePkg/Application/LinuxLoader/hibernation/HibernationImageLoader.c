@@ -163,6 +163,9 @@ typedef struct BouncePfnEntry {
 #define BOUNCE_TABLE_ENTRY_SIZE sizeof(struct BouncePfnEntry)
 #define ENTRIES_PER_TABLE (PAGE_SIZE / BOUNCE_TABLE_ENTRY_SIZE) - 1
 
+/* Number pf pages occupied by the header, swap info and first swap_map page */
+#define HDR_SWP_INFO_NUM_PAGES 4
+
 /*
  * Bounce Tables -  bounced pfn entries are stored in bounced tables.
  * Bounce tables are discontinuous pages linked by the last element
@@ -1181,8 +1184,12 @@ static INT32 InitAesDecrypt (VOID)
         UINT32 AuthslotStart;
         INT32 AuthslotCount;
         Secs2dTaHandle TaHandle = {0};
+        UINT32 NrSwapMapPages;
 
-        AuthslotStart = (NrMetaPages * 2) + NrCopyPages + 9;
+        NrSwapMapPages = (NrCopyPages + NrMetaPages) / ENTRIES_PER_SWAPMAP_PAGE;
+        AuthslotStart = NrMetaPages + NrCopyPages + NrSwapMapPages +
+                              HDR_SWP_INFO_NUM_PAGES;
+
         if (ReadImage (AuthslotStart - 1, &Dp, sizeof (struct DecryptParam))) {
                 return -1;
         }
