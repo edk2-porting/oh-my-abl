@@ -97,6 +97,7 @@ STATIC BOOLEAN BootIntoFastboot = FALSE;
 STATIC BOOLEAN BootIntoRecovery = FALSE;
 UINT64 FlashlessBootImageAddr = 0;
 UINT64 NetworkBootImageAddr = 0;
+STATIC DeviceInfo DevInfo;
 
 // This function is used to Deactivate MDTP by entering recovery UI
 STATIC EFI_STATUS MdtpDisable (VOID)
@@ -146,29 +147,51 @@ GetRebootReason (UINT32 *ResetReason)
   return Status;
 }
 
-
 STATIC VOID
 SetDefaultAudioFw ()
 {
- CHAR8 AudioFW[MAX_AUDIO_FW_LENGTH];
- STATIC CHAR8* Src;
- STATIC CHAR8* AUDIOFRAMEWORK;
- STATIC UINT32 Length;
- EFI_STATUS Status;
+  CHAR8 AudioFW[MAX_AUDIO_FW_LENGTH];
+  STATIC CHAR8* Src;
+  STATIC CHAR8* AUDIOFRAMEWORK;
+  STATIC UINT32 Length;
+  EFI_STATUS Status;
 
- AUDIOFRAMEWORK = GetAudioFw ();
- Status = ReadAudioFrameWork (&Src, &Length);
- if (Status == EFI_SUCCESS) {
-  if (AsciiStrLen (Src) == 0) {
-      if (AsciiStrLen (AUDIOFRAMEWORK) > 0) {
-        AsciiStrnCpyS (AudioFW, MAX_AUDIO_FW_LENGTH, AUDIOFRAMEWORK,
-        AsciiStrLen (AUDIOFRAMEWORK));
-        StoreAudioFrameWork (AudioFW, AsciiStrLen (AUDIOFRAMEWORK));
-   }
+  AUDIOFRAMEWORK = GetAudioFw ();
+  Status = ReadAudioFrameWork (&Src, &Length);
+  if ((AsciiStrCmp (Src, "audioreach") == 0) ||
+                              (AsciiStrCmp (Src, "elite") == 0)) {
+    if (Status == EFI_SUCCESS) {
+      if (AsciiStrLen (Src) == 0) {
+        if (AsciiStrLen (AUDIOFRAMEWORK) > 0) {
+          AsciiStrnCpyS (AudioFW, MAX_AUDIO_FW_LENGTH, AUDIOFRAMEWORK,
+          AsciiStrLen (AUDIOFRAMEWORK));
+          StoreAudioFrameWork (AudioFW, AsciiStrLen (AUDIOFRAMEWORK));
+        }
+      }
+    }
+    else {
+      DEBUG ((EFI_D_ERROR, "AUDIOFRAMEWORK is NOT updated length =%d, %a\n",
+      Length, AUDIOFRAMEWORK));
+    }
   }
- } else
-  DEBUG ((EFI_D_ERROR, "AUDIOFRAMEWORK is NOT updated length =%d, %a\n",
-     Length, AUDIOFRAMEWORK));
+  else {
+    if (Src != NULL) {
+      Status =
+      ReadWriteDeviceInfo (READ_CONFIG, (VOID *)&DevInfo, sizeof (DevInfo));
+      if (Status != EFI_SUCCESS) {
+        DEBUG ((EFI_D_ERROR, "Unable to Read Device Info: %r\n", Status));
+       }
+      gBS->SetMem (DevInfo.AudioFramework, sizeof (DevInfo.AudioFramework), 0);
+      gBS->CopyMem (DevInfo.AudioFramework, AUDIOFRAMEWORK,
+                                      AsciiStrLen (AUDIOFRAMEWORK));
+      Status =
+      ReadWriteDeviceInfo (WRITE_CONFIG, (VOID *)&DevInfo, sizeof (DevInfo));
+      if (Status != EFI_SUCCESS) {
+        DEBUG ((EFI_D_ERROR, "Unable to store audio framework: %r\n", Status));
+        return;
+      }
+    }
+  }
 }
 
 BOOLEAN IsABRetryCountUpdateRequired (VOID)
