@@ -19,8 +19,6 @@
 # define PUTU32(p,v)     *(u32 *)(p) = BSWAP4(v)
 #endif
 
-GCM128_CONTEXT gHandle;
-
 #define PACK(s)         ((size_t)(s)<<(sizeof(size_t)*8-16))
 #define REDUCE1BIT(V)   do { \
         if (sizeof(size_t)==8) { \
@@ -34,6 +32,9 @@ GCM128_CONTEXT gHandle;
                 V.hi  = (V.hi>>1 )^((u64)T<<32); \
         } \
 } while(0)
+
+#define MAX_GCM_CONTEXTS 8
+GCM128_CONTEXT gHandle[MAX_GCM_CONTEXTS];
 
 /*-
  * Even though permitted values for TABLE_BITS are 8, 4 and 1, it should
@@ -1747,10 +1748,12 @@ void CRYPTO_gcm128_tag(GCM128_CONTEXT *ctx, unsigned char *tag, size_t len)
     ENV_sec_memcpy( tag, ln, ctx->Xi.c, ln);
 }
 
-GCM128_CONTEXT *CRYPTO_gcm128_new(void *key, block128_f block)
+GCM128_CONTEXT *CRYPTO_gcm128_new(void *key, block128_f block, UINT32 index)
 {
     GCM128_CONTEXT *ret;
-    ret = &gHandle;
+    if (index >= MAX_GCM_CONTEXTS)
+        return NULL;
+    ret = &gHandle[index];
     CRYPTO_gcm128_init(ret, key, block);
     return ret;
 }

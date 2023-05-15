@@ -73,6 +73,28 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ===========================================================================*/
 #include <avb/libavb/libavb.h>
 #include "env_comdef.h"
+#include "utils.h"
+#include "modes.h"
+
+#define ARMV8_AES_MAXNR             14
+#define CIPHER_AES_BLK_SIZE         16
+
+#define CIPHER_AES_IV_SIZE          16                           /** bytes */
+#define CIPHER_MAX_IV_SIZE          60                           /** bytes */
+
+/**
+ * AES Key and IV sizes
+ */
+#define SW_AES128_KEY_SIZE          16
+#define SW_AES192_KEY_SIZE          24
+#define SW_AES256_KEY_SIZE          32
+#define CIPHER_MAX_KEY_SIZE         SW_AES256_KEY_SIZE
+#define CIPHER_INVALID_KEY_SIZE     0xFFFF                     /** invalid value for key size */
+
+
+#define SW_AES_IV_SIZE         CIPHER_AES_IV_SIZE
+#define SW_AES_BLOCK_BYTE_LEN  16
+#define SW_AES_MAX_IV_SIZE     60
 
 #ifndef IOVECDEF
 typedef  struct  {
@@ -146,6 +168,36 @@ typedef enum
   SW_CIPHER_KEY_SIZE_MAX         = 0x7FFFFFFF
 } SW_Cipher_Key_Size;
 
+typedef struct
+{
+  uint32_t  rd_key[4 * (ARMV8_AES_MAXNR + 1)];
+  int       rounds;
+} AES_KEY;
+
+typedef struct AES_GCM_ARMV8_ctx_s
+{
+  AES_KEY key;
+  GCM128_CONTEXT *ctx;
+  uint8_t  itag[CIPHER_AES_BLK_SIZE];
+  size_t   tag_sz;
+  uint32_t xcm_flags;
+  uint32_t flags;
+  unsigned char iv[CIPHER_MAX_IV_SIZE]; /** Pointer to IV buffer   */
+  size_t   iv_sz;
+  uint8_t  c_key[CIPHER_MAX_KEY_SIZE]; /** Pointer to Cipher Key  */
+  size_t   c_keysize;                  /** Key Size in byte   */
+  SW_Cipher_Alg_Type algo;
+  SW_CipherModeType        mode; /** currently supports GCM only*/
+  SW_CipherEncryptDir dir;
+} AES_GCM_ARMV8_CTX;
+
+/* MAX_GCM_CONTEXTS is the max number of contexts */
+typedef struct GcmAesStruct {
+  AES_GCM_ARMV8_CTX gAesGcmArmV8Ctx;
+  boolean gInitDone;
+  UINT32 InstanceId;
+}GcmAesStruct;
+
 #ifndef _DEFINED_CRYPTOCNTXHANDLE
 #define _DEFINED_CRYPTOCNTXHANDLE
 typedef void CryptoCntxHandle;
@@ -162,7 +214,7 @@ typedef void CryptoCntxHandle;
  *
  */
 
-sw_crypto_errno_enum_type SW_Cipher_Init( SW_Cipher_Alg_Type pAlgo);
+sw_crypto_errno_enum_type SW_Cipher_Init( SW_Cipher_Alg_Type pAlgo, GcmAesStruct *ctx);
 
 /**
  * @brief Deintialize a cipher context
@@ -173,7 +225,7 @@ sw_crypto_errno_enum_type SW_Cipher_Init( SW_Cipher_Alg_Type pAlgo);
  *
  */
 
-sw_crypto_errno_enum_type SW_Cipher_DeInit();
+sw_crypto_errno_enum_type SW_Cipher_DeInit(GcmAesStruct *ctx);
 
 /**
  * @brief This function encrypts/decrypts the passed message
@@ -187,7 +239,7 @@ sw_crypto_errno_enum_type SW_Cipher_DeInit();
  */
 
 sw_crypto_errno_enum_type SW_CipherData (               IovecListType    ioVecIn,
-                              IovecListType    *ioVecOut);
+                              IovecListType    *ioVecOut, const GcmAesStruct *ctx);
 
 
 
@@ -204,7 +256,8 @@ sw_crypto_errno_enum_type SW_CipherData (               IovecListType    ioVecIn
  */
 sw_crypto_errno_enum_type SW_Cipher_SetParam (                 SW_CipherParam  nParamID,
                                   const void           *pParam,
-                                  uint32               cParam );
+                                  uint32               cParam ,
+                                  const GcmAesStruct *ctx);
 
 /**
  * @brief This functions gets the Cipher paramaters created by
@@ -219,6 +272,7 @@ sw_crypto_errno_enum_type SW_Cipher_SetParam (                 SW_CipherParam  n
  */
 sw_crypto_errno_enum_type SW_Cipher_GetParam (                 SW_CipherParam       nParamID,
                                               void                 *pParam,
-                                              uint32               cParam );
+                                              uint32               cParam ,
+                                              const GcmAesStruct *ctx);
 
 #endif /* AES_SHARED */
