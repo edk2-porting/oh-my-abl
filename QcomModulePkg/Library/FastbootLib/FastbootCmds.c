@@ -2536,7 +2536,7 @@ VOID InitMultiThreadEnv ()
 
   if ((Status != EFI_SUCCESS) ||
     (KernIntf == NULL) ||
-    KernIntf->Version < EFI_KERNEL_PROTOCOL_VER_UNSAFE_STACK_APIS) {
+    KernIntf->Version < EFI_KERNEL_PROTOCOL_VER_LOCK_API) {
     DEBUG ((EFI_D_VERBOSE, "Multi thread is not supported.\n"));
     return;
   }
