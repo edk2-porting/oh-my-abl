@@ -2045,6 +2045,18 @@ BOOLEAN IsLEVariant (VOID)
 }
 #endif
 
+#ifndef DISABLE_MULTI_BOOT
+BOOLEAN IsMultiBoot (VOID)
+{
+  return TRUE;
+}
+#else
+BOOLEAN IsMultiBoot (VOID)
+{
+  return FALSE;
+}
+#endif
+
 BOOLEAN IsBuildAsSystemRootImage (BootParamlist *BootParamlistPtr)
 {
    return BootParamlistPtr->RamdiskSize == 0;
