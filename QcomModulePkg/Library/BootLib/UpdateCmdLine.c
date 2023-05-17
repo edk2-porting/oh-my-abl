@@ -83,6 +83,7 @@
 #include "Recovery.h"
 #include "LECmdLine.h"
 #include "EarlyEthernet.h"
+#include "RecoveryInfo.h"
 
 #define BOOT_CPU_PARAM_LEN 13
 #define SIZE_OF_DELIM 2
@@ -835,8 +836,8 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
     AsciiStrCatS (Dst, MaxCmdLineLen, Src);
   }
 
-  if (Param->MultiSlotBoot &&
-     !IsBootDevImage ()) {
+  if (Param->MultiSlotBoot) {
+    if (!IsBootDevImage ()) {
         UnicodeStrToAsciiStr (GetCurrentSlotSuffix ().Suffix,
                               Param->SlotSuffixAscii);
         if (IsLEVariant () &&
@@ -866,6 +867,17 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
                                   AsciiStrLen (Param->SlotSuffixAscii));
           }
         }
+    } else if (IsRecoveryInfo () &&
+               IsLEVariant ()) {
+      /* Recoveryinfo needs LE slot suffix */
+          INT32 StrLen = 0;
+          UnicodeStrToAsciiStr (GetCurrentSlotSuffix ().Suffix,
+                              Param->SlotSuffixAscii);
+          StrLen = AsciiStrLen (SystemdSlotEnv);
+          SystemdSlotEnv[StrLen - 2] = Param->SlotSuffixAscii[1];
+          Src = Param->SystemdSlotEnv;
+          AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+    }
   }
 
   if ((IsBuildAsSystemRootImage (BootParamlistPtr) &&
