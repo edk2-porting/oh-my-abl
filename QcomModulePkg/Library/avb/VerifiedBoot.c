@@ -71,6 +71,7 @@
 #include <Library/MenuKeysDetection.h>
 #include <Library/VerifiedBootMenu.h>
 #include <Library/LEOEMCertificate.h>
+#include "RecoveryInfo.h"
 
 STATIC CONST CHAR8 *VerityMode = " androidboot.veritymode=";
 STATIC CONST CHAR8 *VerifiedState = " androidboot.verifiedbootstate=";
@@ -2171,6 +2172,13 @@ get_ptn_name:
 
     GUARD (StrnCatS (Info->Pname, ARRAY_SIZE (Info->Pname), CurrentSlot.Suffix,
                      StrLen (CurrentSlot.Suffix)));
+    /* For RecoveryInfo skip _a suffix */
+    if (IsRecoveryInfo () &&
+        (!StrCmp (CurrentSlot.Suffix , (CONST CHAR16 *)L"_a"))) {
+      GUARD (StrnCpyS (Info->Pname, ARRAY_SIZE (Info->Pname), L"boot",
+                         StrLen (L"boot")));
+    }
+
   }
 
   DEBUG ((EFI_D_VERBOSE, "MultiSlot %a, partition name %s\n",

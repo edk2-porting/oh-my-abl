@@ -1279,7 +1279,13 @@ GetBootPartitionEntry (Slot *BootSlot)
 
   if (StrnCmp ((CONST CHAR16 *)L"_a", BootSlot->Suffix,
                StrLen (BootSlot->Suffix)) == 0) {
-    Index = GetPartitionIndex ((CHAR16 *)L"boot_a");
+    if (IsRecoveryInfo ()) {
+      DEBUG (( EFI_D_ERROR,  "Using boot parition for recoverinfo\n"));
+      Index = GetPartitionIndex ((CHAR16 *)L"boot");
+    } else {
+      DEBUG (( EFI_D_ERROR,  "using boot_a\n"));
+      Index = GetPartitionIndex ((CHAR16 *)L"boot_a");
+    }
   } else if (StrnCmp ((CONST CHAR16 *)L"_b", BootSlot->Suffix,
                       StrLen (BootSlot->Suffix)) == 0) {
     Index = GetPartitionIndex ((CHAR16 *)L"boot_b");
