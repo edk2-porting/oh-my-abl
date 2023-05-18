@@ -70,8 +70,10 @@
 #include <Library/StackCanary.h>
 #include "Hibernation.h"
 #include "BootStats.h"
+#include <Library/ThreadStack.h>
 #include <Library/DxeServicesTableLib.h>
 #include <VerifiedBoot.h>
+#include <Protocol/EFIKernelInterface.h>
 #if HIBERNATION_SUPPORT_AES
 #include <Library/aes/aes_public.h>
 #include <Protocol/EFIQseecom.h>
@@ -94,15 +96,25 @@ typedef struct FreeRanges {
 }FreeRanges;
 
 #if HIBERNATION_SUPPORT_AES
+#define NUM_CORES 8
+#define NUM_SILVER_CORES 4
+#define NUM_PAGES_PER_GOLD_CORE ((NrCopyPages / 54) * 9)
+#define NUM_PAGES_PER_SILVER_CORE ((NrCopyPages / 54) * 4)
+
 static struct DecryptParam Dp;
 static CHAR8 *Authtags;
-static VOID *AuthCur;
-static VOID *TempOut;
+static VOID *AuthCur[NUM_CORES];
+static VOID *TempOut[NUM_CORES];
 static UINT8 UnwrappedKey[32];
 #define QSEECOM_ALIGN_SIZE      0x40
 #define QSEECOM_ALIGN_MASK      (QSEECOM_ALIGN_SIZE - 1)
 #define QSEECOM_ALIGN(x)        \
         ((x + QSEECOM_ALIGN_MASK) & (~QSEECOM_ALIGN_MASK))
+#else
+#define NUM_CORES 1
+#define NUM_SILVER_CORES 0
+#define NUM_PAGES_PER_GOLD_CORE ((NrCopyPages / 54) * 9)
+#define NUM_PAGES_PER_SILVER_CORE ((NrCopyPages / 54) * 4)
 #endif
 
 /* Holds free memory ranges read from UEFI memory map */
@@ -125,7 +137,7 @@ static struct ArchHibernateHdr *ResumeHdr;
 
 typedef struct PfnBlock {
         UINT64 BasePfn;
-        INT32 AvailablePfns;
+        UINT32 AvailablePfns;
 }PfnBlock;
 
 typedef struct KernelPfnIterator {
@@ -199,11 +211,29 @@ typedef struct Secs2dTaHandle {
         UINT32 AppId;
 }Secs2dTaHandle;
 static INT32 InitAesDecrypt (VOID);
+GcmAesStruct Ctx[8];
 #endif
+
+typedef struct RestoreInfo {
+        UINT64 *KernelPfnIndexes;
+        UINT64 Offset;
+        VOID *DiskReadBuffer;
+        Semaphore* Sem;
+        EFI_STATUS Status;
+        UINT32 NumPages;
+#if HIBERNATION_SUPPORT_AES
+        CHAR8 *Authtags;
+        VOID *TempOut;
+        VOID *AuthCur;
+        UINT32 ThreadId;
+#endif
+}RestoreInfo;
 
 struct BounceTableIterator TableIterator;
 
+UINT64 *KernelPfnIndexes;
 UINT64 RelocateAddress;
+STATIC EFI_KERNEL_PROTOCOL  *KernIntf = NULL;
 
 #define PFN_INDEXES_PER_PAGE 512
 /* Final entry is used to link swap_map pages together */
@@ -264,7 +294,7 @@ static VOID InitKernelPfnIterator (UINT64 *Array)
 
 static INT32 FindNextAvailableBlock (struct KernelPfnIterator *Iter)
 {
-        INT32 AvailablePfns;
+        UINT32 AvailablePfns;
 
         do {
                 UINT64 CurPfn, NextPfn;
@@ -561,6 +591,7 @@ static VOID UpdateBounceEntry (UINT64 DstPfn, UINT64 SrcPfn)
  * Copy page to destination if page is free and is not in reserved area.
  * Bounce page otherwise.
  */
+Mutex *mx;
 static VOID CopyPageToDst (UINT64 SrcPfn, UINT64 DstPfn)
 {
         UINT64 TargetAddr = DstPfn << PAGE_SHIFT;
@@ -568,9 +599,11 @@ static VOID CopyPageToDst (UINT64 SrcPfn, UINT64 DstPfn)
         if (CheckFreeRanges (TargetAddr)) {
                 CopyPage (SrcPfn, DstPfn);
         } else {
+                KernIntf->Mutex->MutexAcquire (mx);
                 UINT64 BouncePfn = GetUnusedPfn ();
                 CopyPage (SrcPfn, BouncePfn);
                 UpdateBounceEntry (DstPfn, BouncePfn);
+                KernIntf->Mutex->MutexRelease (mx);
         }
 }
 
@@ -591,8 +624,24 @@ static INT32 CheckSwapMapPage (UINT64 Offset)
         return (Offset % PFN_INDEXES_PER_PAGE) == 0;
 }
 
+VOID InitReadMultiThreadEnv (VOID)
+{
+        EFI_STATUS Status = EFI_SUCCESS;
+        Status = gBS->LocateProtocol (&gEfiKernelProtocolGuid, NULL,
+                                      (VOID **)&KernIntf);
+
+        if ((Status != EFI_SUCCESS) ||
+            (KernIntf == NULL)) {
+                DEBUG ((EFI_D_INFO,
+                       "InitReadMultiThreadEnv: Multithread not supported\n"));
+                return;
+        }
+        return;
+}
+
 #if HIBERNATION_SUPPORT_AES
-static INT32 DecryptPage (VOID *EncryptData)
+static INT32 DecryptPage (VOID *EncryptData, CHAR8 *Auth, VOID *TempOut,
+                          VOID *AuthCurrent, UINT32 ThreadId)
 {
         SW_CipherEncryptDir Dir = SW_CIPHER_DECRYPT;
         SW_CipherModeType Mode = SW_CIPHER_MODE_GCM;
@@ -600,6 +649,7 @@ static INT32 DecryptPage (VOID *EncryptData)
         IovecListType   ioVecOut;
         IovecType       IovecIn;
         IovecType       IovecOut;
+        UINT32 Ret;
 
         ioVecIn.size = 1;
         ioVecIn.iov = &IovecIn;
@@ -610,48 +660,47 @@ static INT32 DecryptPage (VOID *EncryptData)
         ioVecOut.iov[0].dwLen = PAGE_SIZE;
         ioVecOut.iov[0].pvBase = TempOut;
 
-        if (SW_Cipher_Init (SW_CIPHER_ALG_AES256)) {
+        Ctx[ThreadId].InstanceId = ThreadId;
+        Ret = SW_Cipher_Init (SW_CIPHER_ALG_AES256, &Ctx[ThreadId]);
+        if (Ret) {
                 return -1;
         }
+
         if (SW_Cipher_SetParam (SW_CIPHER_PARAM_DIRECTION, &Dir,
-                sizeof (SW_CipherEncryptDir))) {
+                sizeof (SW_CipherEncryptDir), &Ctx[ThreadId])) {
                 return -1;
         }
-        if (SW_Cipher_SetParam (SW_CIPHER_PARAM_MODE, &Mode, sizeof (Mode))) {
+        if (SW_Cipher_SetParam (SW_CIPHER_PARAM_MODE, &Mode, sizeof (Mode),
+                                &Ctx[ThreadId])) {
                 return -1;
         }
         if (SW_Cipher_SetParam (SW_CIPHER_PARAM_KEY, UnwrappedKey,
-                sizeof (UnwrappedKey))) {
+                sizeof (UnwrappedKey), &Ctx[ThreadId])) {
                 return -1;
         }
-        if (SW_Cipher_SetParam (SW_CIPHER_PARAM_IV, Dp.Iv, sizeof (Dp.Iv))) {
+        if (SW_Cipher_SetParam (SW_CIPHER_PARAM_IV, Dp.Iv, sizeof (Dp.Iv),
+                                &Ctx[ThreadId])) {
                 return -1;
         }
         if (SW_Cipher_SetParam (SW_CIPHER_PARAM_AAD, (VOID *)Dp.Aad,
-                sizeof (Dp.Aad))) {
+                sizeof (Dp.Aad), &Ctx[ThreadId])) {
                 return -1;
         }
-        if (SW_CipherData (ioVecIn, &ioVecOut)) {
+        if (SW_CipherData (ioVecIn, &ioVecOut, &Ctx[ThreadId])) {
                 return -1;
         }
-        if (SW_Cipher_GetParam (SW_CIPHER_PARAM_TAG, (VOID*)(AuthCur),
-                Dp.Authsize)) {
+        if (SW_Cipher_GetParam (SW_CIPHER_PARAM_TAG, (VOID*)(AuthCurrent),
+                Dp.Authsize, &Ctx[ThreadId])) {
                 return -1;
         }
-        if (MemCmp (AuthCur, Authtags, Dp.Authsize)) {
-                printf ("Auth Comparsion failed\n");
+
+        if (MemCmp (AuthCurrent, Auth, Dp.Authsize)) {
+                printf ("Auth Comparsion failed 0x%llx\n", Auth);
                 return -1;
         }
 
         gBS->CopyMem ((VOID *)(EncryptData), (VOID *)(TempOut), PAGE_SIZE);
-        SW_Cipher_DeInit ();
-        Authtags = Authtags + Dp.Authsize;
-        return 0;
-}
-#else
-
-static INT32 DecryptPage (VOID *encrypt_data)
-{
+        SW_Cipher_DeInit (&Ctx[ThreadId]);
         return 0;
 }
 #endif
@@ -800,10 +849,14 @@ static UINT64* ReadKernelImagePfnIndexes (UINT64 *Offset)
 
         *Offset = DiskOffset + PagesToRead;
         while (PendingPages != NrMetaPages) {
-                if (DecryptPage (PfnArrayStart)) {
+#if HIBERNATION_SUPPORT_AES
+                if (DecryptPage (PfnArrayStart, Authtags, TempOut[0],
+                                 AuthCur[0], 0)) {
                         printf ("Decryption failed for pfn array\n");
                         return NULL;
                 }
+                Authtags += Dp.Authsize;
+#endif
                 PfnArrayStart = (CHAR8 *)PfnArrayStart + PAGE_SIZE;
                 PendingPages++;
         }
@@ -814,70 +867,60 @@ err:
         return NULL;
 }
 
-static INT32 ReadDataPages (UINT64 *KernelPfnIndexes,
-                        UINT64 Offset, VOID *DiskReadBuffer)
+static INT32 ReadDataPages (VOID *Arg)
 {
         UINT32 PendingPages, NrReadPages;
-        UINT64 Temp, DiskReadMs = 0;
-        UINT64 CopyPageMs = 0;
         UINT64 SrcPfn, DstPfn;
         UINT64 PfnIndex = 0;
-        UINT64 MBs, MBPS, DDR_MBPS;
         INT32 Ret;
 
-        PendingPages = NrCopyPages;
+        RestoreInfo *Info = (RestoreInfo *) Arg;
+
+        PendingPages = Info->NumPages;
         while (PendingPages > 0) {
                 /* read pages in chunks to improve disk read performance */
+
                 NrReadPages = PendingPages > DISK_BUFFER_PAGES ?
                                         DISK_BUFFER_PAGES : PendingPages;
-                Temp = GetTimerCountms ();
-                Ret = ReadImage (Offset, DiskReadBuffer, NrReadPages);
-                DiskReadMs += (GetTimerCountms () - Temp);
+                Ret = ReadImage (Info->Offset, Info->DiskReadBuffer,
+                                 NrReadPages);
                 if (Ret < 0) {
                         printf ("Disk read failed Line %d\n", __LINE__);
+                        Info->Status = -1;
                         return -1;
                 }
-                SrcPfn = (UINT64) DiskReadBuffer >> PAGE_SHIFT;
+
+                SrcPfn = (UINT64) Info->DiskReadBuffer >> PAGE_SHIFT;
                 while (NrReadPages > 0) {
                         /* skip swap_map pages */
-                        if (!CheckSwapMapPage (Offset)) {
-                                DstPfn = KernelPfnIndexes[PfnIndex++];
+                        if (!CheckSwapMapPage (Info->Offset)) {
+                                DstPfn = Info->KernelPfnIndexes[PfnIndex++];
                                 PendingPages--;
-                                Temp = GetTimerCountms ();
-                                if (DecryptPage ((VOID *)(SrcPfn <<
-                                                        PAGE_SHIFT))) {
+#if HIBERNATION_SUPPORT_AES
+                                if (DecryptPage (
+                                             (VOID *)(SrcPfn << PAGE_SHIFT),
+                                              Info->Authtags, Info->TempOut,
+                                              Info->AuthCur, Info->ThreadId)) {
                                         printf (
-                                        "Decryption failed for Data pages\n"
+                                          "Decrypt failed for Data pages\n"
                                         );
-                                        return -1;
+                                        Info->Status = -1;
+                                        goto err;
                                 }
+                                Info->Authtags += Dp.Authsize;
+#endif
                                 CopyPageToDst (SrcPfn, DstPfn);
-                                CopyPageMs += (GetTimerCountms () - Temp);
                         }
                         SrcPfn++;
                         NrReadPages--;
-                        Offset++;
+                        Info->Offset++;
                 }
         }
-
-        BootStatsSetTimeStamp (BS_KERNEL_LOAD_BOOT_END);
-
-        MBs = (NrCopyPages * PAGE_SIZE) / (1024 * 1024);
-        if ((DiskReadMs == 0)
-            ||
-            (CopyPageMs == 0)) {
-                return 0;
-        }
-
-        MBPS = (MBs * 1000) / DiskReadMs;
-        DDR_MBPS = (MBs * 1000) /CopyPageMs;
-
-        printf ("Image size = %lu MBs\n", MBs);
-        printf ("Time spend - disk IO = %lu msecs (BW = %llu MBps)\n",
-                DiskReadMs, MBPS);
-        printf ("Time spend - DDR copy = %llu msecs (BW = %llu MBps)\n",
-                CopyPageMs, DDR_MBPS);
-
+        Info->Status = 0;
+#if HIBERNATION_SUPPORT_AES
+err:
+#endif
+        KernIntf->Sem->SemPost (Info->Sem, FALSE);
         return 0;
 }
 
@@ -1184,7 +1227,7 @@ static INT32 InitAesDecrypt (VOID)
         UINT32 AuthslotStart;
         INT32 AuthslotCount;
         Secs2dTaHandle TaHandle = {0};
-        UINT32 NrSwapMapPages;
+        UINT32 NrSwapMapPages, i;
 
         NrSwapMapPages = (NrCopyPages + NrMetaPages) / ENTRIES_PER_SWAPMAP_PAGE;
         AuthslotStart = NrMetaPages + NrCopyPages + NrSwapMapPages +
@@ -1202,13 +1245,15 @@ static INT32 InitAesDecrypt (VOID)
         if (ReadImage (AuthslotStart, Authtags, AuthslotCount)) {
                 return -1;
         }
-        TempOut = AllocatePages (1);
-        if (!TempOut) {
-                return -1;
-        }
-        AuthCur = AllocateZeroPool (Dp.Authsize);
-        if (!AuthCur) {
-                return -1;
+        for (i = 0; i < NUM_CORES; i++) {
+                TempOut[i] = AllocatePages (1);
+                if (!TempOut[i]) {
+                        return -1;
+                }
+                AuthCur[i] = AllocateZeroPool (Dp.Authsize);
+                if (!AuthCur[i]) {
+                        return -1;
+                }
         }
         if (InitTaAndGetKey (&TaHandle)) {
                 return -1;
@@ -1226,12 +1271,14 @@ static INT32 InitAesDecrypt (VOID)
 
 static INT32 RestoreSnapshotImage (VOID)
 {
-        INT32 Ret;
-        VOID *DiskReadBuffer;
-        UINT64 StartMs, Offset;
-        UINT64 *KernelPfnIndexes;
+        INT32 Ret, Iter1 = 0;
+        UINT64 StartMs, Offset, PfnOffset = 0;
+        RestoreInfo Info[NUM_CORES];
         struct BounceTableIterator *Bti = &TableIterator;
+        Thread *T[NUM_CORES];
+        CHAR8 *ThreadName;
 
+        InitReadMultiThreadEnv ();
         StartMs = GetTimerCountms ();
         Ret = ReadSwapInfoStruct ();
         if (Ret < 0) {
@@ -1249,15 +1296,80 @@ static INT32 RestoreSnapshotImage (VOID)
         }
         InitKernelPfnIterator (KernelPfnIndexes);
 
-        DiskReadBuffer =  AllocatePages (DISK_BUFFER_PAGES);
-        if (!DiskReadBuffer) {
-                printf ("Memory alloc failed Line %d\n", __LINE__);
+        ThreadName = AllocateZeroPool (sizeof (CHAR8) * 8);
+        if (!ThreadName) {
+                printf ("Error allocating memory\n");
                 return -1;
-        } else {
-                printf ("Disk buffer alloction at 0x%p - 0x%p\n",
-                        DiskReadBuffer,
-                        DiskReadBuffer + DISK_BUFFER_SIZE - 1);
         }
+#if HIBERNATION_SUPPORT_AES
+        for (Iter1 = 0; Iter1 < NUM_SILVER_CORES; Iter1++) {
+                INT32 Iter2;
+                Info[Iter1].Offset = Offset;
+                Info[Iter1].Authtags = Authtags;
+                Info[Iter1].NumPages = NUM_PAGES_PER_SILVER_CORE;
+                Info[Iter1].KernelPfnIndexes = &KernelPfnIndexes[PfnOffset];
+                for (Iter2 = 0; Iter2 < NUM_PAGES_PER_SILVER_CORE; Iter2++) {
+                        if (CheckSwapMapPage (Offset)) {
+                                Offset++;
+                        }
+                        Offset++;
+                        PfnOffset++;
+                        Authtags += Dp.Authsize;
+                }
+        }
+        for (Iter1 = NUM_SILVER_CORES; Iter1 < NUM_CORES - 1; Iter1++) {
+                INT32 Iter2;
+                Info[Iter1].Offset = Offset;
+                Info[Iter1].Authtags = Authtags;
+                Info[Iter1].NumPages = NUM_PAGES_PER_GOLD_CORE;
+                Info[Iter1].KernelPfnIndexes = &KernelPfnIndexes[PfnOffset];
+                for (Iter2 = 0; Iter2 < NUM_PAGES_PER_GOLD_CORE; Iter2++) {
+                        if (CheckSwapMapPage (Offset)) {
+                                Offset++;
+                        }
+                        Offset++;
+                        PfnOffset++;
+                        Authtags += Dp.Authsize;
+                }
+        }
+        Info[Iter1].Authtags = Authtags;
+#endif
+        Info[Iter1].Offset = Offset;
+        Info[Iter1].NumPages = NrCopyPages - (4 * NUM_PAGES_PER_SILVER_CORE) -
+                           (3 * NUM_PAGES_PER_GOLD_CORE);
+        Info[Iter1].KernelPfnIndexes = &KernelPfnIndexes[PfnOffset];
+
+        for (Iter1 = 0; Iter1 < NUM_CORES; Iter1++) {
+                Info[Iter1].DiskReadBuffer = AllocatePages (DISK_BUFFER_PAGES);
+                if (!Info[Iter1].DiskReadBuffer) {
+                       printf ("Memory alloc failed Line %d\n", __LINE__);
+                       return -1;
+                } else {
+                        printf ("Disk buffer alloction at 0x%p - 0x%p\n",
+                                Info[Iter1].DiskReadBuffer,
+                                Info[Iter1].DiskReadBuffer +
+                                DISK_BUFFER_SIZE - 1);
+                }
+#if HIBERNATION_SUPPORT_AES
+                Info[Iter1].ThreadId = Iter1;
+                Info[Iter1].TempOut = TempOut[Iter1];
+                Info[Iter1].AuthCur = AuthCur[Iter1];
+#endif
+                Info[Iter1].Sem = KernIntf->Sem->SemInit (Iter1, 0);
+
+                AsciiSPrint (ThreadName, 8, "Thread%d", Iter1);
+                if (!KernIntf ||
+                    !KernIntf->Thread)
+                        return -1;
+
+                T[Iter1] = KernIntf->Thread->ThreadCreate (ThreadName,
+                                 ReadDataPages, (VOID *)&Info[Iter1],
+                                 UEFI_THREAD_PRIORITY, DEFAULT_STACK_SIZE);
+                KernIntf->Thread->ThreadSetPinnedCpu (T[Iter1], Iter1);
+                AllocateUnSafeStackPtr (T[Iter1]);
+        }
+
+        mx = KernIntf->Mutex->MutexInit (1);
 
         printf ("Mapping Regions:\n");
         Ret = UefiMapUnmapped ();
@@ -1277,19 +1389,35 @@ static INT32 RestoreSnapshotImage (VOID)
                                 (GetUnusedPfn () << PAGE_SHIFT);
         Bti->CurTable = Bti->FirstTable;
 
-        Ret = ReadDataPages (KernelPfnIndexes, Offset, DiskReadBuffer);
-        if (Ret < 0) {
-                printf ("error in restore_snapshot_image\n");
-                goto err;
+        for (Iter1 = NUM_CORES - 1; Iter1 >= 0; Iter1--) {
+                Ret = KernIntf->Thread->ThreadResume (T[Iter1]);
+                DEBUG ((EFI_D_INFO, "Thread %d created with Status : %d\n",
+                        Iter1, Ret));
         }
 
+        for (Iter1 = NUM_CORES - 1; Iter1 >= 0; Iter1--) {
+                KernIntf->Sem->SemWait (Info[Iter1].Sem);
+        }
+
+        for (Iter1 = 0; Iter1 < NUM_CORES; Iter1++) {
+                if (Info[Iter1].Status != 0) {
+                        printf ("error in restore_snapshot_image\n");
+                        goto err;
+                }
+        }
+        BootStatsSetTimeStamp (BS_KERNEL_LOAD_BOOT_END);
+
+        printf ("Image size = %lu MBs\n",
+                (NrCopyPages * PAGE_SIZE) / (1024 * 1024));
         printf ("Time loading image (excluding bounce buffers) = %lu msecs\n",
                 (GetTimerCountms () - StartMs));
         printf ("Image restore Completed...\n");
         printf ("Total bounced Pages = %d (%lu MBs)\n",
                 BouncedPages, (BouncedPages * PAGE_SIZE)/(1024 * 1024));
 err:
-        FreePages (DiskReadBuffer, DISK_BUFFER_PAGES);
+        for (Iter1 = 0; Iter1 < NUM_CORES; Iter1++) {
+                FreePages (Info[Iter1].DiskReadBuffer, DISK_BUFFER_PAGES);
+        }
         return Ret;
 }
 
