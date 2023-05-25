@@ -83,6 +83,7 @@
 #include <Library/HypervisorMvCalls.h>
 #include <Library/UpdateCmdLine.h>
 #include <Protocol/EFICardInfo.h>
+#include <Protocol/EFIClock.h>
 
 #define MAX_APP_STR_LEN 64
 #define MAX_NUM_FS 10
@@ -190,6 +191,47 @@ SetDefaultAudioFw ()
         DEBUG ((EFI_D_ERROR, "Unable to store audio framework: %r\n", Status));
         return;
       }
+    }
+  }
+}
+
+STATIC VOID PrintCpuFrequency (VOID)
+{
+  EFI_CLOCK_PROTOCOL  *ClockProtocol = NULL;
+  EFI_KERNEL_PROTOCOL *KernIntf = NULL;
+  EFI_STATUS  status = EFI_SUCCESS;
+  UINT32  numOfCore = 0;
+  UINT32  pnPerfLevel;
+  UINT32  pnFrequencyHz;
+  UINT32  pnRequiredVoltage;
+  UINT32  i = 0;
+
+  status = gBS->LocateProtocol (&gEfiKernelProtocolGuid,
+                  NULL, (VOID **)&KernIntf);
+  if (EFI_SUCCESS != status) {
+          return;
+  }
+
+  numOfCore = KernIntf->MpCpu->MpcoreGetAvailCpuCount ();
+  if (!numOfCore) {
+     return;
+  }
+
+  status = gBS->LocateProtocol (&gEfiClockProtocolGuid,
+                  NULL, (VOID **)&ClockProtocol);
+  if (EFI_ERROR (status)) {
+    DEBUG ((EFI_D_ERROR, "Failed to locate CLOCK protocol\r\n"));
+    return;
+  }
+
+  if (ClockProtocol) {
+    for (i = 0; i < numOfCore; i++) {
+      status = ClockProtocol->GetCpuPerfLevel (ClockProtocol, i, &pnPerfLevel);
+      if (status != EFI_SUCCESS) {
+          continue;
+      }
+      status = ClockProtocol->GetCpuPerfLevelFrequency (ClockProtocol, i,
+                     pnPerfLevel, &pnFrequencyHz, &pnRequiredVoltage);
     }
   }
 }
@@ -337,6 +379,7 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
   }
 
   SetDefaultAudioFw ();
+  PrintCpuFrequency ();
 
   // check for reboot mode
   Status = GetRebootReason (&BootReason);
