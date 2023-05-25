@@ -485,8 +485,27 @@ GetSystemPath (CHAR8 **SysPath, BOOLEAN MultiSlotBoot, BOOLEAN BootIntoRecovery,
   /* Append slot info for A/B Variant */
   if (MultiSlotBoot &&
       NAND != CheckRootDeviceType ()) {
-     StrnCatS (PartitionName, MAX_GPT_NAME_SIZE, CurSlot.Suffix,
-            StrLen (CurSlot.Suffix));
+    /* Skip slot suffix when RecoveryInfo and slot a*/
+    if (!StrCmp (CurSlot.Suffix, L"_a")) {
+      if (!IsRecoveryInfo ()) {
+        StrnCatS (PartitionName, MAX_GPT_NAME_SIZE, CurSlot.Suffix,
+                  StrLen (CurSlot.Suffix));
+      }
+    } else {
+      /* Slots other than _a */
+      StrnCatS (PartitionName, MAX_GPT_NAME_SIZE, CurSlot.Suffix,
+                StrLen (CurSlot.Suffix));
+    }
+  } else if (IsRecoveryInfo () &&
+             NAND == CheckRootDeviceType ()) {
+
+    /* IsRecoveryinfo implicitly means MultiSlot */
+    /* Append slot suffix for slots other than _a */
+
+    if (StrCmp (CurSlot.Suffix, L"_a")) {
+      StrnCatS (PartitionName, MAX_GPT_NAME_SIZE, CurSlot.Suffix,
+                StrLen (CurSlot.Suffix));
+    }
   }
 #endif
 
