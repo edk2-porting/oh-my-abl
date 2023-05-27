@@ -177,6 +177,9 @@
   !if $(ENABLE_LE_VARIANT) == 1
       GCC:*_*_*_CC_FLAGS = -DENABLE_LE_VARIANT
   !endif
+  !if $(DISABLE_MULTI_BOOT) == 1
+      GCC:*_*_*_CC_FLAGS = -DDISABLE_MULTI_BOOT
+  !endif
   !if $(ENABLE_LV_ATOMIC_AB) == 1
       GCC:*_*_*_CC_FLAGS = -DENABLE_LV_ATOMIC_AB
   !endif
