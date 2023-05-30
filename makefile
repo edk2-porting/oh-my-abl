@@ -19,6 +19,7 @@ ifeq ($(BUILD_NATIVE_AARCH64),true)
 	export CLANG_PREFIX := /usr/bin/aarch64-redhat-linux- 
 	export TARGET_ARCHITECTURE := arm64
 	export DISABLE_KERNEL_PROTOCOL := false
+	export DISABLE_MULTI_BOOT := false
 endif
 
 ifndef $(BOOTLOADER_OUT)
