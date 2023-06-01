@@ -60,12 +60,12 @@ TYPE DEFINITIONS
 @{ */
 /* Recovery status enum type */
 typedef enum {
-    RECOVERY_INFO_NO_RECOVERY,        /* GPIO_BASED_BOOT_SELECTION fuse bit
+    RECOVERY_INFO_NO_RECOVERY    = 0x0,/* GPIO_BASED_BOOT_SELECTION fuse bit
                                          is blown */
-    RECOVERY_INFO_PARTITION_FAIL,     /* Recovery Info Partition not present
+    RECOVERY_INFO_PARTITION_FAIL = 0x1,/* Recovery Info Partition not present
                                          or fail to read */
-    RECOVERY_INFO_TRIAL_BOOT,         /* Trial Boot is enabled */
-    RECOVERY_INFO_RECOVERY,           /* Recovery Info is valid */
+    RECOVERY_INFO_TRIAL_BOOT     = 0x2,/* Trial Boot is enabled */
+    RECOVERY_INFO_RECOVERY       = 0x3,/* Recovery Info is valid */
 }RECOVERY_STATUS_STATE;
 /** @} */
 
@@ -84,6 +84,31 @@ typedef enum {
                              API IMPLEMENTATION
 
 =============================================================================*/
+/* ============================================================================
+**  Function : EFI_Get_Recovery_State
+** ============================================================================
+*/
+/** @ingroup EFI_RECOVERYINFO_PROTOCOL_apis
+  @par Summary
+  Gets the Recovery State
+
+  @param[in]      This               Pointer to the EFI_RECOVERYINFO_PROTOCOL
+                                     instance.
+  @param[out]     RecoveryState      Pointer to a RECOVERY_STATUS_STATE passed
+                                     by the caller that will be populated by
+                                     the driver.
+
+  @return
+  EFI_SUCCESS           -- Function completed successfully. \n
+  EFI_INVALID_PARAMETER -- Input parameter is INVALID. \n
+*/
+
+typedef
+EFI_STATUS
+(EFIAPI *EFI_GET_RECOVERY_STATE)(
+   IN EFI_RECOVERYINFO_PROTOCOL  *This,
+   OUT RECOVERY_STATUS_STATE     *RecoveryState
+);
 
 /* ============================================================================
 **  Function : EFI_Get_Boot_Set
@@ -159,6 +184,7 @@ EFI_STATUS
 */
 struct _EFI_RECOVERYINFO_PROTOCOL {
    UINT64                     Revision;
+   EFI_GET_RECOVERY_STATE     GetRecoveryState;
    EFI_GET_BOOT_SET           GetBootSet;
    EFI_HANDLE_FAILED_SET      HandleFailedSet;
 };
