@@ -113,6 +113,10 @@ struct CarveoutMemRegion {
   UINT64 Size;
 };
 
+typedef struct InitrdStartNode {
+  UINT32 InitrdStartAddr;
+} Initrd_Start_Node;
+
 struct DisplaySplashBufferInfo {
   /* Version number used to track changes to the structure */
   UINT32 uVersion;
@@ -169,4 +173,5 @@ GetUpdatedRamPartitions (VOID *Fdt,
 
 BOOLEAN
 IsCarveoutRemovalEnabled (VOID *Fdt);
+UINT64 GetInitrdStartAddr (VOID *Fdt);
 #endif

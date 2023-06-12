@@ -29,7 +29,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -441,7 +441,8 @@ VOID *
 DeviceTreeAppended (VOID *kernel,
                     UINT32 kernel_size,
                     UINT32 dtb_offset,
-                    VOID *tags)
+                    VOID *tags,
+                    UINT32 *DtbSize)
 {
   EFI_STATUS Status;
   uintptr_t kernel_end = (uintptr_t)kernel + kernel_size;
@@ -553,6 +554,7 @@ DeviceTreeAppended (VOID *kernel,
     }
     gBS->CopyMem (tags, bestmatch_tag, bestmatch_tag_size);
     DtbIdx = best_match_dt_entry->Idx;
+    *DtbSize = bestmatch_tag_size;
     /* clear out the old DTB magic so kernel doesn't find it */
     *((UINT32 *)(kernel + dtb_offset)) = 0;
     FreePool (dt_entry_queue);

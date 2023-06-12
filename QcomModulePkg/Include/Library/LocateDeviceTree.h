@@ -29,7 +29,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
  *
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted (subject to the limitations in the
@@ -341,7 +341,8 @@ VOID *
 DeviceTreeAppended (void *kernel,
                     UINT32 kernel_size,
                     UINT32 dtb_offset,
-                    void *tags);
+                    VOID *Tags,
+                    UINT32 *DtbSize);
 VOID *
 GetSocDtb (void *kernel, UINT32 kernel_size, UINT32 dtb_offset, void *tags);
 BOOLEAN GetDtboNeeded (VOID);

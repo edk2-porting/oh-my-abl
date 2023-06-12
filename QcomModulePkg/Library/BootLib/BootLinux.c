@@ -449,7 +449,8 @@ CheckMDTPStatus (CHAR16 *PartitionName, BootInfo *Info)
 STATIC EFI_STATUS
 ApplyOverlay (BootParamlist *BootParamlistPtr,
               VOID *AppendedDtHdr,
-              struct fdt_entry_node *DtsList)
+              struct fdt_entry_node *DtsList,
+              UINT32 *DtbSize)
 {
   VOID *FinalDtbHdr = AppendedDtHdr;
   VOID *TmpDtbHdr = NULL;
@@ -498,9 +499,10 @@ out:
      CopyMem will not copy Source Buffer to Destination Buffer
      and return Destination BUffer.
   */
+  *DtbSize = fdt_totalsize (FinalDtbHdr);
   gBS->CopyMem ((VOID *)BootParamlistPtr->DeviceTreeLoadAddr,
                 FinalDtbHdr,
-                fdt_totalsize (FinalDtbHdr));
+                *DtbSize);
   post_overlay_free ();
   DEBUG ((EFI_D_INFO, "Apply Overlay total time: %lu ms \n",
         GetTimerCountms () - ApplyDTStartTime));
@@ -539,6 +541,10 @@ DTBImgCheckAndAppendDT (BootInfo *Info, BootParamlist *BootParamlistPtr)
   VOID* ImageBuffer = NULL;
   UINT32 ImageSize = 0;
   CHAR8 *TempHypBootInfo[HYP_MAX_NUM_DTBOS];
+  UINT64 InitrdStartAddr = 0;
+  UINT64 NewDeviceTreeLoadAddr = 0;
+  VOID *Fdt = NULL;
+  UINT32 TotalDtbSize = 0;
 
   if (Info == NULL ||
       BootParamlistPtr == NULL) {
@@ -602,7 +608,8 @@ DTBImgCheckAndAppendDT (BootInfo *Info, BootParamlist *BootParamlistPtr)
     Dtb = DeviceTreeAppended (ImageBuffer,
                              ImageSize,
                              BootParamlistPtr->DtbOffset,
-                             (VOID *)BootParamlistPtr->DeviceTreeLoadAddr);
+                             (VOID *)BootParamlistPtr->DeviceTreeLoadAddr,
+                             &TotalDtbSize);
     if (!Dtb) {
       if (BootParamlistPtr->DtbOffset >= ImageSize) {
         DEBUG ((EFI_D_ERROR, "Dtb offset goes beyond the image size\n"));
@@ -637,8 +644,9 @@ DTBImgCheckAndAppendDT (BootInfo *Info, BootParamlist *BootParamlistPtr)
           return EFI_BAD_BUFFER_SIZE;
         }
 
+        TotalDtbSize = fdt_totalsize (SingleDtHdr);
         gBS->CopyMem ((VOID *)BootParamlistPtr->DeviceTreeLoadAddr,
-                      SingleDtHdr, fdt_totalsize (SingleDtHdr));
+                      SingleDtHdr, TotalDtbSize);
       } else {
         DEBUG ((EFI_D_ERROR, "Error: Device Tree blob not found\n"));
         return EFI_NOT_FOUND;
@@ -691,11 +699,13 @@ DTBImgCheckAndAppendDT (BootInfo *Info, BootParamlist *BootParamlistPtr)
 
     Status = ApplyOverlay (BootParamlistPtr,
                            Dtb,
-                           DtsList);
+                           DtsList,
+                           &TotalDtbSize);
     if (Status != EFI_SUCCESS) {
       DEBUG ((EFI_D_ERROR, "Error: Dtb overlay failed\n"));
       SetVmDisable ();
     }
+    Fdt = Dtb;
   } else {
     /*It is the case of DTB overlay Get the Soc specific dtb */
     SocDtb = GetSocDtb (ImageBuffer,
@@ -788,10 +798,35 @@ DTBImgCheckAndAppendDT (BootInfo *Info, BootParamlist *BootParamlistPtr)
 
     Status = ApplyOverlay (BootParamlistPtr,
                            SocDtb,
-                           DtsList);
+                           DtsList,
+                           &TotalDtbSize);
     if (Status != EFI_SUCCESS) {
       DEBUG ((EFI_D_ERROR, "Error: Dtb overlay failed\n"));
       SetVmDisable ();
+    }
+    Fdt = SocDtb;
+  }
+
+  /* initrd-start defined in dts is preferred, otherwise the addressed loaded
+   * by the boot loader is used.
+   */
+  if (Fdt) {
+    InitrdStartAddr = GetInitrdStartAddr (Fdt);
+    if (InitrdStartAddr > 0) {
+      NewDeviceTreeLoadAddr = (BootParamlistPtr->KernelEndAddr -
+                               (DT_SIZE_2MB +
+                               BootParamlistPtr->PageSize));
+      gBS->CopyMem ((VOID *)NewDeviceTreeLoadAddr,
+                    (VOID *)BootParamlistPtr->DeviceTreeLoadAddr,
+                    TotalDtbSize);
+      if (NewDeviceTreeLoadAddr >
+                 (BootParamlistPtr->DeviceTreeLoadAddr + TotalDtbSize)) {
+        gBS->SetMem ((VOID *)BootParamlistPtr->DeviceTreeLoadAddr,
+                    TotalDtbSize, 0);
+      }
+      BootParamlistPtr->DeviceTreeLoadAddr = NewDeviceTreeLoadAddr;
+      DEBUG ((EFI_D_VERBOSE, "Update Device tree Load Address: 0x%x\n",
+                                       BootParamlistPtr->DeviceTreeLoadAddr));
     }
   }
   return EFI_SUCCESS;
@@ -925,11 +960,21 @@ LoadAddrAndDTUpdate (BootInfo *Info, BootParamlist *BootParamlistPtr)
     RamdiskImageBuffer = BootParamlistPtr->ImageBuffer;
   }
 
-  RamdiskLoadAddr = BootParamlistPtr->RamdiskLoadAddr;
-
   TotalRamdiskSize = BootParamlistPtr->RamdiskSize +
                             BootParamlistPtr->VendorRamdiskSize +
                             BootParamlistPtr->RecoveryRamdiskSize;
+
+  RamdiskLoadAddr = GetInitrdStartAddr (
+                       (VOID *)(BootParamlistPtr->DeviceTreeLoadAddr));
+  if (RamdiskLoadAddr > 0) {
+    BootParamlistPtr->RamdiskLoadAddr = RamdiskLoadAddr -
+                                        (LOCAL_ROUND_TO_PAGE (TotalRamdiskSize,
+                                        BootParamlistPtr->PageSize) +
+                                        BootParamlistPtr->PageSize);
+    DEBUG ((EFI_D_VERBOSE, "Update Ramdisk Load Address: 0x%x\n",
+                                       BootParamlistPtr->RamdiskLoadAddr));
+  }
+  RamdiskLoadAddr = BootParamlistPtr->RamdiskLoadAddr;
 
   if (RamdiskEndAddr - RamdiskLoadAddr < TotalRamdiskSize) {
     DEBUG ((EFI_D_ERROR, "Error: Ramdisk size is over the limit\n"));
