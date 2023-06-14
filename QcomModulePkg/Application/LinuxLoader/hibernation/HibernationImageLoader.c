@@ -113,8 +113,8 @@ static UINT8 UnwrappedKey[32];
 #else
 #define NUM_CORES 1
 #define NUM_SILVER_CORES 0
-#define NUM_PAGES_PER_GOLD_CORE ((NrCopyPages / 54) * 9)
-#define NUM_PAGES_PER_SILVER_CORE ((NrCopyPages / 54) * 4)
+#define NUM_PAGES_PER_GOLD_CORE 0
+#define NUM_PAGES_PER_SILVER_CORE 0
 #endif
 
 /* Holds free memory ranges read from UEFI memory map */
