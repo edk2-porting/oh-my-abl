@@ -324,7 +324,7 @@ LinuxLoaderEntry (IN EFI_HANDLE ImageHandle, IN EFI_SYSTEM_TABLE *SystemTable)
   BootStatsSetTimeStamp (BS_BL_START);
 
   /* check if it is NetworkBoot, FlashlessBoot or Fastboot */
-  if (!IsMultiBoot ()) {
+  if (IsMultiBoot ()) {
     Val = GetBootDeviceType ();
     if (Val == EFI_EMMC_NETWORK_FLASH_TYPE) {
       NetworkBootImageAddr = BASE_ADDRESS;
