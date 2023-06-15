@@ -74,6 +74,8 @@
 #include <Uefi.h>
 #include <Uefi/UefiSpec.h>
 #include <VerifiedBoot.h>
+#include <Protocol/EFIRecoveryInfo.h>
+#include "RecoveryInfo.h"
 
 STATIC BOOLEAN FlashingGpt;
 STATIC BOOLEAN ParseSecondaryGpt;
@@ -774,11 +776,20 @@ PartitionHasMultiSlot (CONST CHAR16 *Pname)
   for (i = 0; i < PartitionCount; i++) {
     if (!(StrnCmp (PtnEntries[i].PartEntry.PartitionName, Pname, Len))) {
       if (PtnEntries[i].PartEntry.PartitionName[Len] == L'_' &&
-          (PtnEntries[i].PartEntry.PartitionName[Len + 1] == L'a' ||
-           PtnEntries[i].PartEntry.PartitionName[Len + 1] == L'b'))
-        if (++SlotCount > MIN_SLOTS) {
+          (PtnEntries[i].PartEntry.PartitionName[Len + 1] == L'a')) {
+        SlotCount++;
+      } else if (PtnEntries[i].PartEntry.PartitionName[Len] == L'_' &&
+                 (PtnEntries[i].PartEntry.PartitionName[Len + 1] == L'b')) {
+        if (IsRecoveryInfo ()) {
+          DEBUG (( EFI_D_INFO, "Multislot because RecoveryInfo Detected\n"));
           return TRUE;
         }
+        SlotCount++;
+      }
+    }
+
+    if (SlotCount > MIN_SLOTS) {
+      return TRUE;
     }
   }
   return FALSE;
@@ -1268,7 +1279,13 @@ GetBootPartitionEntry (Slot *BootSlot)
 
   if (StrnCmp ((CONST CHAR16 *)L"_a", BootSlot->Suffix,
                StrLen (BootSlot->Suffix)) == 0) {
-    Index = GetPartitionIndex ((CHAR16 *)L"boot_a");
+    if (IsRecoveryInfo ()) {
+      DEBUG (( EFI_D_ERROR,  "Using boot parition for recoverinfo\n"));
+      Index = GetPartitionIndex ((CHAR16 *)L"boot");
+    } else {
+      DEBUG (( EFI_D_ERROR,  "using boot_a\n"));
+      Index = GetPartitionIndex ((CHAR16 *)L"boot_a");
+    }
   } else if (StrnCmp ((CONST CHAR16 *)L"_b", BootSlot->Suffix,
                       StrLen (BootSlot->Suffix)) == 0) {
     Index = GetPartitionIndex ((CHAR16 *)L"boot_b");
@@ -1454,6 +1471,12 @@ GetActiveSlot (Slot *ActiveSlot)
 
   if (AtomicABEnabled ()) {
     return GetAtomicABActiveSlot (ActiveSlot);
+  }
+
+  if ((IsSuffixEmpty (ActiveSlot) == TRUE) &&
+      (IsRecoveryInfo ())) {
+    Status = RI_GetActiveSlot (ActiveSlot);
+    return Status;
   }
 
   if (IsSuffixEmpty (ActiveSlot) == TRUE) {
@@ -1780,6 +1803,10 @@ FindBootableSlot (Slot *BootableSlot)
                          "for slot %s\n",
             BootableSlot->Suffix));
     return EFI_NOT_FOUND;
+  }
+  /* Rely on uefi that returned bootset is */
+  if (IsRecoveryInfo ()) {
+    goto out;
   }
 
   Unbootable = (BootEntry->PartEntry.Attributes & PART_ATT_UNBOOTABLE_VAL) >>
