@@ -49,6 +49,14 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+/* Changes from Qualcomm Innovation Center are provided under the following
+ * license:
+ *
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
+ */
+
 #include "avb_util.h"
 #include "avb_ops.h"
 #include <stdarg.h>
@@ -785,24 +793,47 @@ EFI_STATUS UpdateRollbackSyscall ()
   MajorVersion = (FeatureVersion >> 22) & 0x3FF;
   MinorVersion = (FeatureVersion >> 12) & 0x3FF;
   if (MajorVersion > 5 || (MajorVersion == 5 && MinorVersion > 1)) {
-    // Make ScmSipSysCall to update rollback
-    Status = pQcomScmProtocol->ScmSipSysCall (
-          pQcomScmProtocol, TZ_UPDATE_ROLLBACK_VERSION_ID,
-          TZ_UPDATE_ROLLBACK_VERSION_ID_PARAM_ID, Parameters, Results);
-    if (Status != EFI_SUCCESS) {
-      DEBUG ((EFI_D_ERROR, "UpdateRollbackSyscall: ScmCall Status: (0x%x)\r\n",
-               Status));
-      Status = EFI_FAILURE;
-      return Status;
+      // Make ScmSysCall to update rollback
+    Status = pQcomScmProtocol->ScmQseeSysCall (
+        pQcomScmProtocol,
+        TZ_UPDATE_ROLLBACK_VERSION_IF_A_B_PARTITION_FEATURE_ENABLED_ID,
+        TZ_UPDATE_ROLLBACK_VERSION_IF_A_B_PARTITION_FEATURE_ENABLED_ID_PARAM_ID,
+        Parameters, Results);
+
+    if (Status == EFI_UNSUPPORTED) {
+        DEBUG ((EFI_D_ERROR, "UpdateRollbackSyscall: ScmCall Status:"
+                " (0x%x)\r\n", Status));
+        Status = pQcomScmProtocol->ScmSipSysCall (
+                 pQcomScmProtocol, TZ_UPDATE_ROLLBACK_VERSION_ID,
+                 TZ_UPDATE_ROLLBACK_VERSION_ID_PARAM_ID, Parameters, Results);
+        if (Status != EFI_SUCCESS) {
+            DEBUG ((EFI_D_ERROR, "UpdateRollbackSyscall: ScmCall Status:"
+                    " (0x%x)\r\n", Status));
+            Status = EFI_FAILURE;
+            return Status;
+        }
+        if (SysCallRsp->status != 1) {
+            Status = SysCallRsp->status;
+            DEBUG ((EFI_D_ERROR, "TZ_UPDATE_ROLLBACK_VERSION_ID"
+                    " failed, Status = (0x%x)\r\n", Status));
+            return Status;
+        }
+    } else if (Status != EFI_SUCCESS) {
+        DEBUG ((EFI_D_ERROR, "UpdateRollbackSyscall: ScmCall Status:"
+                " (0x%x)\r\n", Status));
+        Status = EFI_FAILURE;
+        return Status;
     }
     if (SysCallRsp->status != 1) {
       Status = SysCallRsp->status;
-      DEBUG(( EFI_D_ERROR, "TZ_UPDATE_ROLLBACK_VERSION_ID failed, "
-                    "Status = (0x%x)\r\n", Status));
+      DEBUG ((EFI_D_ERROR,
+              "TZ_UPDATE_ROLLBACK_VERSION_IF_A_B_PARTITION_FEATURE_ENABLED_ID"
+              " failed, Status = (0x%x)\r\n", Status));
       return Status;
     }
   } else {
-    DEBUG ((EFI_D_WARN, "UpdateRollbackSyscall: Older TZ, skipping update"));
+      DEBUG ((EFI_D_WARN,
+              "UpdateRollbackSyscall: Older TZ, skipping update\n"));
   }
   return Status;
 }
