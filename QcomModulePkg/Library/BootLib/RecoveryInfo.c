@@ -60,3 +60,27 @@ EFI_STATUS RI_GetActiveSlot (Slot *ActiveSlot)
    return EFI_SUCCESS;
 
 }
+
+EFI_STATUS RI_HandleFailedSlot (Slot ActiveSlot)
+{
+  EFI_STATUS Status = EFI_SUCCESS ;
+  EFI_RECOVERYINFO_PROTOCOL *pRecoveryInfoProtocol = NULL;
+  BootSetType BootSet = SET_INVALID;
+
+  Status = gBS->LocateProtocol (& gEfiRecoveryInfoProtocolGuid, NULL,
+                                (VOID **) & pRecoveryInfoProtocol);
+  if (Status != EFI_SUCCESS) {
+    return Status;
+  }
+
+  if (!StrCmp (ActiveSlot.Suffix, (CONST CHAR16 *)L"_a")) {
+    BootSet = SET_A;
+  } else if (!StrCmp (ActiveSlot.Suffix, (CONST CHAR16 *)L"_b")) {
+    BootSet = SET_B;
+  }
+
+  Status = pRecoveryInfoProtocol->HandleFailedSet (pRecoveryInfoProtocol,
+                                                    BootSet);
+  return EFI_UNSUPPORTED;
+}
+

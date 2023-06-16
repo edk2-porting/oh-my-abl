@@ -83,7 +83,9 @@
 #include <Library/HypervisorMvCalls.h>
 #include <Library/UpdateCmdLine.h>
 #include <Protocol/EFICardInfo.h>
+
 #include <Protocol/EFIClock.h>
+#include "RecoveryInfo.h"
 
 #define MAX_APP_STR_LEN 64
 #define MAX_NUM_FS 10
@@ -482,6 +484,12 @@ flashless_boot:
     Status = LoadImageAndAuth (&Info, FALSE, SetRotAndBootState);
     if (Status != EFI_SUCCESS) {
       DEBUG ((EFI_D_ERROR, "LoadImageAndAuth failed: %r\n", Status));
+      if (IsRecoveryInfo ()) {
+        Slot CurrentSlot ;
+        CurrentSlot = GetCurrentSlotSuffix ();
+        RI_HandleFailedSlot (CurrentSlot);
+        /*No return*/
+      }
       goto fastboot;
     }
 
