@@ -18,14 +18,25 @@ BOOLEAN IsRecoveryInfo ()
 {
   EFI_STATUS Status = EFI_SUCCESS ;
   EFI_RECOVERYINFO_PROTOCOL *pRecoveryInfoProtocol = NULL;
+  RECOVERY_STATUS_STATE RecoveryState;
 
   if (HasRecoveryInfo == -1 ) {
+    DEBUG (( EFI_D_VERBOSE,  "Initializing HasRecoveryInfo\n"));
     Status = gBS->LocateProtocol (& gEfiRecoveryInfoProtocolGuid, NULL,
                                   (VOID **) & pRecoveryInfoProtocol);
-    if (Status == EFI_SUCCESS) {
-      HasRecoveryInfo = 1;
-    } else {
+    if (Status != EFI_SUCCESS) {
       HasRecoveryInfo = 0;
+      return FALSE;
+    }
+
+    Status = pRecoveryInfoProtocol -> GetRecoveryState (pRecoveryInfoProtocol,
+                                                        &RecoveryState);
+    if (Status != EFI_SUCCESS) {
+      HasRecoveryInfo = 1;
+    } else if ((RecoveryState != RECOVERY_INFO_PARTITION_FAIL) &&
+         (Status == EFI_SUCCESS)) {
+      DEBUG (( EFI_D_INFO,  "RecoveryInfo is enabled\n"));
+      HasRecoveryInfo = 1;
     }
   }
 
