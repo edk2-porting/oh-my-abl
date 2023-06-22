@@ -53,7 +53,7 @@
 /*
  * Changes from Qualcomm Innovation Center are provided under the following
  * license:
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted (subject to the limitations in the disclaimer
@@ -347,17 +347,20 @@ out:
 		avb_free(Page);
 	}
 
-        if (avb_strncmp ("boot", Partition, 4) == 0) {
+        if (Partition != NULL) {
+            if (avb_strncmp ("boot", Partition, 4) == 0) {
                 BootStatsSetTimeStamp (BS_KERNEL_LOAD_BOOT_END);
-        } else if (avb_strncmp ("vendor_boot", Partition, 11) == 0) {
+            } else if (avb_strncmp ("vendor_boot", Partition, 11) == 0) {
                 BootStatsSetTimeStamp (BS_KERNEL_LOAD_VENDOR_BOOT_END);
-        } else if (avb_strncmp ("init_boot", Partition, 9) == 0) {
+            } else if (avb_strncmp ("init_boot", Partition, 9) == 0) {
                 BootStatsSetTimeStamp (BS_KERNEL_LOAD_INIT_BOOT_END);
+            }
+
+            DEBUG ((EFI_D_INFO, "Load Image %a total time: %lu ms \n",
+                Partition, GetTimerCountms () - LoadImageStartTime));
         }
 
-    DEBUG ((EFI_D_INFO, "Load Image %a total time: %lu ms \n",
-          Partition, GetTimerCountms () - LoadImageStartTime));
-	return Result;
+        return Result;
 }
 
 AvbIOResult AvbWriteToPartition(AvbOps *Ops, const char *Partition, int64_t Offset,

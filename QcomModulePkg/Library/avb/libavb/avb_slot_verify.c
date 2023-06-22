@@ -447,13 +447,15 @@ static AvbSlotVerifyResult load_and_verify_hash_partition(
   if (image_size_to_hash > image_size) {
     image_size_to_hash = image_size;
   }
-  if (avb_strcmp((const char*)hash_desc.hash_algorithm, "sha256") == 0) {
+  if (avb_strncmp ((const char*)hash_desc.hash_algorithm, "sha256",
+      sizeof ("sha256")) == 0) {
     avb_sha256_init(&sha256_ctx);
     avb_sha256_update(&sha256_ctx, desc_salt, hash_desc.salt_len);
     avb_sha256_update(&sha256_ctx, image_buf, image_size_to_hash);
     digest = avb_sha256_final(&sha256_ctx);
     digest_len = AVB_SHA256_DIGEST_SIZE;
-  } else if (avb_strcmp((const char*)hash_desc.hash_algorithm, "sha512") == 0) {
+  } else if (avb_strncmp ((const char*)hash_desc.hash_algorithm, "sha512",
+             sizeof ("sha512")) == 0) {
     avb_sha512_init(&sha512_ctx);
     avb_sha512_update(&sha512_ctx, desc_salt, hash_desc.salt_len);
     avb_sha512_update(&sha512_ctx, image_buf, image_size_to_hash);
@@ -1220,14 +1222,14 @@ static AvbSlotVerifyResult load_and_verify_vbmeta(
           part_name[hashtree_desc.partition_name_len] = '\0';
 
           /* Determine the expected digest size from the hash algorithm. */
-          if (avb_strcmp((const char*)hashtree_desc.hash_algorithm, "sha1") ==
-              0) {
+          if (avb_strncmp ((const char*)hashtree_desc.hash_algorithm, "sha1",
+              sizeof ("sha1")) == 0) {
             digest_len = AVB_SHA1_DIGEST_SIZE;
-          } else if (avb_strcmp((const char*)hashtree_desc.hash_algorithm,
-                                "sha256") == 0) {
+          } else if (avb_strncmp ((const char*)hashtree_desc.hash_algorithm,
+                     "sha256", sizeof ("sha256")) == 0) {
             digest_len = AVB_SHA256_DIGEST_SIZE;
-          } else if (avb_strcmp((const char*)hashtree_desc.hash_algorithm,
-                                "sha512") == 0) {
+          } else if (avb_strncmp ((const char*)hashtree_desc.hash_algorithm,
+                     "sha512", sizeof ("sha512")) == 0) {
             digest_len = AVB_SHA512_DIGEST_SIZE;
           } else {
             avb_errorv(part_name, ": Unsupported hash algorithm.\n", NULL);
