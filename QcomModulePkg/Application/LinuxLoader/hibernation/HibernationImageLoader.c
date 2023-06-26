@@ -908,7 +908,7 @@ static INT32 ReadDataPages (VOID *Arg)
                 if (Ret < 0) {
                         printf ("Disk read failed Line %d\n", __LINE__);
                         Info->Status = -1;
-                        return -1;
+                        goto err;
                 }
 
                 SrcPfn = (UINT64) Info->DiskReadBuffer >> PAGE_SHIFT;
@@ -939,9 +939,7 @@ static INT32 ReadDataPages (VOID *Arg)
                 }
         }
         Info->Status = 0;
-#if HIBERNATION_SUPPORT_AES
 err:
-#endif
         KernIntf->Sem->SemPost (Info->Sem, FALSE);
         return 0;
 }
