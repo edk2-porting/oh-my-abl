@@ -94,6 +94,9 @@ fi
 if [ -n "${UBUNTU_AB_OTA}" ]; then
   MAKE_FLAGS+=("UBUNTU_AB_OTA=${UBUNTU_AB_OTA}")
 fi
+if [ -n "${RW_ROOTFS}" ]; then
+  MAKE_FLAGS+=("RW_ROOTFS=${RW_ROOTFS}")
+fi
 if [ -n "${TARGET_AUDIO_FRAMEWORK}" ]; then
   MAKE_FLAGS+=("TARGET_AUDIO_FRAMEWORK=${TARGET_AUDIO_FRAMEWORK}")
 fi

@@ -234,6 +234,9 @@
   !if $(UBUNTU_AB_OTA)
       GCC:*_*_*_CC_FLAGS = -DUBUNTU_AB_OTA
   !endif
+  !if $(RW_ROOTFS)
+      GCC:*_*_*_CC_FLAGS = -DRW_ROOTFS
+  !endif
 
 [PcdsFixedAtBuild.common]
 
