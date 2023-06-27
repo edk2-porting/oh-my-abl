@@ -231,6 +231,9 @@
   !if $(EXTRA_TARGET_OPTFLAGS) != ""
       GCC:*_*_*_ARCHCC_FLAGS = $(EXTRA_TARGET_OPTFLAGS)
   !endif
+  !if $(UBUNTU_AB_OTA)
+      GCC:*_*_*_CC_FLAGS = -DUBUNTU_AB_OTA
+  !endif
 
 [PcdsFixedAtBuild.common]
 

@@ -474,12 +474,16 @@ GetSystemPath (CHAR8 **SysPath, BOOLEAN MultiSlotBoot, BOOLEAN BootIntoRecovery,
             StrLen (ReqPartition));
   }
 
+  /* If it support Ubuntu ab ota, there are not system _a and _b slot.
+   * And there is only one system partition.*/
+#ifndef UBUNTU_AB_OTA
   /* Append slot info for A/B Variant */
   if (MultiSlotBoot &&
       NAND != CheckRootDeviceType ()) {
      StrnCatS (PartitionName, MAX_GPT_NAME_SIZE, CurSlot.Suffix,
             StrLen (CurSlot.Suffix));
   }
+#endif
 
   Index = GetPartitionIndex (PartitionName);
   if (Index == INVALID_PTN || Index >= MAX_NUM_PARTITIONS) {
