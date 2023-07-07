@@ -76,6 +76,7 @@
 #include <Protocol/EFIPmicPon.h>
 #include <Protocol/Print2.h>
 #include <Library/EarlyUsbInit.h>
+#include <Library/IntegrityIMA.h>
 
 #include "AutoGen.h"
 #include "DeviceInfo.h"
@@ -984,6 +985,11 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
     AsciiStrCatS (Dst, MaxCmdLineLen, Src);
   }
 
+  if (IsIntegrityIMAEnabled ()) {
+    Src = Param->IntegrityIMACmdline;
+    AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+  }
+
   if (IsHibernationEnabled ()) {
     Src = Param->ResumeCmdLine;
     AsciiStrCatS (Dst, MaxCmdLineLen, Src);
@@ -1235,6 +1241,7 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
   CHAR8 MemOffAmt[MEM_OFF_SIZE];
   BOOLEAN BootConfigFlag = FALSE;
   CHAR8 UsbCompositionCmdline[COMPOSITION_CMDLINE_LEN]= "\0";
+  CHAR8 IntegrityIMACmdline[IMA_CMDLINE_LEN] = "\0";
 
   CONST CHAR8 *CmdLine = BootParamlistPtr->CmdLine;
   CHAR8 **FinalCmdLine = &BootParamlistPtr->FinalCmdLine;
@@ -1672,6 +1679,11 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
     CmdLineLen += AsciiStrLen (UsbCompositionCmdline);
   }
 
+  if (IsIntegrityIMAEnabled ()) {
+    GetIntegrityIMACmdline (IntegrityIMACmdline);
+    CmdLineLen += AsciiStrLen (IntegrityIMACmdline);
+  }
+
   if (BootCpuSelectionEnabled ()) {
     AsciiSPrint (BootCpuCmdLine, sizeof (BootCpuCmdLine), " boot_cpu=%d",
                  BootCpuId);
@@ -1741,6 +1753,10 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
 
   if (EarlyUsbInitEnabled ()) {
     Param.UsbCompCmdLine = UsbCompositionCmdline;
+  }
+
+  if (IsIntegrityIMAEnabled ()) {
+    Param.IntegrityIMACmdline = IntegrityIMACmdline;
   }
 
   if (IsHibernationEnabled ()) {

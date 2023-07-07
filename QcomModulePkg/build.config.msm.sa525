@@ -13,6 +13,8 @@ EARLY_ETH_ENABLED=1
 TARGET_SUPPORTS_EARLY_USB_INIT=1
 NAND_UBI_VOLUME_FLASHING_ENABLED=1
 CMDLINE_SHOW_SECURE_BOOT_STATUS=1
+INTEGRITY_LE_IMA=0
+INTEGRITY_LE_EVM=0
 
 ################################################################################
 . ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.common
