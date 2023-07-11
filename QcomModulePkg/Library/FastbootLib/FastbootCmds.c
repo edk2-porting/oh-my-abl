@@ -1745,9 +1745,13 @@ ReenumeratePartTable (VOID)
     /*Check for multislot boot support*/
     MultiSlotBoot = PartitionHasMultiSlot (L"boot");
     if (MultiSlotBoot) {
-      UpdatePartitionAttributes (PARTITION_ALL);
-      FindPtnActiveSlot ();
-      PopulateMultislotMetadata ();
+      if (!IsRecoveryInfo ()) {
+        UpdatePartitionAttributes (PARTITION_ALL);
+        FindPtnActiveSlot ();
+        PopulateMultislotMetadata ();
+      } else {
+        DEBUG (( EFI_D_ERROR, "Skip UpdateParitionAttribute\n"));
+      }
       DEBUG ((EFI_D_VERBOSE, "Multi Slot boot is supported\n"));
     } else {
       DEBUG ((EFI_D_VERBOSE, "Multi Slot boot is not supported\n"));
