@@ -53,6 +53,11 @@ EFI_STATUS RI_GetActiveSlot (Slot *ActiveSlot)
     return Status;
   }
 
+  if (BootSet >= (sizeof (Slots) / sizeof (Slot))) {
+    DEBUG ((EFI_D_ERROR, "GetBootSet: Invalid BootSet chosen"));
+    return EFI_UNSUPPORTED;
+  }
+
   /* SET_A = 0 SET_B = 1 */
    GUARD (StrnCpyS (ActiveSlot->Suffix, ARRAY_SIZE (ActiveSlot->Suffix),
                     Slots[BootSet].Suffix,
