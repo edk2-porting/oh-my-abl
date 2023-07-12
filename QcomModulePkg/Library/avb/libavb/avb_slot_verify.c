@@ -417,14 +417,13 @@ static AvbSlotVerifyResult load_and_verify_hash_partition(
     avb_debugv(part_name, ": Loading entire partition.\n", NULL);
   }
 
-  ret = load_full_partition(
-      ops, part_name, image_size, &image_buf, &image_preloaded);
-  if (ret != AVB_SLOT_VERIFY_RESULT_OK) {
-    goto out;
-  }
-
 #if BOOTIMAGE_LOAD_VERIFY_IN_PARALLEL
   if ((avb_strncmp ("boot", part_name, 4) == 0)) {
+    image_buf = avb_malloc (image_size);
+    if (image_buf == NULL) {
+      ret = AVB_SLOT_VERIFY_RESULT_ERROR_OOM;
+      goto out;
+    }
     ret = LoadAndVerifyBootHashPartition (ops,
                                           hash_desc,
                                           part_name,
@@ -433,7 +432,19 @@ static AvbSlotVerifyResult load_and_verify_hash_partition(
                                           image_buf,
                                           hash_desc.image_size);
     goto out;
+  } else {
+    ret = load_full_partition (
+        ops, part_name, image_size, &image_buf, &image_preloaded);
+    if (ret != AVB_SLOT_VERIFY_RESULT_OK) {
+      goto out;
+    }
   }
+#else
+    ret = load_full_partition (
+        ops, part_name, image_size, &image_buf, &image_preloaded);
+    if (ret != AVB_SLOT_VERIFY_RESULT_OK) {
+      goto out;
+    }
 #endif
 
   // Although only one of the type might be used, we have to defined the
