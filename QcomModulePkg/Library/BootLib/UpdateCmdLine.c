@@ -107,6 +107,7 @@ STATIC CONST CHAR8 *AndroidBootMode = " androidboot.mode=";
 STATIC CONST CHAR8 *LogLevel = " quite";
 STATIC CONST CHAR8 *BatteryChgPause = " androidboot.mode=charger";
 STATIC CONST CHAR8 *MdtpActiveFlag = " mdtp";
+STATIC CONST CHAR8 *PartActiveBoot = " part.activeboot=boot";
 STATIC CONST CHAR8 *AlarmBootCmdLine = " androidboot.alarmboot=true";
 STATIC CHAR8 SystemdSlotEnv[] = " systemd.setenv=\"SLOT_SUFFIX=_a\"";
 STATIC CONST CHAR8 *NoPasr = " mem_offline.nopasr=1";
@@ -547,9 +548,16 @@ GetSystemPath (CHAR8 **SysPath, BOOLEAN MultiSlotBoot, BOOLEAN BootIntoRecovery,
                    " rootfstype=squashfs root=/dev/mtdblock%d ubi.mtd=%d",
                    MtdBlkIndex, (Index - 1));
     } else {
-      AsciiSPrint (*SysPath, MAX_PATH_SIZE,
+      Slot CurSlot = GetCurrentSlotSuffix ();
+      if (MultiSlotBoot) {
+        AsciiSPrint (*SysPath, MAX_PATH_SIZE,
+         " rootfstype=ubifs rootflags=bulk_read root=ubi0:rootfs%s ubi.mtd=%d",
+                 CurSlot.Suffix, (Index - 1));
+      } else {
+        AsciiSPrint (*SysPath, MAX_PATH_SIZE,
           " rootfstype=ubifs rootflags=bulk_read root=ubi0:rootfs ubi.mtd=%d",
           (Index - 1));
+      }
     }
   } else if (!AsciiStrCmp ("UFS", RootDevStr)) {
     AsciiSPrint (*SysPath, MAX_PATH_SIZE, " %a=/dev/sd%c%d",
@@ -867,6 +875,21 @@ UpdateCmdLineParams (UpdateCmdLineParamList *Param, CHAR8 **FinalCmdLine,
   if (Param->MdtpActive) {
     Src = Param->MdtpActiveFlag;
     AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+  }
+
+  if (NAND == CheckRootDeviceType ()) {
+    Src = PartActiveBoot;
+    AsciiStrCatS (Dst, MaxCmdLineLen, Src);
+    if (Param->MultiSlotBoot) {
+      Slot CurrentSlot = GetCurrentSlotSuffix ();
+      if (!IsRecoveryInfo () ||
+         (StrCmp (CurrentSlot.Suffix, L"_a"))) {
+        char CurSlotSuffix[sizeof (CurrentSlot.Suffix)];
+        AsciiSPrint (CurSlotSuffix, sizeof (CurrentSlot.Suffix),
+                     "%s", CurrentSlot.Suffix);
+        AsciiStrCatS (Dst, MaxCmdLineLen, CurSlotSuffix);
+      }
+    }
   }
 
   if (Param->MultiSlotBoot) {
@@ -1435,6 +1458,18 @@ UpdateCmdLine (BootParamlist *BootParamlistPtr,
     AddtoBootConfigList (BootConfigFlag, MdtpActiveFlag, NULL,
                      BootConfigListHead, ParamLen, 0);
   }
+
+  if (NAND == CheckRootDeviceType ()) {
+    /* Add additional length for slot suffix */
+    ParamLen = AsciiStrLen (PartActiveBoot) + MAX_SLOT_SUFFIX_SZ;
+    BootConfigFlag = IsAndroidBootParam (PartActiveBoot,
+                               ParamLen, HeaderVersion);
+    ADD_PARAM_LEN (BootConfigFlag, ParamLen, CmdLineLen,
+                                         BootConfigLen);
+    AddtoBootConfigList (BootConfigFlag, PartActiveBoot, NULL,
+                     BootConfigListHead, ParamLen, 0);
+  }
+
   MultiSlotBoot = PartitionHasMultiSlot ((CONST CHAR16 *)L"boot");
   if (MultiSlotBoot &&
      !IsBootDevImage ()) {
