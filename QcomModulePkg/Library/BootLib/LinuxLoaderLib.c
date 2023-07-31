@@ -83,6 +83,7 @@
 #define FILE_INFO_SIZE (SIZE_OF_EFI_FILE_INFO + 256)
 
 STATIC UINT32 TimerFreq, FactormS;
+STATIC MemCardType RootDeviceType = UNKNOWN;
 
 /* Returns 0 if the volume label matches otherwise non zero */
 STATIC UINTN
@@ -530,6 +531,13 @@ GetNandMiscPartiGuid (EFI_GUID *Ptype)
   return Status;
 }
 
+VOID StoreRootDeviceType (VOID)
+{
+    if (RootDeviceType == UNKNOWN) {
+        RootDeviceType = CheckRootDeviceType ();
+    }
+}
+
 EFI_STATUS
 WriteBlockToPartitionNoFlush (EFI_BLOCK_IO_PROTOCOL *BlockIo,
                    IN EFI_HANDLE *Handle,
@@ -562,7 +570,7 @@ WriteBlockToPartitionNoFlush (EFI_BLOCK_IO_PROTOCOL *BlockIo,
     * NOTE: For NAND Targets, BlockSize would be EraseLengthGranularity
     * aligned which is available in EFI_ERASE_BLOCK_PROTOCOL.
     */
-  if (CheckRootDeviceType () == NAND) {
+  if (RootDeviceType == NAND) {
     if (Handle == NULL) {
       DEBUG ((EFI_D_ERROR, "WriteBlockToPartition: Input Handle is Null.\n"));
       return EFI_INVALID_PARAMETER;
