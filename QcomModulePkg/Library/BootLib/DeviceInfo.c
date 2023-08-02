@@ -163,9 +163,8 @@ ReadAudioFrameWork (CHAR8 **CmdLine, UINT32 *CmdLineLen)
 {
   EFI_STATUS Status = EFI_SUCCESS;
 
-  Status =
-      ReadWriteDeviceInfo (READ_CONFIG, (VOID *)&DevInfo, sizeof (DevInfo));
-  if (Status != EFI_SUCCESS) {
+  if (FirstReadDevInfo == TRUE) {
+    Status = EFI_NOT_STARTED;
     DEBUG ((EFI_D_ERROR, "Unable to read audio framework: %r\n", Status));
     return Status;
   }

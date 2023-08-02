@@ -426,13 +426,19 @@ GetAudioFrameWork (CHAR8 *FrameWork, UINT32* Length)
 {
   EFI_STATUS Status;
   CHAR8 *Src;
+  CHAR8 *AUDIOFRAMEWORK;
 
-  Status = ReadAudioFrameWork (&Src, Length);
-  if (Status == EFI_SUCCESS) {
-     if (*Length) {
+  AUDIOFRAMEWORK = GetAudioFw ();
+
+  if ((*Length = AsciiStrLen (AUDIOFRAMEWORK)) > 0) {
+      AsciiStrCpyS (FrameWork, *Length + 1, AUDIOFRAMEWORK);
+      Status = ReadAudioFrameWork (&Src, Length);
+    if (Status == EFI_SUCCESS) {
+      if (*Length) {
         AsciiStrCpyS (FrameWork, *Length, Src);
-   }
- }
+      }
+    }
+  }
 }
 
 /*

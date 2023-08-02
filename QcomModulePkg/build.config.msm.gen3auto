@@ -14,6 +14,7 @@ EARLY_ETH_AS_DLKM=1
 ENABLE_EARLY_SERVICES=1
 KERNEL_LOAD_ADDRESS=0xC0000000
 KERNEL_SIZE_RESERVED=0x0C800000
+TARGET_AUDIO_FRAMEWORK="elite"
 ################################################################################
 . ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.common
 . ${ROOT_DIR}/${ABL_SRC}/QcomModulePkg/build.config.msm.signature_v1
