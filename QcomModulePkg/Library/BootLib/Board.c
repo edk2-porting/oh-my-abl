@@ -400,10 +400,10 @@ CheckRootDeviceType (VOID)
   EFI_MEM_CARDINFO_PROTOCOL *CardInfo;
   /*For network boot, avoid uefi call to get the root device type
   and return UNKNOWN. */
-  UINT8 Val = GetBootDeviceType ();
+  UINT32 Val = GetBootDeviceType ();
 
   if (Val == EFI_EMMC_NETWORK_FLASH_TYPE) {
-    return Type;
+    return UNKNOWN;
   }
 
   if (Type == UNKNOWN) {
