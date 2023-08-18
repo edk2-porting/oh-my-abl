@@ -3806,7 +3806,7 @@ PublishGetVarPartitionInfo (
 
   /* Loop will go through each partition entry
      and publish info for all partitions.*/
-  for (PtnLoopCount = 1; PtnLoopCount <= NumParts; PtnLoopCount++) {
+  for (PtnLoopCount = 0; PtnLoopCount < NumParts; PtnLoopCount++) {
     PublishType = FALSE;
     PublishSize = FALSE;
     PartitionNameUniCode = PtnEntries[PtnLoopCount].PartEntry.PartitionName;
