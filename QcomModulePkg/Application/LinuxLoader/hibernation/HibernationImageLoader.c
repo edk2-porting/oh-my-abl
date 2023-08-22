@@ -352,7 +352,7 @@ static UINT64 GetUnusedPfn ()
  * are kept unallocated for UEFI to use. If kernel has any destined pages in
  * this region, that will be bounced.
  */
-static VOID PreallocateFreeRanges (VOID)
+static INT32 PreallocateFreeRanges (VOID)
 {
         INT32 Iter = 0, Ret;
         INT32 ReservationDone = 0;
@@ -388,8 +388,10 @@ static VOID PreallocateFreeRanges (VOID)
                         printf (
                         "WARN: Prealloc falied LINE %d alloc_addr = 0x%lx\n",
                          __LINE__, AllocAddr);
+                        return Ret;
                 }
         }
+        return 0;
 }
 
 /* Assumption: There is no overlap in the regions */
@@ -1414,8 +1416,17 @@ static INT32 RestoreSnapshotImage (VOID)
          * No dynamic allocation beyond this point. If not honored it will
          * result in corruption of pages.
          */
-        GetConventionalMemoryRanges ();
-        PreallocateFreeRanges ();
+        Ret = GetConventionalMemoryRanges ();
+        if (Ret < 0) {
+                printf ("Error getting memory regions\n");
+                goto err;
+        }
+
+        Ret = PreallocateFreeRanges ();
+        if (Ret < 0) {
+                printf ("Error allocating memory\n");
+                goto err;
+        }
 
         Bti->FirstTable = (struct BounceTable *)
                                 (GetUnusedPfn () << PAGE_SHIFT);
