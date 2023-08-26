@@ -295,20 +295,12 @@ BOOLEAN IsDisableParallelDownloadFlash (VOID)
 STATIC EFI_STATUS FastbootUnInit (VOID)
 {
   FASTBOOT_VAR *Var;
-  FASTBOOT_VAR *VarPrev = NULL;
 
-  for (Var = Varlist; Var && Var->next; Var = Var->next) {
-    if (VarPrev) {
-      FreePool (VarPrev);
-      VarPrev = NULL;
-    }
-    VarPrev = Var;
-  }
-  if (Var) {
+  while (Varlist) {
+    Var = Varlist;
+    Varlist = Varlist->next;
     FreePool (Var);
-    Var = NULL;
   }
-
   return EFI_SUCCESS;
 }
 
