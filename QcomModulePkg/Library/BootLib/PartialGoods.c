@@ -743,7 +743,9 @@ ReadCpuPartialGoods (EFI_CHIPINFO_PROTOCOL *pChipInfoProtocol, UINT32 *Value)
     Status =
         pChipInfoProtocol->GetDisabledCPUs (pChipInfoProtocol, CpuCluster,
                                              Value);
-  } else {
+  }
+  if (pChipInfoProtocol->Revision < EFI_CHIPINFO_PROTOCOL_REVISION_5 ||
+     Status == EFI_NOT_FOUND) {
     Status =
         pChipInfoProtocol->GetSubsetCPUs (pChipInfoProtocol, CpuCluster,
                                              Value);
@@ -778,7 +780,9 @@ ReadMMPartialGoods (EFI_CHIPINFO_PROTOCOL *pChipInfoProtocol, UINT32 *Value)
                                             i, 0, &SubsetBoolVal);
       SubsetVal = (UINT32) SubsetBoolVal;
 
-    } else {
+    }
+    if (pChipInfoProtocol->Revision < EFI_CHIPINFO_PROTOCOL_REVISION_5 ||
+       Status == EFI_NOT_FOUND) {
       /* Ensure to reset the Value before checking for Part Subset*/
       SubsetVal = 0;
       Status =
