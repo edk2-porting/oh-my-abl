@@ -199,6 +199,7 @@
 	gEfiDisplayPowerStateProtocolGuid
 	gEfiRecoveryInfoProtocolGuid
 	gEfiClockProtocolGuid
+	gQcomPmicSdamProtocolGuid
 
 [FixedPcd]
 	gArmTokenSpaceGuid.PcdSystemMemoryBase
