@@ -1,12 +1,12 @@
 ################################################################################
 SECTOOLS=${SECTOOLS_V2}
-SECTOOLS_SECURITY_PROFILE=${SECTOOLS_SECURITY_PROFILE_V2[@]}
+SECTOOLS_SECURITY_PROFILE=${ROOT_DIR}/${ABL_SRC}/security_profile.xml
 
 SECABL_ARGS=("secure-image" "${ABL_OUT_DIR}/unsigned_abl.elf")
-SECABL_ARGS+=("--outfile" "${ABL_IMAGE_DIR}/${ABL_IMAGE_NAME}")
+SECABL_ARGS+=("--outfile" "${ABL_OUT_DIR}/abl_signed.elf")
 EXTRA_SECABL_ARGS=("--image-id" "ABL")
 EXTRA_SECABL_ARGS+=("--security-profile")
 EXTRA_SECABL_ARGS+=("${SECTOOLS_SECURITY_PROFILE}")
-EXTRA_SECABL_ARGS+=("--sign" "--signing-mode" "TEST")
+EXTRA_SECABL_ARGS+=("--sign" "--signing-mode" "TEST" "--verbose")
 
 SECABL_CMD=("${SECTOOLS}" "${SECABL_ARGS[@]}" "${EXTRA_SECABL_ARGS[@]}")

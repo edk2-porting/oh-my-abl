@@ -180,14 +180,15 @@ EFI_STATUS PreparePlatformHardware (EFI_KERNEL_PROTOCOL *KernIntf,
 VOID
 RebootDevice (UINT8 RebootReason)
 {
-  ResetDataType ResetData;
+  UINTN Pages = EFI_SIZE_TO_PAGES(sizeof(ResetDataType)) + 1;
+  ResetDataType *ResetData = AllocatePages(Pages);
   EFI_STATUS Status = EFI_INVALID_PARAMETER;
 
   WaitForFlashFinished ();
 
-  StrnCpyS (ResetData.DataBuffer, ARRAY_SIZE (ResetData.DataBuffer),
+  StrnCpyS (ResetData->DataBuffer, ARRAY_SIZE (ResetData->DataBuffer),
             (CONST CHAR16 *)STR_RESET_PARAM, ARRAY_SIZE (STR_RESET_PARAM) - 1);
-  ResetData.Bdata = RebootReason;
+  ResetData->Bdata = RebootReason;
   if (RebootReason == NORMAL_MODE)
     Status = EFI_SUCCESS;
 
@@ -197,7 +198,7 @@ RebootDevice (UINT8 RebootReason)
                       STR_RESET_PLAT_SPECIFIC_EDL);
 
   gRT->ResetSystem (EfiResetCold, Status, sizeof (ResetDataType),
-                    (VOID *)&ResetData);
+                    (VOID *)ResetData);
 }
 
 VOID ShutdownDevice (VOID)

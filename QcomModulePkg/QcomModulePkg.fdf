@@ -145,6 +145,11 @@ FvNameGuid         = 046fae99-cf2e-49ed-a6a8-a1488b7e80d3
 
 INF QcomModulePkg/Application/LinuxLoader/LinuxLoader.inf
 
+# FILE APPLICATION = f536d559-459f-48fa-8bbc-43b554ecae8d {
+#   SECTION PE32 = QcomModulePkg/Application/testLinuxLoader/Section_PE32_image_Ebl_Ebl_body.efi
+#   SECTION UI = "LinuxLoader"
+# }
+
 [FV.FVMAIN_COMPACT]
 FvAlignment        = 8
 ERASE_POLARITY     = 1

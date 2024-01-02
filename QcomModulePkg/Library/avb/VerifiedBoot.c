@@ -1808,70 +1808,70 @@ out:
 STATIC EFI_STATUS
 DisplayVerifiedBootScreen (BootInfo *Info)
 {
-  EFI_STATUS Status = EFI_SUCCESS;
-  CHAR8 FfbmStr[FFBM_MODE_BUF_SIZE] = {'\0'};
+  // EFI_STATUS Status = EFI_SUCCESS;
+  // CHAR8 FfbmStr[FFBM_MODE_BUF_SIZE] = {'\0'};
 
   if (GetAVBVersion () < AVB_1) {
     return EFI_SUCCESS;
   }
 
-  if (!StrnCmp (Info->Pname, L"boot", StrLen (L"boot"))) {
-    Status = GetFfbmCommand (FfbmStr, FFBM_MODE_BUF_SIZE);
-    if (Status != EFI_SUCCESS) {
-      DEBUG ((EFI_D_VERBOSE, "No Ffbm cookie found, ignore: %r\n", Status));
-      FfbmStr[0] = '\0';
-    }
-  }
+  // if (!StrnCmp (Info->Pname, L"boot", StrLen (L"boot"))) {
+  //   Status = GetFfbmCommand (FfbmStr, FFBM_MODE_BUF_SIZE);
+  //   if (Status != EFI_SUCCESS) {
+  //     DEBUG ((EFI_D_VERBOSE, "No Ffbm cookie found, ignore: %r\n", Status));
+  //     FfbmStr[0] = '\0';
+  //   }
+  // }
 
   DEBUG ((EFI_D_VERBOSE, "Boot State is : %d\n", Info->BootState));
-  switch (Info->BootState) {
-  case RED:
-    Status = DisplayVerifiedBootMenu (DISPLAY_MENU_RED);
-    if (Status != EFI_SUCCESS) {
-      DEBUG ((EFI_D_INFO,
-              "Your device is corrupt. It can't be trusted and will not boot."
-              "\nYour device will shutdown in 30s\n"));
-    }
-    MicroSecondDelay (30000000);
-    ShutdownDevice ();
-    break;
-  case YELLOW:
-    Status = DisplayVerifiedBootMenu (DISPLAY_MENU_YELLOW);
-    if (Status == EFI_SUCCESS) {
-      WaitForExitKeysDetection ();
-    } else {
-      DEBUG ((EFI_D_INFO, "Your device has loaded a different operating system."
-                          "\nWait for 5 seconds before proceeding\n"));
-    }
-    break;
-  case ORANGE:
-    if (FfbmStr[0] != '\0' && !TargetBuildVariantUser ()) {
-      DEBUG ((EFI_D_VERBOSE, "Device will boot into FFBM mode\n"));
-    } else {
-      Status = DisplayVerifiedBootMenu (DISPLAY_MENU_ORANGE);
-      if (Status == EFI_SUCCESS) {
-        WaitForExitKeysDetection ();
-      } else {
-        DEBUG (
-            (EFI_D_INFO, "Device is unlocked, Skipping boot verification\n"));
-      }
-    }
-    break;
-  default:
-    break;
-  }
+  // switch (Info->BootState) {
+  // case RED:
+  //   Status = DisplayVerifiedBootMenu (DISPLAY_MENU_RED);
+  //   if (Status != EFI_SUCCESS) {
+  //     DEBUG ((EFI_D_INFO,
+  //             "Your device is corrupt. It can't be trusted and will not boot."
+  //             "\nYour device will shutdown in 30s\n"));
+  //   }
+  //   MicroSecondDelay (30000000);
+  //   ShutdownDevice ();
+  //   break;
+  // case YELLOW:
+  //   Status = DisplayVerifiedBootMenu (DISPLAY_MENU_YELLOW);
+  //   if (Status == EFI_SUCCESS) {
+  //     WaitForExitKeysDetection ();
+  //   } else {
+  //     DEBUG ((EFI_D_INFO, "Your device has loaded a different operating system."
+  //                         "\nWait for 5 seconds before proceeding\n"));
+  //   }
+  //   break;
+  // case ORANGE:
+  //   if (FfbmStr[0] != '\0' && !TargetBuildVariantUser ()) {
+  //     DEBUG ((EFI_D_VERBOSE, "Device will boot into FFBM mode\n"));
+  //   } else {
+  //     Status = DisplayVerifiedBootMenu (DISPLAY_MENU_ORANGE);
+  //     if (Status == EFI_SUCCESS) {
+  //       WaitForExitKeysDetection ();
+  //     } else {
+  //       DEBUG (
+  //           (EFI_D_INFO, "Device is unlocked, Skipping boot verification\n"));
+  //     }
+  //   }
+  //   break;
+  // default:
+  //   break;
+  // }
 
   /* dm-verity warning */
-  if ( !IsEnforcing () &&
-       !Info->BootIntoRecovery) {
-      Status = DisplayVerifiedBootMenu (DISPLAY_MENU_EIO);
-      if (Status == EFI_SUCCESS) {
-        WaitForExitKeysDetection ();
-      } else {
-        DEBUG ((EFI_D_INFO, "The dm-verity is not started in restart mode." \
-              "\nWait for 30 seconds before proceeding\n"));
-      }
-  }
+  // if ( !IsEnforcing () &&
+  //      !Info->BootIntoRecovery) {
+  //     Status = DisplayVerifiedBootMenu (DISPLAY_MENU_EIO);
+  //     if (Status == EFI_SUCCESS) {
+  //       WaitForExitKeysDetection ();
+  //     } else {
+  //       DEBUG ((EFI_D_INFO, "The dm-verity is not started in restart mode." \
+  //             "\nWait for 30 seconds before proceeding\n"));
+  //     }
+  // }
 
   return EFI_SUCCESS;
 }

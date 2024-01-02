@@ -2993,11 +2993,70 @@ out:
 }
 #endif
 
+// #define DEFINE_INSTCODE(name, ...) static void name() { asm volatile(".word " #__VA_ARGS__ : : : ); };
+
+// DEFINE_INSTCODE(some_neon, 0x4e20d400) // fadd v0.4s,v0.4s,v0.4s
+// DEFINE_INSTCODE(some_vfpv4, 0x0e216800) // fcvtn v0.4h,v0.4s
+// DEFINE_INSTCODE(some_cpuid, 0xd5380000) // mrs x0,midr_el1
+// DEFINE_INSTCODE(some_asimdhp, 0x0e401400) // fadd v0.4h,v0.4h,v0.4h
+// DEFINE_INSTCODE(some_asimddp, 0x4e809400) // sdot v0.4h,v0.16b,v0.16b
+// DEFINE_INSTCODE(some_asimdfhm, 0x4e20ec00) // fmlal v0.4s,v0.4h,v0.4h
+// DEFINE_INSTCODE(some_bf16, 0x6e40ec00) // bfmmla v0.4h,v0.8h,v0.8h
+// DEFINE_INSTCODE(some_i8mm, 0x4e80a400) // smmla v0.4h,v0.16b,v0.16b
+// DEFINE_INSTCODE(some_sve, 0x65608000) // fmad z0.h,p0/m,z0.h,z0.h
+// DEFINE_INSTCODE(some_sve2, 0x44405000) // smlslb z0.h,z0.b,z0.b
+// DEFINE_INSTCODE(some_svebf16, 0x6460e400) // bfmmla z0.s,z0.h,z0.h
+// DEFINE_INSTCODE(some_svei8mm, 0x45009800) // smmla z0.s,z0.b,z0.b
+// DEFINE_INSTCODE(some_svef32mm, 0x64a0e400) // fmmla z0.s,z0.s,z0.s
+
+// static void mod_cpacr() {
+//   UINTN val, val2, val3;
+//   asm volatile("mrs %0, CPACR_EL1" : "=r" (val));
+//   DEBUG((EFI_D_INFO, "CPACR_EL1 = 0x%x\n", val));
+//   val2 = 0x330000;
+//   asm volatile("msr CPACR_EL1, %0" : "=r" (val2));
+//   asm volatile("mrs %0, CPACR_EL1" : "=r" (val3));
+//   DEBUG((EFI_D_INFO, "CPACR_EL1 = 0x%x\n", val3));
+// }
+
 STATIC VOID
 CmdRebootBootloader (CONST CHAR8 *arg, VOID *data, UINT32 sz)
 {
   DEBUG ((EFI_D_INFO, "Rebooting the device into bootloader mode\n"));
   FastbootOkay ("");
+
+  // mod_cpacr();
+
+
+
+  // DEBUG ((EFI_D_INFO, "Running some_neon\n"));
+  // some_neon();
+  // DEBUG ((EFI_D_INFO, "Running some_vfpv4\n"));
+  // some_vfpv4();
+  // DEBUG ((EFI_D_INFO, "Running some_cpuid\n"));
+  // some_cpuid();
+  // DEBUG ((EFI_D_INFO, "Running some_asimdhp\n"));
+  // some_asimdhp();
+  // DEBUG ((EFI_D_INFO, "Running some_asimddp\n"));
+  // some_asimddp();
+  // DEBUG ((EFI_D_INFO, "Running some_asimdfhm\n"));
+  // some_asimdfhm();
+  // DEBUG ((EFI_D_INFO, "Running some_bf16\n"));
+  // some_bf16();
+  // DEBUG ((EFI_D_INFO, "Running some_i8mm\n"));
+  // some_i8mm();
+  // DEBUG ((EFI_D_INFO, "Running some_sve\n"));
+  // some_sve();
+  // DEBUG ((EFI_D_INFO, "Running some_sve2\n"));
+  // some_sve2();
+  // DEBUG ((EFI_D_INFO, "Running some_svebf16\n"));
+  // some_svebf16();
+  // DEBUG ((EFI_D_INFO, "Running some_svei8mm\n"));
+  // some_svei8mm();
+  // DEBUG ((EFI_D_INFO, "Running some_svef32mm\n"));
+  // some_svef32mm();
+
+
   RebootDevice (FASTBOOT_MODE);
 
   // Shouldn't get here

@@ -109,20 +109,27 @@ STATIC MENU_MSG_INFO mFastbootOptionTitle[] = {
      OPTION_ITEM,
      0,
      POWEROFF},
-    {{"Boot to FFBM"},
-     BIG_FACTOR,
-     BGR_YELLOW,
-     BGR_BLACK,
-     OPTION_ITEM,
-     0,
-     FFBM},
-    {{"Boot to QMMI"},
-     BIG_FACTOR,
-     BGR_YELLOW,
-     BGR_BLACK,
-     OPTION_ITEM,
-     0,
-     QMMI},
+    // {{"Boot to FFBM"},
+    //  BIG_FACTOR,
+    //  BGR_YELLOW,
+    //  BGR_BLACK,
+    //  OPTION_ITEM,
+    //  0,
+    //  FFBM},
+    // {{"Boot to QMMI"},
+    //  BIG_FACTOR,
+    //  BGR_YELLOW,
+    //  BGR_BLACK,
+    //  OPTION_ITEM,
+    //  0,
+    //  QMMI},
+    {{"Emergency Download"},
+      BIG_FACTOR,
+      BGR_RED,
+      BGR_BLACK,
+      OPTION_ITEM,
+      0,
+      REBOOTEDL},
     {{"Boot to Alternate Slot"},
       BIG_FACTOR,
       BGR_RED,
@@ -158,7 +165,7 @@ STATIC MENU_MSG_INFO mFastbootAlternateWarnMsgInfo[] = {
 STATIC MENU_MSG_INFO mFastbootCommonMsgInfo[] = {
     {{"FastBoot Mode"},
      COMMON_FACTOR,
-     BGR_RED,
+     BGR_GREEN,
      BGR_BLACK,
      COMMON,
      0,
@@ -207,7 +214,7 @@ STATIC MENU_MSG_INFO mFastbootCommonMsgInfo[] = {
      NOACTION},
     {{"DEVICE STATE - "},
      COMMON_FACTOR,
-     BGR_RED,
+     BGR_GREEN,
      BGR_BLACK,
      COMMON,
      0,
@@ -309,13 +316,13 @@ UpdateFastbootOptionItem (UINT32 OptionItem, UINT32 *pLocation)
     }
   }
 
-  if (mFastbootOptionTitle[OptionItem].Action == ALTERNATESLOT) {
-    mFastbootAlternateWarnMsgInfo[0].Location = Location;
-    Status = DrawMenu (&mFastbootAlternateWarnMsgInfo[0], &Height);
-  } else {
+  // if (mFastbootOptionTitle[OptionItem].Action == ALTERNATESLOT) {
+  //   mFastbootAlternateWarnMsgInfo[0].Location = Location;
+  //   Status = DrawMenu (&mFastbootAlternateWarnMsgInfo[0], &Height);
+  // } else {
     mFastbootCommonWarnMsgInfo[0].Location = Location;
     Status = DrawMenu (&mFastbootCommonWarnMsgInfo[0], &Height);
-  }
+  // }
   if (Status != EFI_SUCCESS) {
     goto Exit;
   }
@@ -354,10 +361,10 @@ FastbootMenuShowScreen (OPTION_MENU_INFO *OptionMenuInfo)
   ZeroMem (&OptionMenuInfo->Info, sizeof (MENU_OPTION_ITEM_INFO));
 
   /* Only add alternate boot option when device is unbootable */
-  if (FixedPcdGetBool (EnableForceBootAlternateSlot) &&
-     !IsSlotsUbootable ()) {
-      OptionTotal = OptionTotal - 1;
-  }
+  // if (FixedPcdGetBool (EnableForceBootAlternateSlot) &&
+  //    !IsSlotsUbootable ()) {
+  //     OptionTotal = OptionTotal - 1;
+  // }
 
   /* Update fastboot option title */
   OptionMenuInfo->Info.MsgInfo = mFastbootOptionTitle;

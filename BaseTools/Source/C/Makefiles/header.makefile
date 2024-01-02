@@ -69,11 +69,11 @@ BUILD_OPTFLAGS = -O2 $(EXTRA_OPTFLAGS)
 
 ifeq ($(DARWIN),Darwin)
 # assume clang or clang compatible flags on OS X
-BUILD_CFLAGS = -MD -fshort-wchar -fno-strict-aliasing -Wall -Werror \
+BUILD_CFLAGS = -MD -fshort-wchar -fno-strict-aliasing \
 -Wno-deprecated-declarations -Wno-self-assign -Wno-unused-result -nostdlib -g
 else
 BUILD_CFLAGS = -MD -fshort-wchar -fno-strict-aliasing -fwrapv \
--fno-delete-null-pointer-checks -Wall -Werror \
+-fno-delete-null-pointer-checks \
 -Wno-deprecated-declarations \
 -Wno-unused-result -nostdlib -g
 ifeq ($(BUILD_NATIVE_AARCH64), true)

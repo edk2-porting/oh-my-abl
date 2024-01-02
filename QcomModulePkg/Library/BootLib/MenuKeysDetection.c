@@ -202,6 +202,9 @@ UpdateDeviceStatus (OPTION_MENU_INFO *MsgInfo, INTN Reason)
     DEBUG ((EFI_D_WARN,
           "Reset unbootable slots failed enter fastboot mode\n"));
     break;
+  case REBOOTEDL:
+    RebootDevice (EMERGENCY_DLOAD);
+    break;
   }
 }
 
